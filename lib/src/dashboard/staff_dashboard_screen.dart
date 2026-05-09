@@ -1,41 +1,56 @@
 import 'package:flutter/material.dart';
+
+import '../orders/order.dart';
+import '../orders/order_details_screen.dart';
 import '../shared/widgets/app_theme.dart';
 
 class StaffDashboardScreen extends StatelessWidget {
   const StaffDashboardScreen({super.key});
 
-  static const List<_DashboardOrder> _orders = [
-    _DashboardOrder(
+  static const List<LaundryOrder> _orders = [
+    LaundryOrder(
       orderId: 'AMW-1024',
       customerName: 'Sarah N.',
       serviceType: 'Wash & Iron',
       status: 'Pending pickup',
       timeLabel: 'Pickup: 10:30 AM',
       itemCount: 8,
+      phone: '+256 700 123 456',
+      address: 'Kikoni, near Makerere western gate',
+      notes: 'Customer requested careful handling for white shirts.',
     ),
-    _DashboardOrder(
+    LaundryOrder(
       orderId: 'AMW-1025',
       customerName: 'Brian K.',
       serviceType: 'Dry cleaning',
       status: 'In progress',
       timeLabel: 'Due: 2:00 PM',
       itemCount: 3,
+      phone: '+256 701 456 789',
+      address: 'Wandegeya, opposite main stage',
+      notes: 'Suit jacket and trousers. Keep separate from regular wash.',
     ),
-    _DashboardOrder(
+    LaundryOrder(
       orderId: 'AMW-1026',
       customerName: 'Grace A.',
       serviceType: 'Iron only',
       status: 'Ready for delivery',
       timeLabel: 'Delivery: 4:30 PM',
       itemCount: 6,
+      phone: '+256 702 222 111',
+      address: 'Nakulabye, close to Shell',
+      notes: 'Call before delivery.',
     ),
-    _DashboardOrder(
+    LaundryOrder(
       orderId: 'AMW-1027',
       customerName: 'Daniel M.',
       serviceType: 'Wash only',
       status: 'Completed',
       timeLabel: 'Done: 9:15 AM',
       itemCount: 5,
+      phone: '+256 703 333 222',
+      address: 'Bwaise, main road',
+      notes: 'Paid in cash at pickup.',
     ),
   ];
 
@@ -108,7 +123,6 @@ class StaffDashboardScreen extends StatelessWidget {
     );
   }
 }
-
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader();
 
@@ -121,7 +135,7 @@ class _DashboardHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: amuwakPrimary.withValues(alpha: 0.18),
+            color: amuwakPrimary.withOpacity(0.18),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -169,7 +183,6 @@ class _DashboardHeader extends StatelessWidget {
     );
   }
 }
-
 class _SummaryGrid extends StatelessWidget {
   const _SummaryGrid({
     required this.totalOrders,
@@ -299,7 +312,6 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -398,7 +410,7 @@ class _ActionButton extends StatelessWidget {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({required this.order});
 
-  final _DashboardOrder order;
+  final LaundryOrder order;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +420,13 @@ class _OrderCard extends StatelessWidget {
       color: amuwakWhite,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => OrderDetailsScreen(order: order),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -484,7 +502,7 @@ class _OrderCard extends StatelessWidget {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
+                  color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -555,22 +573,4 @@ class _InfoChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DashboardOrder {
-  const _DashboardOrder({
-    required this.orderId,
-    required this.customerName,
-    required this.serviceType,
-    required this.status,
-    required this.timeLabel,
-    required this.itemCount,
-  });
-
-  final String orderId;
-  final String customerName;
-  final String serviceType;
-  final String status;
-  final String timeLabel;
-  final int itemCount;
 }
