@@ -20,4 +20,28 @@ class LaundryOrder {
   final String phone;
   final String address;
   final String notes;
+
+  LaundryOrder copyWith({
+    String? orderId,
+    String? customerName,
+    String? serviceType,
+    String? status,
+    String? timeLabel,
+    int? itemCount,
+    String? phone,
+    String? address,
+    String? notes,
+  }) {
+    return LaundryOrder(
+      orderId: orderId ?? this.orderId,
+      customerName: customerName ?? this.customerName,
+      serviceType: serviceType ?? this.serviceType,
+      status: status ?? this.status,
+      timeLabel: timeLabel ?? this.timeLabel,
+      itemCount: itemCount ?? this.itemCount,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      notes: notes ?? this.notes,
+    );
+  }
 }

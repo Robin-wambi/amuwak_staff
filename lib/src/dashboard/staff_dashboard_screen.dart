@@ -4,11 +4,16 @@ import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
 import '../shared/widgets/app_theme.dart';
 
-class StaffDashboardScreen extends StatelessWidget {
+class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({super.key});
 
-  static const List<LaundryOrder> _orders = [
-    LaundryOrder(
+  @override
+  State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
+}
+
+class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
+  final List<LaundryOrder> _orders = [
+    const LaundryOrder(
       orderId: 'AMW-1024',
       customerName: 'Sarah N.',
       serviceType: 'Wash & Iron',
@@ -19,7 +24,7 @@ class StaffDashboardScreen extends StatelessWidget {
       address: 'Kikoni, near Makerere western gate',
       notes: 'Customer requested careful handling for white shirts.',
     ),
-    LaundryOrder(
+    const LaundryOrder(
       orderId: 'AMW-1025',
       customerName: 'Brian K.',
       serviceType: 'Dry cleaning',
@@ -30,7 +35,7 @@ class StaffDashboardScreen extends StatelessWidget {
       address: 'Wandegeya, opposite main stage',
       notes: 'Suit jacket and trousers. Keep separate from regular wash.',
     ),
-    LaundryOrder(
+    const LaundryOrder(
       orderId: 'AMW-1026',
       customerName: 'Grace A.',
       serviceType: 'Iron only',
@@ -41,7 +46,7 @@ class StaffDashboardScreen extends StatelessWidget {
       address: 'Nakulabye, close to Shell',
       notes: 'Call before delivery.',
     ),
-    LaundryOrder(
+    const LaundryOrder(
       orderId: 'AMW-1027',
       customerName: 'Daniel M.',
       serviceType: 'Wash only',
@@ -54,21 +59,31 @@ class StaffDashboardScreen extends StatelessWidget {
     ),
   ];
 
+  void _replaceUpdatedOrder(LaundryOrder updatedOrder) {
+    final orderIndex = _orders.indexWhere(
+      (order) => order.orderId == updatedOrder.orderId,
+    );
+
+    if (orderIndex == -1) {
+      return;
+    }
+
+    setState(() {
+      _orders[orderIndex] = updatedOrder;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
-    final pendingPickup = _orders
-        .where((order) => order.status == 'Pending pickup')
-        .length;
-    final inProgress = _orders
-        .where((order) => order.status == 'In progress')
-        .length;
-    final readyForDelivery = _orders
-        .where((order) => order.status == 'Ready for delivery')
-        .length;
-    final completed = _orders
-        .where((order) => order.status == 'Completed')
-        .length;
+    final pendingPickup =
+        _orders.where((order) => order.status == 'Pending pickup').length;
+    final inProgress =
+        _orders.where((order) => order.status == 'In progress').length;
+    final readyForDelivery =
+        _orders.where((order) => order.status == 'Ready for delivery').length;
+    final completed =
+        _orders.where((order) => order.status == 'Completed').length;
 
     return Scaffold(
       backgroundColor: amuwakBackground,
@@ -114,7 +129,10 @@ class StaffDashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             for (final order in _orders) ...[
-              _OrderCard(order: order),
+              _OrderCard(
+                order: order,
+                onUpdated: _replaceUpdatedOrder,
+              ),
               const SizedBox(height: 12),
             ],
           ],
@@ -123,6 +141,7 @@ class StaffDashboardScreen extends StatelessWidget {
     );
   }
 }
+
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader();
 
@@ -135,7 +154,7 @@ class _DashboardHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: amuwakPrimary.withOpacity(0.18),
+            color: amuwakPrimary.withValues(alpha: 0.18),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -159,7 +178,10 @@ class _DashboardHeader extends StatelessWidget {
               children: [
                 Text(
                   'Welcome back',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
                 SizedBox(height: 3),
                 Text(
@@ -173,7 +195,10 @@ class _DashboardHeader extends StatelessWidget {
                 SizedBox(height: 3),
                 Text(
                   "Today's laundry operations",
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -183,6 +208,7 @@ class _DashboardHeader extends StatelessWidget {
     );
   }
 }
+
 class _SummaryGrid extends StatelessWidget {
   const _SummaryGrid({
     required this.totalOrders,
@@ -302,7 +328,10 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -312,6 +341,7 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -408,9 +438,13 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order});
+  const _OrderCard({
+    required this.order,
+    required this.onUpdated,
+  });
 
   final LaundryOrder order;
+  final ValueChanged<LaundryOrder> onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -420,12 +454,16 @@ class _OrderCard extends StatelessWidget {
       color: amuwakWhite,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
             MaterialPageRoute(
               builder: (_) => OrderDetailsScreen(order: order),
             ),
           );
+
+          if (updatedOrder != null) {
+            onUpdated(updatedOrder);
+          }
         },
         borderRadius: BorderRadius.circular(24),
         child: Container(
@@ -497,12 +535,10 @@ class _OrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -538,7 +574,10 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+  });
 
   final IconData icon;
   final String label;
