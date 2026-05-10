@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
+import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
@@ -76,14 +77,18 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
-    final pendingPickup =
-        _orders.where((order) => order.status == 'Pending pickup').length;
-    final inProgress =
-        _orders.where((order) => order.status == 'In progress').length;
-    final readyForDelivery =
-        _orders.where((order) => order.status == 'Ready for delivery').length;
-    final completed =
-        _orders.where((order) => order.status == 'Completed').length;
+    final pendingPickup = _orders
+        .where((order) => order.status == 'Pending pickup')
+        .length;
+    final inProgress = _orders
+        .where((order) => order.status == 'In progress')
+        .length;
+    final readyForDelivery = _orders
+        .where((order) => order.status == 'Ready for delivery')
+        .length;
+    final completed = _orders
+        .where((order) => order.status == 'Completed')
+        .length;
 
     return Scaffold(
       backgroundColor: amuwakBackground,
@@ -117,7 +122,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
               completed: completed,
             ),
             const SizedBox(height: 24),
-            const _QuickActions(),
+            _QuickActions(orders: _orders),
             const SizedBox(height: 24),
             const Text(
               'Assigned orders',
@@ -129,10 +134,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             ),
             const SizedBox(height: 12),
             for (final order in _orders) ...[
-              _OrderCard(
-                order: order,
-                onUpdated: _replaceUpdatedOrder,
-              ),
+              _OrderCard(order: order, onUpdated: _replaceUpdatedOrder),
               const SizedBox(height: 12),
             ],
           ],
@@ -178,10 +180,7 @@ class _DashboardHeader extends StatelessWidget {
               children: [
                 Text(
                   'Welcome back',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
                 SizedBox(height: 3),
                 Text(
@@ -195,10 +194,7 @@ class _DashboardHeader extends StatelessWidget {
                 SizedBox(height: 3),
                 Text(
                   "Today's laundry operations",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
@@ -328,10 +324,7 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.black54, fontSize: 13),
                 ),
               ],
             ),
@@ -343,7 +336,9 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  const _QuickActions({required this.orders});
+
+  final List<LaundryOrder> orders;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +376,15 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Report',
                 icon: Icons.bar_chart_rounded,
-                onTap: () {},
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DailyReportScreen(
+                        orders: List<LaundryOrder>.from(orders),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -438,10 +441,7 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({
-    required this.order,
-    required this.onUpdated,
-  });
+  const _OrderCard({required this.order, required this.onUpdated});
 
   final LaundryOrder order;
   final ValueChanged<LaundryOrder> onUpdated;
@@ -456,9 +456,7 @@ class _OrderCard extends StatelessWidget {
       child: InkWell(
         onTap: () async {
           final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
-            MaterialPageRoute(
-              builder: (_) => OrderDetailsScreen(order: order),
-            ),
+            MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
           );
 
           if (updatedOrder != null) {
@@ -535,8 +533,10 @@ class _OrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -574,10 +574,7 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-  });
+  const _InfoChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
