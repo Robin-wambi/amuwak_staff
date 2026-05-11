@@ -77,6 +77,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     });
   }
 
+  Future<void> _openOrderDetails(LaundryOrder order) async {
+    final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
+      MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+    );
+
+    if (!mounted) return;
+    if (updatedOrder != null) {
+      _replaceUpdatedOrder(updatedOrder);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
@@ -129,7 +140,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             ),
             const SizedBox(height: 12),
             for (final order in _orders) ...[
-              _OrderCard(order: order, onUpdated: _replaceUpdatedOrder),
+              _OrderCard(order: order, onTap: () => _openOrderDetails(order)),
               const SizedBox(height: 12),
             ],
           ],
@@ -436,10 +447,10 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onUpdated});
+  const _OrderCard({required this.order, required this.onTap});
 
   final LaundryOrder order;
-  final ValueChanged<LaundryOrder> onUpdated;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -449,15 +460,7 @@ class _OrderCard extends StatelessWidget {
       color: amuwakWhite,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        onTap: () async {
-          final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
-            MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
-          );
-
-          if (updatedOrder != null) {
-            onUpdated(updatedOrder);
-          }
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(16),
