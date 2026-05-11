@@ -244,7 +244,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
     );
   }
-
 }
 
 class _DetailsSection extends StatelessWidget {

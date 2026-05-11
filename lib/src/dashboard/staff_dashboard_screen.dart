@@ -554,7 +554,6 @@ class _OrderCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _InfoChip extends StatelessWidget {
