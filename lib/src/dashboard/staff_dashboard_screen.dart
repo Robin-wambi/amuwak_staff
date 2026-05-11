@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
+import '../orders/order_status.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 
@@ -18,7 +19,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1024',
       customerName: 'Sarah N.',
       serviceType: 'Wash & Iron',
-      status: 'Pending pickup',
+      status: OrderStatus.pendingPickup,
       timeLabel: 'Pickup: 10:30 AM',
       itemCount: 8,
       phone: '+256 700 123 456',
@@ -29,7 +30,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1025',
       customerName: 'Brian K.',
       serviceType: 'Dry cleaning',
-      status: 'In progress',
+      status: OrderStatus.inProgress,
       timeLabel: 'Due: 2:00 PM',
       itemCount: 3,
       phone: '+256 701 456 789',
@@ -40,7 +41,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1026',
       customerName: 'Grace A.',
       serviceType: 'Iron only',
-      status: 'Ready for delivery',
+      status: OrderStatus.readyForDelivery,
       timeLabel: 'Delivery: 4:30 PM',
       itemCount: 6,
       phone: '+256 702 222 111',
@@ -51,7 +52,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1027',
       customerName: 'Daniel M.',
       serviceType: 'Wash only',
-      status: 'Completed',
+      status: OrderStatus.completed,
       timeLabel: 'Done: 9:15 AM',
       itemCount: 5,
       phone: '+256 703 333 222',
@@ -78,16 +79,16 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
     final pendingPickup = _orders
-        .where((order) => order.status == 'Pending pickup')
+        .where((order) => order.status == OrderStatus.pendingPickup)
         .length;
     final inProgress = _orders
-        .where((order) => order.status == 'In progress')
+        .where((order) => order.status == OrderStatus.inProgress)
         .length;
     final readyForDelivery = _orders
-        .where((order) => order.status == 'Ready for delivery')
+        .where((order) => order.status == OrderStatus.readyForDelivery)
         .length;
     final completed = _orders
-        .where((order) => order.status == 'Completed')
+        .where((order) => order.status == OrderStatus.completed)
         .length;
 
     return Scaffold(
@@ -448,7 +449,7 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.status);
+    final statusColor = order.status.color;
 
     return Material(
       color: amuwakWhite,
@@ -542,7 +543,7 @@ class _OrderCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  order.status,
+                  order.status.label,
                   style: TextStyle(
                     color: statusColor,
                     fontWeight: FontWeight.w700,
@@ -557,20 +558,6 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Pending pickup':
-        return const Color(0xFF9A5B00);
-      case 'In progress':
-        return const Color(0xFF7A4CC2);
-      case 'Ready for delivery':
-        return const Color(0xFF0B7285);
-      case 'Completed':
-        return const Color(0xFF2F7D32);
-      default:
-        return amuwakPrimary;
-    }
-  }
 }
 
 class _InfoChip extends StatelessWidget {

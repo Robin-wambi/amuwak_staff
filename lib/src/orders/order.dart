@@ -1,3 +1,5 @@
+import 'order_status.dart';
+
 class LaundryOrder {
   const LaundryOrder({
     required this.orderId,
@@ -14,7 +16,7 @@ class LaundryOrder {
   final String orderId;
   final String customerName;
   final String serviceType;
-  final String status;
+  final OrderStatus status;
   final String timeLabel;
   final int itemCount;
   final String phone;
@@ -25,7 +27,7 @@ class LaundryOrder {
     String? orderId,
     String? customerName,
     String? serviceType,
-    String? status,
+    OrderStatus? status,
     String? timeLabel,
     int? itemCount,
     String? phone,

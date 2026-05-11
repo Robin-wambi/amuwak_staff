@@ -21,23 +21,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     _order = widget.order;
   }
 
-  String? _nextStatus(String status) {
-    switch (status) {
-      case 'Pending pickup':
-        return 'In progress';
-      case 'In progress':
-        return 'Ready for delivery';
-      case 'Ready for delivery':
-        return 'Completed';
-      case 'Completed':
-        return null;
-      default:
-        return null;
-    }
-  }
-
   void _updateStatus() {
-    final nextStatus = _nextStatus(_order.status);
+    final nextStatus = _order.status.nextStatus;
 
     if (nextStatus == null) {
       return;
@@ -49,7 +34,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Order moved to $nextStatus.')));
+    ).showSnackBar(SnackBar(content: Text('Order moved to ${nextStatus.label}.')));
   }
 
   void _handleBackNavigation() {
@@ -58,8 +43,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(_order.status);
-    final nextStatus = _nextStatus(_order.status);
+    final statusColor = _order.status.color;
+    final nextStatus = _order.status.nextStatus;
     final isCompleted = nextStatus == null;
 
     return PopScope<LaundryOrder>(
@@ -163,7 +148,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     Icon(Icons.circle, size: 10, color: statusColor),
                     const SizedBox(width: 8),
                     Text(
-                      _order.status,
+                      _order.status.label,
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
@@ -242,7 +227,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       : Icons.update_rounded,
                 ),
                 label: Text(
-                  isCompleted ? 'Order completed' : 'Move to $nextStatus',
+                  isCompleted ? 'Order completed' : 'Move to ${nextStatus.label}',
                 ),
               ),
               const SizedBox(height: 8),
@@ -260,20 +245,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Pending pickup':
-        return const Color(0xFF9A5B00);
-      case 'In progress':
-        return const Color(0xFF7A4CC2);
-      case 'Ready for delivery':
-        return const Color(0xFF0B7285);
-      case 'Completed':
-        return const Color(0xFF2F7D32);
-      default:
-        return amuwakPrimary;
-    }
-  }
 }
 
 class _DetailsSection extends StatelessWidget {

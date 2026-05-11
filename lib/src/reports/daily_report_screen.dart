@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
+import '../orders/order_status.dart';
 import '../shared/widgets/app_theme.dart';
 
 class DailyReportScreen extends StatelessWidget {
@@ -12,16 +13,16 @@ class DailyReportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalOrders = orders.length;
     final pendingPickup = orders
-        .where((order) => order.status == 'Pending pickup')
+        .where((order) => order.status == OrderStatus.pendingPickup)
         .length;
     final inProgress = orders
-        .where((order) => order.status == 'In progress')
+        .where((order) => order.status == OrderStatus.inProgress)
         .length;
     final readyForDelivery = orders
-        .where((order) => order.status == 'Ready for delivery')
+        .where((order) => order.status == OrderStatus.readyForDelivery)
         .length;
     final completed = orders
-        .where((order) => order.status == 'Completed')
+        .where((order) => order.status == OrderStatus.completed)
         .length;
     final totalItems = orders.fold<int>(
       0,
@@ -248,31 +249,31 @@ class _StatusBreakdownCard extends StatelessWidget {
       child: Column(
         children: [
           _StatusRow(
-            label: 'Pending pickup',
+            label: OrderStatus.pendingPickup.label,
             value: pendingPickup,
             total: totalOrders,
-            color: const Color(0xFF9A5B00),
+            color: OrderStatus.pendingPickup.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'In progress',
+            label: OrderStatus.inProgress.label,
             value: inProgress,
             total: totalOrders,
-            color: const Color(0xFF7A4CC2),
+            color: OrderStatus.inProgress.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'Ready for delivery',
+            label: OrderStatus.readyForDelivery.label,
             value: readyForDelivery,
             total: totalOrders,
-            color: const Color(0xFF0B7285),
+            color: OrderStatus.readyForDelivery.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'Completed',
+            label: OrderStatus.completed.label,
             value: completed,
             total: totalOrders,
-            color: const Color(0xFF2F7D32),
+            color: OrderStatus.completed.color,
           ),
         ],
       ),
