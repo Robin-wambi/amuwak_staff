@@ -7,9 +7,10 @@ void main() {
   testWidgets('App opens to login screen first', (WidgetTester tester) async {
     await tester.pumpWidget(const AmuwakStaffApp());
 
-    expect(find.text('Amuwak Staff'), findsOneWidget);
+    // The login subtitle is unique to the login screen, so use it as the anchor.
     expect(find.text('Login to manage laundry orders'), findsOneWidget);
-    expect(find.text('Login'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(2));
   });
 
   testWidgets('Empty login fields show validation messages', (
