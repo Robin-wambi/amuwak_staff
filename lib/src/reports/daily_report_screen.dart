@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
+import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
 import '../shared/widgets/app_theme.dart';
 
@@ -12,22 +13,11 @@ class DailyReportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalOrders = orders.length;
-    final pendingPickup = orders
-        .where((order) => order.status == OrderStatus.pendingPickup)
-        .length;
-    final inProgress = orders
-        .where((order) => order.status == OrderStatus.inProgress)
-        .length;
-    final readyForDelivery = orders
-        .where((order) => order.status == OrderStatus.readyForDelivery)
-        .length;
-    final completed = orders
-        .where((order) => order.status == OrderStatus.completed)
-        .length;
-    final totalItems = orders.fold<int>(
-      0,
-      (sum, order) => sum + order.itemCount,
-    );
+    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = orders.countByStatus(OrderStatus.completed);
+    final totalItems = orders.totalItems;
     final pendingWork = totalOrders - completed;
 
     return Scaffold(
@@ -111,7 +101,7 @@ class DailyReportScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: _ReportMetricCard(
-                    title: 'Completed',
+                    title: OrderStatus.completed.label,
                     value: '$completed',
                     icon: Icons.check_circle_outline_rounded,
                   ),

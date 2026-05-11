@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
+import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
@@ -78,18 +79,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
-    final pendingPickup = _orders
-        .where((order) => order.status == OrderStatus.pendingPickup)
-        .length;
-    final inProgress = _orders
-        .where((order) => order.status == OrderStatus.inProgress)
-        .length;
-    final readyForDelivery = _orders
-        .where((order) => order.status == OrderStatus.readyForDelivery)
-        .length;
-    final completed = _orders
-        .where((order) => order.status == OrderStatus.completed)
-        .length;
+    final pendingPickup = _orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = _orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = _orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = _orders.countByStatus(OrderStatus.completed);
 
     return Scaffold(
       backgroundColor: amuwakBackground,
@@ -249,7 +242,7 @@ class _SummaryGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _SummaryCard(
-                title: 'In progress',
+                title: OrderStatus.inProgress.label,
                 value: '$inProgress',
                 icon: Icons.timelapse_rounded,
               ),
