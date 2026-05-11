@@ -46,4 +46,32 @@ class LaundryOrder {
       notes: notes ?? this.notes,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LaundryOrder &&
+        other.orderId == orderId &&
+        other.customerName == customerName &&
+        other.serviceType == serviceType &&
+        other.status == status &&
+        other.timeLabel == timeLabel &&
+        other.itemCount == itemCount &&
+        other.phone == phone &&
+        other.address == address &&
+        other.notes == notes;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        orderId,
+        customerName,
+        serviceType,
+        status,
+        timeLabel,
+        itemCount,
+        phone,
+        address,
+        notes,
+      );
 }
