@@ -6,6 +6,7 @@ import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
+import '../shared/widgets/coming_soon_snackbar.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({super.key});
@@ -97,7 +98,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         actions: [
           IconButton(
             tooltip: 'Notifications',
-            onPressed: () {},
+            onPressed: () => showComingSoon(context, 'Notifications'),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
         ],
@@ -354,7 +355,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'New pickup',
                 icon: Icons.add_location_alt_outlined,
-                onTap: () {},
+                onTap: () => showComingSoon(context, 'New pickup'),
               ),
             ),
             const SizedBox(width: 10),
@@ -362,7 +363,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Check order',
                 icon: Icons.search_rounded,
-                onTap: () {},
+                onTap: () => showComingSoon(context, 'Order search'),
               ),
             ),
             const SizedBox(width: 10),
