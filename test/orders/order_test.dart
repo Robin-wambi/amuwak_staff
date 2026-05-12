@@ -37,5 +37,6 @@ void main() {
     final updated = a.copyWith(status: OrderStatus.inProgress);
 
     expect(updated, isNot(equals(a)));
+    expect(updated.hashCode, isNot(equals(a.hashCode)));
   });
 }

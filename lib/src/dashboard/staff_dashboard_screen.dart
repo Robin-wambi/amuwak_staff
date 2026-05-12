@@ -242,7 +242,7 @@ class _SummaryGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _SummaryCard(
-                title: 'Pickup',
+                title: OrderStatus.pendingPickup.label,
                 value: '$pendingPickup',
                 icon: Icons.local_shipping_outlined,
               ),
@@ -262,7 +262,7 @@ class _SummaryGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _SummaryCard(
-                title: 'Ready',
+                title: OrderStatus.readyForDelivery.label,
                 value: '$readyForDelivery',
                 icon: Icons.checkroom_outlined,
               ),
@@ -374,7 +374,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Check order',
                 icon: Icons.search_rounded,
-                onTap: () => showComingSoon(context, 'Order search'),
+                onTap: () => showComingSoon(context, 'Check order'),
               ),
             ),
             const SizedBox(width: 10),
@@ -385,6 +385,8 @@ class _QuickActions extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
+                      // Pass a snapshot so the report reflects counts at the
+                      // moment it was opened, not later dashboard mutations.
                       builder: (_) => DailyReportScreen(
                         orders: List<LaundryOrder>.from(orders),
                       ),
