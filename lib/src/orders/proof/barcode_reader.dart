@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 typedef OnBarcodeDetected = void Function(String value);
 
@@ -26,4 +27,23 @@ class FakeCameraView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Production factory: returns a `CameraViewBuilder` that uses `mobile_scanner`
+/// to scan QR codes via the device camera. The first detected barcode's raw
+/// value is forwarded to `onDetected`.
+CameraViewBuilder mobileScannerCameraViewBuilder() {
+  return (context, onDetected) {
+    return MobileScanner(
+      onDetect: (capture) {
+        for (final barcode in capture.barcodes) {
+          final value = barcode.rawValue;
+          if (value != null) {
+            onDetected(value);
+            return;
+          }
+        }
+      },
+    );
+  };
 }
