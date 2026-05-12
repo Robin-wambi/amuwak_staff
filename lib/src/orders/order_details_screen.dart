@@ -32,9 +32,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       _order = _order.copyWith(status: nextStatus);
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Order moved to ${nextStatus.label}.')));
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('Order moved to ${nextStatus.label}.')),
+      );
   }
 
   void _handleBackNavigation() {
