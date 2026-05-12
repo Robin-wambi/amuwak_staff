@@ -1,0 +1,115 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
+import 'package:amuwak_staff/src/orders/proof/scanner_screen.dart';
+
+Future<bool?> _pumpAndPushScanner(
+  WidgetTester tester, {
+  required String expectedOrderId,
+  required String scannedValue,
+}) async {
+  bool? result;
+
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) {
+          return Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ScannerScreen(
+                        expectedOrderId: expectedOrderId,
+                        cameraViewBuilder: (ctx, onDetected) {
+                          return FakeCameraView(
+                            scannedValue: scannedValue,
+                            onDetected: onDetected,
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open scanner'),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+
+  await tester.tap(find.text('Open scanner'));
+  await tester.pumpAndSettle();
+  return Future.value(result);
+}
+
+void main() {
+  testWidgets('matching scanned value pops the screen with true',
+      (tester) async {
+    await _pumpAndPushScanner(
+      tester,
+      expectedOrderId: 'AMW-1',
+      scannedValue: 'AMW-1',
+    );
+
+    await tester.tap(find.text('Simulate scan'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScannerScreen), findsNothing);
+  });
+
+  testWidgets('wrong scanned value shows an error and stays on screen',
+      (tester) async {
+    await _pumpAndPushScanner(
+      tester,
+      expectedOrderId: 'AMW-1',
+      scannedValue: 'AMW-9',
+    );
+
+    await tester.tap(find.text('Simulate scan'));
+    await tester.pump();
+
+    expect(find.byType(ScannerScreen), findsOneWidget);
+    expect(find.textContaining('AMW-9'), findsOneWidget);
+    expect(find.textContaining('AMW-1'), findsOneWidget);
+  });
+
+  testWidgets('manual entry path: matching id pops with true', (tester) async {
+    await _pumpAndPushScanner(
+      tester,
+      expectedOrderId: 'AMW-1',
+      scannedValue: 'unused',
+    );
+
+    await tester.tap(find.text('Enter order ID instead'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField), 'AMW-1');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScannerScreen), findsNothing);
+  });
+
+  testWidgets('manual entry path: wrong id shows error', (tester) async {
+    await _pumpAndPushScanner(
+      tester,
+      expectedOrderId: 'AMW-1',
+      scannedValue: 'unused',
+    );
+
+    await tester.tap(find.text('Enter order ID instead'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField), 'AMW-9');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+    await tester.pump();
+
+    expect(find.byType(ScannerScreen), findsOneWidget);
+    expect(find.textContaining('AMW-9'), findsOneWidget);
+  });
+}
