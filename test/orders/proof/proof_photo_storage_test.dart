@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
@@ -34,6 +37,87 @@ void main() {
       expect(storage.savedPhotos, hasLength(1));
       expect(storage.savedPhotos.single.path, equals(path));
       expect(storage.savedPhotos.single.bytes, equals(const [9, 8, 7]));
+    });
+  });
+
+  group('FileProofPhotoStorage', () {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('proof_photo_test_');
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    Future<Uint8List> identityCompressor(Uint8List bytes) async => bytes;
+
+    test('save writes a jpg under <baseDir>/proofs/<orderId>/', () async {
+      final fixedClock = DateTime(2026, 5, 12, 9, 42, 0).millisecondsSinceEpoch;
+      final storage = FileProofPhotoStorage(
+        baseDir: tempDir,
+        compressor: identityCompressor,
+        clock: () => DateTime.fromMillisecondsSinceEpoch(fixedClock),
+      );
+
+      final path = await storage.save(
+        orderId: 'AMW-1',
+        type: ProofEventType.pickup,
+        index: 0,
+        bytes: const [1, 2, 3, 4],
+      );
+
+      final file = File(path);
+      expect(await file.exists(), isTrue);
+      expect(path, contains('proofs${Platform.pathSeparator}AMW-1'));
+      expect(path, endsWith('pickup_${fixedClock}_0.jpg'));
+      expect(await file.readAsBytes(), equals(const [1, 2, 3, 4]));
+    });
+
+    test('save creates the order directory if missing', () async {
+      final storage = FileProofPhotoStorage(
+        baseDir: tempDir,
+        compressor: identityCompressor,
+      );
+
+      final orderDir =
+          Directory('${tempDir.path}/proofs/NEW-ORDER');
+      expect(await orderDir.exists(), isFalse);
+
+      await storage.save(
+        orderId: 'NEW-ORDER',
+        type: ProofEventType.delivery,
+        index: 1,
+        bytes: const [9, 9, 9],
+      );
+
+      expect(await orderDir.exists(), isTrue);
+    });
+
+    test('save runs bytes through the compressor before writing', () async {
+      var compressorCalled = false;
+      Future<Uint8List> spyCompressor(Uint8List bytes) async {
+        compressorCalled = true;
+        return Uint8List.fromList(bytes.reversed.toList());
+      }
+
+      final storage = FileProofPhotoStorage(
+        baseDir: tempDir,
+        compressor: spyCompressor,
+      );
+
+      final path = await storage.save(
+        orderId: 'AMW-2',
+        type: ProofEventType.pickup,
+        index: 0,
+        bytes: const [1, 2, 3],
+      );
+
+      expect(compressorCalled, isTrue);
+      expect(await File(path).readAsBytes(), equals(const [3, 2, 1]));
     });
   });
 }
