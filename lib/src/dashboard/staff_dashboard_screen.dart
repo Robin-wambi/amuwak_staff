@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
+import '../orders/order_list_extensions.dart';
+import '../orders/order_status.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
+import '../shared/widgets/coming_soon_snackbar.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({super.key});
@@ -18,7 +21,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1024',
       customerName: 'Sarah N.',
       serviceType: 'Wash & Iron',
-      status: 'Pending pickup',
+      status: OrderStatus.pendingPickup,
       timeLabel: 'Pickup: 10:30 AM',
       itemCount: 8,
       phone: '+256 700 123 456',
@@ -29,7 +32,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1025',
       customerName: 'Brian K.',
       serviceType: 'Dry cleaning',
-      status: 'In progress',
+      status: OrderStatus.inProgress,
       timeLabel: 'Due: 2:00 PM',
       itemCount: 3,
       phone: '+256 701 456 789',
@@ -40,7 +43,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1026',
       customerName: 'Grace A.',
       serviceType: 'Iron only',
-      status: 'Ready for delivery',
+      status: OrderStatus.readyForDelivery,
       timeLabel: 'Delivery: 4:30 PM',
       itemCount: 6,
       phone: '+256 702 222 111',
@@ -51,7 +54,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       orderId: 'AMW-1027',
       customerName: 'Daniel M.',
       serviceType: 'Wash only',
-      status: 'Completed',
+      status: OrderStatus.completed,
       timeLabel: 'Done: 9:15 AM',
       itemCount: 5,
       phone: '+256 703 333 222',
@@ -74,21 +77,24 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     });
   }
 
+  Future<void> _openOrderDetails(LaundryOrder order) async {
+    final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
+      MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+    );
+
+    if (!mounted) return;
+    if (updatedOrder != null) {
+      _replaceUpdatedOrder(updatedOrder);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
-    final pendingPickup = _orders
-        .where((order) => order.status == 'Pending pickup')
-        .length;
-    final inProgress = _orders
-        .where((order) => order.status == 'In progress')
-        .length;
-    final readyForDelivery = _orders
-        .where((order) => order.status == 'Ready for delivery')
-        .length;
-    final completed = _orders
-        .where((order) => order.status == 'Completed')
-        .length;
+    final pendingPickup = _orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = _orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = _orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = _orders.countByStatus(OrderStatus.completed);
 
     return Scaffold(
       backgroundColor: amuwakBackground,
@@ -103,7 +109,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         actions: [
           IconButton(
             tooltip: 'Notifications',
-            onPressed: () {},
+            onPressed: () => showComingSoon(context, 'Notifications'),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
         ],
@@ -134,7 +140,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             ),
             const SizedBox(height: 12),
             for (final order in _orders) ...[
-              _OrderCard(order: order, onUpdated: _replaceUpdatedOrder),
+              _OrderCard(order: order, onTap: () => _openOrderDetails(order)),
               const SizedBox(height: 12),
             ],
           ],
@@ -236,7 +242,7 @@ class _SummaryGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _SummaryCard(
-                title: 'Pickup',
+                title: OrderStatus.pendingPickup.label,
                 value: '$pendingPickup',
                 icon: Icons.local_shipping_outlined,
               ),
@@ -248,7 +254,7 @@ class _SummaryGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _SummaryCard(
-                title: 'In progress',
+                title: OrderStatus.inProgress.label,
                 value: '$inProgress',
                 icon: Icons.timelapse_rounded,
               ),
@@ -256,7 +262,7 @@ class _SummaryGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _SummaryCard(
-                title: 'Ready',
+                title: OrderStatus.readyForDelivery.label,
                 value: '$readyForDelivery',
                 icon: Icons.checkroom_outlined,
               ),
@@ -360,7 +366,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'New pickup',
                 icon: Icons.add_location_alt_outlined,
-                onTap: () {},
+                onTap: () => showComingSoon(context, 'New pickup'),
               ),
             ),
             const SizedBox(width: 10),
@@ -368,7 +374,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Check order',
                 icon: Icons.search_rounded,
-                onTap: () {},
+                onTap: () => showComingSoon(context, 'Check order'),
               ),
             ),
             const SizedBox(width: 10),
@@ -379,6 +385,8 @@ class _QuickActions extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
+                      // Pass a snapshot so the report reflects counts at the
+                      // moment it was opened, not later dashboard mutations.
                       builder: (_) => DailyReportScreen(
                         orders: List<LaundryOrder>.from(orders),
                       ),
@@ -441,28 +449,20 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onUpdated});
+  const _OrderCard({required this.order, required this.onTap});
 
   final LaundryOrder order;
-  final ValueChanged<LaundryOrder> onUpdated;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.status);
+    final statusColor = order.status.color;
 
     return Material(
       color: amuwakWhite,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
-        onTap: () async {
-          final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
-            MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
-          );
-
-          if (updatedOrder != null) {
-            onUpdated(updatedOrder);
-          }
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -542,7 +542,7 @@ class _OrderCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  order.status,
+                  order.status.label,
                   style: TextStyle(
                     color: statusColor,
                     fontWeight: FontWeight.w700,
@@ -555,21 +555,6 @@ class _OrderCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Pending pickup':
-        return const Color(0xFF9A5B00);
-      case 'In progress':
-        return const Color(0xFF7A4CC2);
-      case 'Ready for delivery':
-        return const Color(0xFF0B7285);
-      case 'Completed':
-        return const Color(0xFF2F7D32);
-      default:
-        return amuwakPrimary;
-    }
   }
 }
 

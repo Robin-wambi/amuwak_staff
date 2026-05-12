@@ -1,3 +1,5 @@
+import 'order_status.dart';
+
 class LaundryOrder {
   const LaundryOrder({
     required this.orderId,
@@ -14,7 +16,7 @@ class LaundryOrder {
   final String orderId;
   final String customerName;
   final String serviceType;
-  final String status;
+  final OrderStatus status;
   final String timeLabel;
   final int itemCount;
   final String phone;
@@ -25,7 +27,7 @@ class LaundryOrder {
     String? orderId,
     String? customerName,
     String? serviceType,
-    String? status,
+    OrderStatus? status,
     String? timeLabel,
     int? itemCount,
     String? phone,
@@ -44,4 +46,32 @@ class LaundryOrder {
       notes: notes ?? this.notes,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LaundryOrder &&
+        other.orderId == orderId &&
+        other.customerName == customerName &&
+        other.serviceType == serviceType &&
+        other.status == status &&
+        other.timeLabel == timeLabel &&
+        other.itemCount == itemCount &&
+        other.phone == phone &&
+        other.address == address &&
+        other.notes == notes;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        orderId,
+        customerName,
+        serviceType,
+        status,
+        timeLabel,
+        itemCount,
+        phone,
+        address,
+        notes,
+      );
 }

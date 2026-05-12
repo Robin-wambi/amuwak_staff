@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
+import '../orders/order_list_extensions.dart';
+import '../orders/order_status.dart';
 import '../shared/widgets/app_theme.dart';
 
 class DailyReportScreen extends StatelessWidget {
@@ -11,22 +13,11 @@ class DailyReportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalOrders = orders.length;
-    final pendingPickup = orders
-        .where((order) => order.status == 'Pending pickup')
-        .length;
-    final inProgress = orders
-        .where((order) => order.status == 'In progress')
-        .length;
-    final readyForDelivery = orders
-        .where((order) => order.status == 'Ready for delivery')
-        .length;
-    final completed = orders
-        .where((order) => order.status == 'Completed')
-        .length;
-    final totalItems = orders.fold<int>(
-      0,
-      (sum, order) => sum + order.itemCount,
-    );
+    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = orders.countByStatus(OrderStatus.completed);
+    final totalItems = orders.totalItems;
     final pendingWork = totalOrders - completed;
 
     return Scaffold(
@@ -110,7 +101,7 @@ class DailyReportScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: _ReportMetricCard(
-                    title: 'Completed',
+                    title: OrderStatus.completed.label,
                     value: '$completed',
                     icon: Icons.check_circle_outline_rounded,
                   ),
@@ -248,31 +239,31 @@ class _StatusBreakdownCard extends StatelessWidget {
       child: Column(
         children: [
           _StatusRow(
-            label: 'Pending pickup',
+            label: OrderStatus.pendingPickup.label,
             value: pendingPickup,
             total: totalOrders,
-            color: const Color(0xFF9A5B00),
+            color: OrderStatus.pendingPickup.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'In progress',
+            label: OrderStatus.inProgress.label,
             value: inProgress,
             total: totalOrders,
-            color: const Color(0xFF7A4CC2),
+            color: OrderStatus.inProgress.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'Ready for delivery',
+            label: OrderStatus.readyForDelivery.label,
             value: readyForDelivery,
             total: totalOrders,
-            color: const Color(0xFF0B7285),
+            color: OrderStatus.readyForDelivery.color,
           ),
           const SizedBox(height: 14),
           _StatusRow(
-            label: 'Completed',
+            label: OrderStatus.completed.label,
             value: completed,
             total: totalOrders,
-            color: const Color(0xFF2F7D32),
+            color: OrderStatus.completed.color,
           ),
         ],
       ),
