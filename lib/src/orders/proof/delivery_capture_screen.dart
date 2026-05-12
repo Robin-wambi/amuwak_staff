@@ -4,7 +4,6 @@ import '../../shared/widgets/app_theme.dart';
 import '../order.dart';
 import '../order_status.dart';
 import '../proof_event.dart';
-import 'pickup_capture_screen.dart' show PickPhotoFn;
 import 'proof_photo_storage.dart';
 
 DateTime _defaultClock() => DateTime.now();

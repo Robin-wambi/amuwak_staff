@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../proof_event.dart';
 
+typedef PickPhotoFn = Future<List<int>?> Function();
+
 abstract class ProofPhotoStorage {
   Future<String> save({
     required String orderId,

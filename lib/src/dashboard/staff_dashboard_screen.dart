@@ -66,6 +66,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     ),
   ];
 
+  // Backend deferred per SPEC-000: photos live in memory only. Swap for
+  // `createDefaultProofPhotoStorage()` once the upload endpoint is available.
   final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
   final ImagePicker _imagePicker = ImagePicker();
 

@@ -7,8 +7,6 @@ import '../proof_event.dart';
 import 'proof_photo_storage.dart';
 import 'qr_display_widget.dart';
 
-typedef PickPhotoFn = Future<List<int>?> Function();
-
 DateTime _defaultClock() => DateTime.now();
 
 enum _Stage { collecting, showQr }
