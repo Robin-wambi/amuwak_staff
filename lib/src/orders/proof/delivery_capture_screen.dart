@@ -1,0 +1,206 @@
+import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_theme.dart';
+import '../order.dart';
+import '../order_status.dart';
+import '../proof_event.dart';
+import 'pickup_capture_screen.dart' show PickPhotoFn;
+import 'proof_photo_storage.dart';
+
+DateTime _defaultClock() => DateTime.now();
+
+class DeliveryCaptureScreen extends StatefulWidget {
+  const DeliveryCaptureScreen({
+    super.key,
+    required this.order,
+    required this.photoStorage,
+    required this.pickPhoto,
+    this.clock = _defaultClock,
+  });
+
+  final LaundryOrder order;
+  final ProofPhotoStorage photoStorage;
+  final PickPhotoFn pickPhoto;
+  final DateTime Function() clock;
+
+  @override
+  State<DeliveryCaptureScreen> createState() => _DeliveryCaptureScreenState();
+}
+
+class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
+  final List<List<int>> _photoBytes = [];
+  final TextEditingController _notesController = TextEditingController();
+  bool _saving = false;
+
+  static const int _maxPhotos = 3;
+
+  bool get _canDeliver => _photoBytes.isNotEmpty && !_saving;
+
+  Future<void> _addPhoto() async {
+    if (_photoBytes.length >= _maxPhotos) return;
+    final bytes = await widget.pickPhoto();
+    if (bytes == null) return;
+    setState(() {
+      _photoBytes.add(bytes);
+    });
+  }
+
+  Future<void> _markDelivered() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final paths = <String>[];
+    for (var i = 0; i < _photoBytes.length; i++) {
+      final path = await widget.photoStorage.save(
+        orderId: widget.order.orderId,
+        type: ProofEventType.delivery,
+        index: i,
+        bytes: _photoBytes[i],
+      );
+      paths.add(path);
+    }
+    final event = ProofEvent(
+      type: ProofEventType.delivery,
+      capturedAt: widget.clock(),
+      count: widget.order.pickupProof?.count ?? widget.order.itemCount,
+      photoPaths: paths,
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+    );
+    final updated = widget.order.copyWith(
+      status: OrderStatus.completed,
+      proofEvents: [...widget.order.proofEvents, event],
+    );
+    if (!mounted) return;
+    Navigator.pop<LaundryOrder>(context, updated);
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pickup = widget.order.pickupProof;
+    return Scaffold(
+      backgroundColor: amuwakBackground,
+      appBar: AppBar(
+        backgroundColor: amuwakBackground,
+        foregroundColor: amuwakDark,
+        elevation: 0,
+        title: const Text('Hand over'),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
+            Text(
+              widget.order.customerName,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: amuwakDark,
+              ),
+            ),
+            Text(
+              widget.order.address,
+              style: const TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: amuwakWhite,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: amuwakSoftAccent),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'From pickup',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: amuwakDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    pickup == null
+                        ? 'No pickup proof on file.'
+                        : 'Pickup count: ${pickup.count}',
+                    style: const TextStyle(color: Colors.black87),
+                  ),
+                  if (pickup != null && pickup.photoPaths.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${pickup.photoPaths.length} photo(s) on file',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Handover photos (${_photoBytes.length}/$_maxPhotos)',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: amuwakDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (var i = 0; i < _photoBytes.length; i++)
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      color: amuwakSoftAccent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.image_outlined),
+                  ),
+                if (_photoBytes.length < _maxPhotos)
+                  GestureDetector(
+                    key: const Key('add_handover_photo'),
+                    onTap: _addPhoto,
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: amuwakPrimary),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.add_a_photo_outlined,
+                        color: amuwakPrimary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _canDeliver ? _markDelivered : null,
+              child: const Text('Mark delivered'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
