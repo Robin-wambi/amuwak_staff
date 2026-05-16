@@ -163,6 +163,26 @@ void main() {
   );
 
   testWidgets(
+    'manual entry path: lowercase id for an uppercase order matches',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderId: 'AMW-1024',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order ID instead'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField), 'amw-1024');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ScannerScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
     'repeated detections after a match do not pop the screen twice',
     (tester) async {
       bool? result;

@@ -32,7 +32,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   void _handleDetected(String value) {
     if (_matched || !mounted) return;
     final trimmed = value.trim();
-    if (trimmed == widget.expectedOrderId) {
+    if (trimmed.toUpperCase() == widget.expectedOrderId.toUpperCase()) {
       _matched = true;
       Navigator.pop(context, true);
       return;
