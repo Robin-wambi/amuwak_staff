@@ -121,6 +121,7 @@ Future<FileProofPhotoStorage> createDefaultProofPhotoStorage() async {
         maxEdge: 1280,
       );
       image.dispose();
+      codec.dispose();
       final result = await FlutterImageCompress.compressWithList(
         bytes,
         minWidth: target.minWidth,
