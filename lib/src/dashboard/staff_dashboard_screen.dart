@@ -70,6 +70,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   // `createDefaultProofPhotoStorage()` once the upload endpoint is available.
   final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
   final ImagePicker _imagePicker = ImagePicker();
+  final CameraViewBuilder _cameraViewBuilder = mobileScannerCameraViewBuilder();
 
   Future<List<int>?> _pickPhoto() async {
     final XFile? file = await _imagePicker.pickImage(
@@ -101,7 +102,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
           order: order,
           photoStorage: _photoStorage,
           pickPhoto: _pickPhoto,
-          cameraViewBuilder: mobileScannerCameraViewBuilder(),
+          cameraViewBuilder: _cameraViewBuilder,
         ),
       ),
     );
