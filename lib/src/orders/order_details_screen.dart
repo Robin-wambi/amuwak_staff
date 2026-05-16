@@ -171,7 +171,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => Navigator.pop(context, _order),
+            onPressed: _handleBackNavigation,
           ),
         ),
         body: SafeArea(
