@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -178,6 +180,43 @@ void main() {
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Rapid taps on add handover photo only trigger one pickPhoto and hide the tile',
+    (tester) async {
+      final completers = <Completer<List<int>?>>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DeliveryCaptureScreen(
+            order: _orderReadyForDelivery(),
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () {
+              final c = Completer<List<int>?>();
+              completers.add(c);
+              return c.future;
+            },
+            clock: () => DateTime(2026, 5, 12, 16, 13),
+          ),
+        ),
+      );
+
+      final addTile = find.byKey(const Key('add_handover_photo'));
+      for (var i = 0; i < 5; i++) {
+        await tester.tap(addTile);
+      }
+      await tester.pump();
+
+      expect(completers, hasLength(1));
+      expect(find.byKey(const Key('add_handover_photo')), findsNothing);
+
+      completers.first.complete(const [4, 5, 6]);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_handover_photo')), findsOneWidget);
+      expect(completers, hasLength(1));
     },
   );
 }

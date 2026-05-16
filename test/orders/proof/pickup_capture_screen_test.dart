@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -226,6 +228,46 @@ void main() {
       );
       // The exception was handled, not left dangling.
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Rapid taps on add photo only trigger one pickPhoto and hide the tile',
+    (tester) async {
+      final completers = <Completer<List<int>?>>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () {
+              final c = Completer<List<int>?>();
+              completers.add(c);
+              return c.future;
+            },
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      final addTile = find.byKey(const Key('add_photo'));
+      // Five rapid taps before any rebuild — only one pickPhoto must fly.
+      for (var i = 0; i < 5; i++) {
+        await tester.tap(addTile);
+      }
+      await tester.pump();
+
+      expect(completers, hasLength(1));
+      // While picking, the tile is hidden so the user can't queue more taps.
+      expect(find.byKey(const Key('add_photo')), findsNothing);
+
+      // Resolve the pick. The tile should reappear (still under _maxPhotos).
+      completers.first.complete(const [1, 2, 3]);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_photo')), findsOneWidget);
+      expect(completers, hasLength(1));
     },
   );
 }

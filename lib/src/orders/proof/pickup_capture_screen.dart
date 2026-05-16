@@ -35,6 +35,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   final List<List<int>> _photoBytes = [];
   final TextEditingController _notesController = TextEditingController();
   bool _saving = false;
+  bool _pickingPhoto = false;
 
   static const int _maxPhotos = 3;
 
@@ -42,12 +43,21 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
       _count > 0 && _photoBytes.isNotEmpty && !_saving;
 
   Future<void> _addPhoto() async {
-    if (_photoBytes.length >= _maxPhotos) return;
-    final bytes = await widget.pickPhoto();
-    if (bytes == null) return;
-    setState(() {
-      _photoBytes.add(bytes);
-    });
+    if (_photoBytes.length >= _maxPhotos || _pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final bytes = await widget.pickPhoto();
+      if (!mounted) return;
+      if (bytes != null) {
+        setState(() {
+          _photoBytes.add(bytes);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _pickingPhoto = false);
+      }
+    }
   }
 
   void _onConfirm() {
@@ -194,7 +204,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                 ),
                 child: const Icon(Icons.image_outlined),
               ),
-            if (_photoBytes.length < _maxPhotos)
+            if (_photoBytes.length < _maxPhotos && !_pickingPhoto)
               GestureDetector(
                 key: const Key('add_photo'),
                 onTap: _addPhoto,
