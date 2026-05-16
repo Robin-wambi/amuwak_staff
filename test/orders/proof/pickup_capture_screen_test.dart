@@ -7,6 +7,18 @@ import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 
+class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
+  @override
+  Future<String> save({
+    required String orderId,
+    required ProofEventType type,
+    required int index,
+    required List<int> bytes,
+  }) async {
+    throw Exception('disk full');
+  }
+}
+
 const _baseOrder = LaundryOrder(
   orderId: 'AMW-0421',
   customerName: 'Jane Doe',
@@ -154,4 +166,66 @@ void main() {
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [10, 20, 30]));
   });
+
+  testWidgets(
+    'Done re-enables itself and surfaces an error when photo save fails',
+    (tester) async {
+      LaundryOrder? captured;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      captured = await Navigator.of(context).push<LaundryOrder>(
+                        MaterialPageRoute(
+                          builder: (_) => PickupCaptureScreen(
+                            order: _baseOrder,
+                            photoStorage: _ThrowingProofPhotoStorage(),
+                            pickPhoto: () async => const [10, 20, 30],
+                            clock: () => DateTime(2026, 5, 12, 9, 42),
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+
+      // Push has not resolved — the screen did not pop.
+      expect(captured, isNull);
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+      // Done button is re-enabled so the user can retry.
+      final done = find.widgetWithText(ElevatedButton, 'Done');
+      expect(tester.widget<ElevatedButton>(done).onPressed, isNotNull);
+      // User-facing error feedback is visible.
+      expect(
+        find.textContaining('Could not save pickup proof'),
+        findsOneWidget,
+      );
+      // The exception was handled, not left dangling.
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

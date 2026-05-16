@@ -47,31 +47,41 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
   Future<void> _markDelivered() async {
     if (_saving) return;
     setState(() => _saving = true);
-    final paths = <String>[];
-    for (var i = 0; i < _photoBytes.length; i++) {
-      final path = await widget.photoStorage.save(
-        orderId: widget.order.orderId,
+    try {
+      final paths = <String>[];
+      for (var i = 0; i < _photoBytes.length; i++) {
+        final path = await widget.photoStorage.save(
+          orderId: widget.order.orderId,
+          type: ProofEventType.delivery,
+          index: i,
+          bytes: _photoBytes[i],
+        );
+        paths.add(path);
+      }
+      final event = ProofEvent(
         type: ProofEventType.delivery,
-        index: i,
-        bytes: _photoBytes[i],
+        capturedAt: widget.clock(),
+        count: widget.order.pickupProof?.count ?? widget.order.itemCount,
+        photoPaths: paths,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
-      paths.add(path);
+      final updated = widget.order.copyWith(
+        status: OrderStatus.completed,
+        proofEvents: [...widget.order.proofEvents, event],
+      );
+      if (!mounted) return;
+      Navigator.pop<LaundryOrder>(context, updated);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save delivery proof. Please try again.'),
+        ),
+      );
     }
-    final event = ProofEvent(
-      type: ProofEventType.delivery,
-      capturedAt: widget.clock(),
-      count: widget.order.pickupProof?.count ?? widget.order.itemCount,
-      photoPaths: paths,
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-    );
-    final updated = widget.order.copyWith(
-      status: OrderStatus.completed,
-      proofEvents: [...widget.order.proofEvents, event],
-    );
-    if (!mounted) return;
-    Navigator.pop<LaundryOrder>(context, updated);
   }
 
   @override

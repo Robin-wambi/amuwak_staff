@@ -7,6 +7,18 @@ import 'package:amuwak_staff/src/orders/proof/delivery_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 
+class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
+  @override
+  Future<String> save({
+    required String orderId,
+    required ProofEventType type,
+    required int index,
+    required List<int> bytes,
+  }) async {
+    throw Exception('disk full');
+  }
+}
+
 LaundryOrder _orderReadyForDelivery() {
   return LaundryOrder(
     orderId: 'AMW-0421',
@@ -109,4 +121,63 @@ void main() {
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [50, 60, 70]));
   });
+
+  testWidgets(
+    'Mark delivered re-enables itself and surfaces an error when photo save fails',
+    (tester) async {
+      LaundryOrder? captured;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      captured = await Navigator.of(context).push<LaundryOrder>(
+                        MaterialPageRoute(
+                          builder: (_) => DeliveryCaptureScreen(
+                            order: _orderReadyForDelivery(),
+                            photoStorage: _ThrowingProofPhotoStorage(),
+                            pickPhoto: () async => const [50, 60, 70],
+                            clock: () => DateTime(2026, 5, 12, 16, 13),
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+
+      expect(captured, isNull);
+      expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
+      final markDelivered = find.widgetWithText(
+        ElevatedButton,
+        'Mark delivered',
+      );
+      expect(
+        tester.widget<ElevatedButton>(markDelivered).onPressed,
+        isNotNull,
+      );
+      expect(
+        find.textContaining('Could not save delivery proof'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

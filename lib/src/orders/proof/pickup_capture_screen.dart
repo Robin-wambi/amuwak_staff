@@ -59,31 +59,41 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   Future<void> _onDone() async {
     if (_saving) return;
     setState(() => _saving = true);
-    final paths = <String>[];
-    for (var i = 0; i < _photoBytes.length; i++) {
-      final path = await widget.photoStorage.save(
-        orderId: widget.order.orderId,
+    try {
+      final paths = <String>[];
+      for (var i = 0; i < _photoBytes.length; i++) {
+        final path = await widget.photoStorage.save(
+          orderId: widget.order.orderId,
+          type: ProofEventType.pickup,
+          index: i,
+          bytes: _photoBytes[i],
+        );
+        paths.add(path);
+      }
+      final event = ProofEvent(
         type: ProofEventType.pickup,
-        index: i,
-        bytes: _photoBytes[i],
+        capturedAt: widget.clock(),
+        count: _count,
+        photoPaths: paths,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
-      paths.add(path);
+      final updated = widget.order.copyWith(
+        status: OrderStatus.inProgress,
+        proofEvents: [...widget.order.proofEvents, event],
+      );
+      if (!mounted) return;
+      Navigator.pop<LaundryOrder>(context, updated);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save pickup proof. Please try again.'),
+        ),
+      );
     }
-    final event = ProofEvent(
-      type: ProofEventType.pickup,
-      capturedAt: widget.clock(),
-      count: _count,
-      photoPaths: paths,
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-    );
-    final updated = widget.order.copyWith(
-      status: OrderStatus.inProgress,
-      proofEvents: [...widget.order.proofEvents, event],
-    );
-    if (!mounted) return;
-    Navigator.pop<LaundryOrder>(context, updated);
   }
 
   @override
