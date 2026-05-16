@@ -114,6 +114,55 @@ void main() {
   });
 
   testWidgets(
+    'scanning a non-order-id value shows a generic mismatch error',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderId: 'AMW-1',
+        scannedValue: 'https://example.com',
+      );
+
+      await tester.tap(find.text('Simulate scan'));
+      await tester.pump();
+
+      expect(find.byType(ScannerScreen), findsOneWidget);
+      // Must NOT use the "belongs to order #..." phrasing for a random value.
+      expect(find.textContaining('belongs to order'), findsNothing);
+      expect(find.textContaining('https://example.com'), findsNothing);
+      // Generic mismatch references only the expected order.
+      expect(
+        find.textContaining('does not match order #AMW-1'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'empty manual submit shows a generic mismatch error',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderId: 'AMW-1',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order ID instead'));
+      await tester.pumpAndSettle();
+
+      // Submit with the field still empty.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+      await tester.pump();
+
+      expect(find.byType(ScannerScreen), findsOneWidget);
+      expect(find.textContaining('belongs to order'), findsNothing);
+      expect(
+        find.textContaining('does not match order #AMW-1'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'repeated detections after a match do not pop the screen twice',
     (tester) async {
       bool? result;

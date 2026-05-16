@@ -26,6 +26,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // from firing on a widget that is mid-disposal.
   bool _matched = false;
 
+  static final RegExp _orderIdPattern =
+      RegExp(r'^AMW-\d+$', caseSensitive: false);
+
   void _handleDetected(String value) {
     if (_matched || !mounted) return;
     final trimmed = value.trim();
@@ -34,9 +37,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
       Navigator.pop(context, true);
       return;
     }
+    final looksLikeOrderId = _orderIdPattern.hasMatch(trimmed);
     setState(() {
-      _errorMessage =
-          'This tag belongs to order #$trimmed, not #${widget.expectedOrderId}.';
+      _errorMessage = looksLikeOrderId
+          ? 'This tag belongs to order #$trimmed, not #${widget.expectedOrderId}.'
+          : 'This tag does not match order #${widget.expectedOrderId}.';
       if (_showManualEntry) {
         _manualController.clear();
       }
