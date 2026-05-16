@@ -40,6 +40,48 @@ void main() {
     });
   });
 
+  group('compressTargetForMaxEdge', () {
+    test('landscape source: longer edge becomes maxEdge', () {
+      final target = compressTargetForMaxEdge(
+        width: 4000,
+        height: 3000,
+        maxEdge: 1280,
+      );
+      expect(target.minWidth, equals(1280));
+      expect(target.minHeight, equals(960));
+    });
+
+    test('portrait source: longer edge becomes maxEdge', () {
+      final target = compressTargetForMaxEdge(
+        width: 3000,
+        height: 4000,
+        maxEdge: 1280,
+      );
+      expect(target.minWidth, equals(960));
+      expect(target.minHeight, equals(1280));
+    });
+
+    test('square source: both dimensions equal maxEdge', () {
+      final target = compressTargetForMaxEdge(
+        width: 2000,
+        height: 2000,
+        maxEdge: 1280,
+      );
+      expect(target.minWidth, equals(1280));
+      expect(target.minHeight, equals(1280));
+    });
+
+    test('preserves aspect ratio for narrow portrait', () {
+      final target = compressTargetForMaxEdge(
+        width: 1080,
+        height: 1920,
+        maxEdge: 1280,
+      );
+      expect(target.minHeight, equals(1280));
+      expect(target.minWidth, equals(720));
+    });
+  });
+
   group('FileProofPhotoStorage', () {
     late Directory tempDir;
 

@@ -1,10 +1,36 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../proof_event.dart';
+
+/// Computes the `minWidth` / `minHeight` pair to pass to
+/// `FlutterImageCompress.compressWithList` so that the LONGER edge of the
+/// result is at most [maxEdge] pixels, preserving aspect ratio.
+///
+/// The package's own `minWidth` / `minHeight` parameters together cap the
+/// SHORTER edge, not the longer one — passing `(maxEdge, maxEdge)` for a
+/// 4000×3000 source yields ~1707×1280, not 1280×960. Computing the pair from
+/// the source dimensions makes 1280 mean "longest edge ≤ 1280" as intended.
+({int minWidth, int minHeight}) compressTargetForMaxEdge({
+  required int width,
+  required int height,
+  required int maxEdge,
+}) {
+  if (width >= height) {
+    return (
+      minWidth: maxEdge,
+      minHeight: (maxEdge * height / width).round(),
+    );
+  }
+  return (
+    minWidth: (maxEdge * width / height).round(),
+    minHeight: maxEdge,
+  );
+}
 
 typedef PickPhotoFn = Future<List<int>?> Function();
 
@@ -78,17 +104,27 @@ class FileProofPhotoStorage implements ProofPhotoStorage {
 }
 
 /// Production factory: resolves the app documents directory via path_provider
-/// and uses flutter_image_compress to shrink images to 1280px max edge at
-/// JPEG quality 80.
+/// and uses flutter_image_compress to shrink images so the longer edge is
+/// capped at 1280 pixels (JPEG quality 80). Images smaller than the cap pass
+/// through untouched — flutter_image_compress never upscales.
 Future<FileProofPhotoStorage> createDefaultProofPhotoStorage() async {
   final dir = await getApplicationDocumentsDirectory();
   return FileProofPhotoStorage(
     baseDir: dir,
     compressor: (bytes) async {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final target = compressTargetForMaxEdge(
+        width: image.width,
+        height: image.height,
+        maxEdge: 1280,
+      );
+      image.dispose();
       final result = await FlutterImageCompress.compressWithList(
         bytes,
-        minWidth: 1280,
-        minHeight: 1280,
+        minWidth: target.minWidth,
+        minHeight: target.minHeight,
         quality: 80,
         format: CompressFormat.jpeg,
       );
