@@ -112,4 +112,60 @@ void main() {
     expect(find.byType(ScannerScreen), findsOneWidget);
     expect(find.textContaining('AMW-9'), findsOneWidget);
   });
+
+  testWidgets(
+    'repeated detections after a match do not pop the screen twice',
+    (tester) async {
+      bool? result;
+      var pushCount = 0;
+      late OnBarcodeDetected captured;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      pushCount++;
+                      result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => ScannerScreen(
+                            expectedOrderId: 'AMW-1',
+                            cameraViewBuilder: (ctx, onDetected) {
+                              captured = onDetected;
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open scanner'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open scanner'));
+      await tester.pumpAndSettle();
+
+      // MobileScanner fires onDetect continuously while a QR code is in the
+      // camera frame, including after the first matching detection has been
+      // forwarded. Simulate two calls in rapid succession.
+      captured('AMW-1');
+      captured('AMW-1');
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      // Wrapper screen with the launch button must still be present — i.e. the
+      // second pop must have been suppressed.
+      expect(find.text('Open scanner'), findsOneWidget);
+      expect(pushCount, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

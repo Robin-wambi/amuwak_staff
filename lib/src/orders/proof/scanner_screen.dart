@@ -21,10 +21,16 @@ class _ScannerScreenState extends State<ScannerScreen> {
   bool _showManualEntry = false;
   final TextEditingController _manualController = TextEditingController();
   String? _errorMessage;
+  // MobileScanner fires onDetect continuously while a QR code is in view, so
+  // we latch on the first matching detection to prevent a second Navigator.pop
+  // from firing on a widget that is mid-disposal.
+  bool _matched = false;
 
   void _handleDetected(String value) {
+    if (_matched || !mounted) return;
     final trimmed = value.trim();
     if (trimmed == widget.expectedOrderId) {
+      _matched = true;
       Navigator.pop(context, true);
       return;
     }
