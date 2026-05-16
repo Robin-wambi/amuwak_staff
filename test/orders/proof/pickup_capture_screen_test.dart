@@ -270,4 +270,79 @@ void main() {
       expect(completers, hasLength(1));
     },
   );
+
+  testWidgets(
+    'Back from QR stage returns to collecting without losing count/photos/notes',
+    (tester) async {
+      final storage = InMemoryProofPhotoStorage();
+      LaundryOrder? captured;
+      var poppedFromPush = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      captured = await Navigator.of(context).push<LaundryOrder>(
+                        MaterialPageRoute(
+                          builder: (_) => PickupCaptureScreen(
+                            order: _baseOrder,
+                            photoStorage: storage,
+                            pickPhoto: () async => const [10, 20, 30],
+                            clock: () => DateTime(2026, 5, 12, 9, 42),
+                          ),
+                        ),
+                      );
+                      poppedFromPush = true;
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Enter count, photo, notes.
+      for (var i = 0; i < 7; i++) {
+        await tester.tap(find.byKey(const Key('count_increment')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField),
+        'fragile silk',
+      );
+      await tester.pump();
+
+      // Move to QR stage.
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+
+      // Tap the AppBar back arrow.
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      // We should be back on the collecting stage, NOT have left the route.
+      expect(poppedFromPush, isFalse);
+      expect(captured, isNull);
+      expect(find.text('Tie tag to the bag'), findsNothing);
+      expect(find.text('Confirm with customer'), findsOneWidget);
+
+      // Count, photo, and notes are preserved.
+      expect(find.text('7'), findsOneWidget);
+      expect(find.text('Photos (1/3)'), findsOneWidget);
+      expect(find.text('fragile silk'), findsOneWidget);
+    },
+  );
 }

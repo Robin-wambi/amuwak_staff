@@ -114,20 +114,29 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: amuwakBackground,
-      appBar: AppBar(
+    return PopScope(
+      canPop: _stage == _Stage.collecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_stage == _Stage.showQr) {
+          setState(() => _stage = _Stage.collecting);
+        }
+      },
+      child: Scaffold(
         backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
-        elevation: 0,
-        title: Text(
-          _stage == _Stage.collecting ? 'Confirm pickup' : 'Tag the bag',
+        appBar: AppBar(
+          backgroundColor: amuwakBackground,
+          foregroundColor: amuwakDark,
+          elevation: 0,
+          title: Text(
+            _stage == _Stage.collecting ? 'Confirm pickup' : 'Tag the bag',
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: _stage == _Stage.collecting
-            ? _buildCollecting()
-            : _buildQrStage(),
+        body: SafeArea(
+          child: _stage == _Stage.collecting
+              ? _buildCollecting()
+              : _buildQrStage(),
+        ),
       ),
     );
   }
