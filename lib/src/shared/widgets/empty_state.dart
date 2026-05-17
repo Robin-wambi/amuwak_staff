@@ -22,7 +22,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 72, color: amuwakSoftAccent),
+            Icon(icon, size: 72, color: amuwakPrimary.withValues(alpha: 0.45)),
             const SizedBox(height: 16),
             Text(
               headline,
