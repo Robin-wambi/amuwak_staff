@@ -302,6 +302,37 @@ void main() {
   );
 
   testWidgets(
+    'Add photo recovers and surfaces an error when pickPhoto throws',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async {
+              throw Exception('camera permission revoked');
+            },
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+
+      // No photo was added — the tile is still available for retry.
+      expect(find.byKey(const Key('add_photo')), findsOneWidget);
+      // User-facing error feedback is visible.
+      expect(
+        find.textContaining('Could not open camera'),
+        findsOneWidget,
+      );
+      // The exception was handled, not left dangling.
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Back from QR stage returns to collecting without losing count/photos/notes',
     (tester) async {
       final storage = InMemoryProofPhotoStorage();

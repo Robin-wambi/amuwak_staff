@@ -279,6 +279,37 @@ void main() {
   );
 
   testWidgets(
+    'Add handover photo recovers and surfaces an error when pickPhoto throws',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DeliveryCaptureScreen(
+            order: _orderReadyForDelivery(),
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async {
+              throw Exception('camera permission revoked');
+            },
+            clock: () => DateTime(2026, 5, 12, 16, 13),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+
+      // No photo was added — the tile is still available for retry.
+      expect(find.byKey(const Key('add_handover_photo')), findsOneWidget);
+      // User-facing error feedback is visible.
+      expect(
+        find.textContaining('Could not open camera'),
+        findsOneWidget,
+      );
+      // The exception was handled, not left dangling.
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Rapid taps on add handover photo only trigger one pickPhoto and hide the tile',
     (tester) async {
       final completers = <Completer<List<int>?>>[];

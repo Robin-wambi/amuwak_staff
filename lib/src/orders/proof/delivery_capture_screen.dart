@@ -49,6 +49,13 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
           _photoBytes.add(bytes);
         });
       }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open camera. Please try again.'),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _pickingPhoto = false);
