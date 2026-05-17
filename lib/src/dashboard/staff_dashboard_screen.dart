@@ -11,8 +11,18 @@ import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/coming_soon_snackbar.dart';
 
+typedef RetrieveLostPhotoFn = Future<bool> Function();
+
 class StaffDashboardScreen extends StatefulWidget {
-  const StaffDashboardScreen({super.key});
+  const StaffDashboardScreen({
+    super.key,
+    this.retrieveLostPhoto,
+  });
+
+  // On Android the OS may kill MainActivity while the camera is open, dropping
+  // the photo bytes silently. We check on startup so the rider knows to retry
+  // instead of believing the capture succeeded. iOS is a no-op (empty response).
+  final RetrieveLostPhotoFn? retrieveLostPhoto;
 
   @override
   State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
@@ -71,6 +81,35 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
   final ImagePicker _imagePicker = ImagePicker();
   final CameraViewBuilder _cameraViewBuilder = mobileScannerCameraViewBuilder();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final retriever = widget.retrieveLostPhoto ?? _defaultRetrieveLostPhoto;
+      final lost = await retriever();
+      if (!mounted || !lost) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your last photo capture was interrupted. Please retry.',
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<bool> _defaultRetrieveLostPhoto() async {
+    try {
+      final response = await _imagePicker.retrieveLostData();
+      if (response.isEmpty) return false;
+      return response.file != null ||
+          (response.files?.isNotEmpty ?? false) ||
+          response.exception != null;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<List<int>?> _pickPhoto() async {
     final XFile? file = await _imagePicker.pickImage(
