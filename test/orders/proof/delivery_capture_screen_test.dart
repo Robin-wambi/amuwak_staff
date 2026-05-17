@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -248,6 +249,32 @@ void main() {
       final delivery = captured!.deliveryProof!;
       // Count came from itemCount because pickupProof was null.
       expect(delivery.count, equals(7));
+    },
+  );
+
+  testWidgets(
+    'Captured handover photo thumbnail renders the bytes via MemoryImage',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DeliveryCaptureScreen(
+            order: _orderReadyForDelivery(),
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [11, 22, 33, 44],
+            clock: () => DateTime(2026, 5, 12, 16, 13),
+          ),
+        ),
+      );
+
+      expect(find.byType(Image), findsNothing);
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+
+      final images = tester.widgetList<Image>(find.byType(Image)).toList();
+      expect(images, hasLength(1));
+      final memoryImage = images.single.image as MemoryImage;
+      expect(memoryImage.bytes, equals(Uint8List.fromList(const [11, 22, 33, 44])));
     },
   );
 

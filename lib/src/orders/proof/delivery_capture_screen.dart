@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../shared/widgets/app_theme.dart';
@@ -182,7 +184,14 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
                       color: amuwakSoftAccent,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.image_outlined),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.memory(
+                      Uint8List.fromList(_photoBytes[i]),
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.image_outlined),
+                    ),
                   ),
                 if (_photoBytes.length < _maxPhotos && !_pickingPhoto)
                   GestureDetector(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -268,6 +269,35 @@ void main() {
 
       expect(find.byKey(const Key('add_photo')), findsOneWidget);
       expect(completers, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'Captured photo thumbnail renders the bytes via MemoryImage',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [9, 8, 7, 6, 5],
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      // No photo yet → no Image widget in the slot row.
+      expect(find.byType(Image), findsNothing);
+
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+
+      final images = tester.widgetList<Image>(find.byType(Image)).toList();
+      expect(images, hasLength(1));
+      final image = images.single;
+      expect(image.image, isA<MemoryImage>());
+      final memoryImage = image.image as MemoryImage;
+      expect(memoryImage.bytes, equals(Uint8List.fromList(const [9, 8, 7, 6, 5])));
     },
   );
 
