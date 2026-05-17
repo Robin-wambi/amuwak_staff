@@ -128,4 +128,63 @@ void main() {
     expect(find.textContaining('Pickup'), findsWidgets);
     expect(find.textContaining('Delivery'), findsWidgets);
   });
+
+  testWidgets(
+    'History row for same-day event shows only HH:mm — no date',
+    (tester) async {
+      final storage = InMemoryProofPhotoStorage();
+      // Wrap fixes today = 2026-05-12 via the injected clock.
+      final sameDay = _pendingPickup.copyWith(
+        status: OrderStatus.completed,
+        proofEvents: [
+          ProofEvent(
+            type: ProofEventType.pickup,
+            capturedAt: DateTime(2026, 5, 12, 9, 42),
+            count: 12,
+            photoPaths: const ['memory://AMW-0421/pickup_0'],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_wrap(sameDay, storage: storage));
+
+      expect(find.textContaining('09:42'), findsOneWidget);
+      // Date prefix must NOT appear for a same-day event.
+      expect(find.textContaining('May'), findsNothing);
+      expect(find.textContaining('12 May'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'History row for an event on a different day prepends the date',
+    (tester) async {
+      final storage = InMemoryProofPhotoStorage();
+      // Wrap fixes today = 2026-05-12. Pickup happened yesterday.
+      final spansMidnight = _pendingPickup.copyWith(
+        status: OrderStatus.completed,
+        proofEvents: [
+          ProofEvent(
+            type: ProofEventType.pickup,
+            capturedAt: DateTime(2026, 5, 11, 22, 15),
+            count: 12,
+            photoPaths: const ['memory://AMW-0421/pickup_0'],
+          ),
+          ProofEvent(
+            type: ProofEventType.delivery,
+            capturedAt: DateTime(2026, 5, 12, 8, 30),
+            count: 12,
+            photoPaths: const ['memory://AMW-0421/delivery_0'],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_wrap(spansMidnight, storage: storage));
+
+      // Yesterday's pickup is dated.
+      expect(find.textContaining('11 May'), findsOneWidget);
+      expect(find.textContaining('22:15'), findsOneWidget);
+      // Today's delivery is time-only.
+      expect(find.textContaining('08:30'), findsOneWidget);
+    },
+  );
 }

@@ -254,7 +254,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           title: 'History',
                           children: [
                             for (final event in _order.proofEvents)
-                              _ProofEventRow(event: event),
+                              _ProofEventRow(event: event, now: widget.clock()),
                           ],
                         ),
                       ],
@@ -444,17 +444,26 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _ProofEventRow extends StatelessWidget {
-  const _ProofEventRow({required this.event});
+  const _ProofEventRow({required this.event, required this.now});
   final ProofEvent event;
+  final DateTime now;
+
+  static const _monthAbbreviations = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
 
   String get _label =>
       event.type == ProofEventType.pickup ? 'Pickup' : 'Delivery';
 
-  String get _timeText {
+  String get _timestampText {
     final dt = event.capturedAt;
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
+    final sameDay =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    if (sameDay) return '$hh:$mm';
+    return '${dt.day} ${_monthAbbreviations[dt.month - 1]} · $hh:$mm';
   }
 
   @override
@@ -473,7 +482,7 @@ class _ProofEventRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '$_label · $_timeText · ${event.count} items · '
+              '$_label · $_timestampText · ${event.count} items · '
               '${event.photoPaths.length} photo(s)',
               style: const TextStyle(
                 color: amuwakDark,
