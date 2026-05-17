@@ -184,6 +184,74 @@ void main() {
   );
 
   testWidgets(
+    'Delivery falls back to itemCount when the order has no pickup proof',
+    (tester) async {
+      // Defensive path: scanner flow normally guarantees a pickup proof, but
+      // if the screen is reached for an order without one, the delivery
+      // event's count must come from itemCount rather than crash.
+      final storage = InMemoryProofPhotoStorage();
+      LaundryOrder? captured;
+
+      const orderWithoutPickup = LaundryOrder(
+        orderId: 'AMW-0999',
+        customerName: 'No Pickup',
+        serviceType: 'Wash & iron',
+        status: OrderStatus.readyForDelivery,
+        timeLabel: 'Today, 16:00',
+        itemCount: 7,
+        phone: '+234000',
+        address: '5 Yaba',
+        notes: '',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      captured =
+                          await Navigator.of(context).push<LaundryOrder>(
+                        MaterialPageRoute(
+                          builder: (_) => DeliveryCaptureScreen(
+                            order: orderWithoutPickup,
+                            photoStorage: storage,
+                            pickPhoto: () async => const [50, 60, 70],
+                            clock: () => DateTime(2026, 5, 12, 16, 13),
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // The "From pickup" panel surfaces the missing-pickup state.
+      expect(find.text('No pickup proof on file.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+
+      expect(captured, isNotNull);
+      final delivery = captured!.deliveryProof!;
+      // Count came from itemCount because pickupProof was null.
+      expect(delivery.count, equals(7));
+    },
+  );
+
+  testWidgets(
     'Rapid taps on add handover photo only trigger one pickPhoto and hide the tile',
     (tester) async {
       final completers = <Completer<List<int>?>>[];
