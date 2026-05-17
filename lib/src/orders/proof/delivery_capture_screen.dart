@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../shared/widgets/app_theme.dart';
 import '../order.dart';
@@ -38,6 +37,15 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
 
   bool get _canDeliver => _photoBytes.isNotEmpty && !_saving;
 
+  String _pickPhotoErrorMessage(String code) {
+    return switch (code) {
+      'camera_access_denied' =>
+        'Camera permission denied. Enable it in Settings to take photos.',
+      'no_available_camera' => 'No camera is available on this device.',
+      _ => 'Could not open camera. Please try again.',
+    };
+  }
+
   Future<void> _addPhoto() async {
     if (_photoBytes.length >= _maxPhotos || _pickingPhoto) return;
     setState(() => _pickingPhoto = true);
@@ -49,6 +57,11 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
           _photoBytes.add(bytes);
         });
       }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_pickPhotoErrorMessage(e.code))),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
@@ -328,6 +329,57 @@ void main() {
         findsOneWidget,
       );
       // The exception was handled, not left dangling.
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Add photo surfaces a permission-specific message when camera access is denied',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async {
+              throw PlatformException(code: 'camera_access_denied');
+            },
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_photo')), findsOneWidget);
+      expect(find.textContaining('Camera permission denied'), findsOneWidget);
+      expect(find.textContaining('Settings'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Add photo surfaces a device-specific message when no camera is available',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async {
+              throw PlatformException(code: 'no_available_camera');
+            },
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_photo')), findsOneWidget);
+      expect(find.textContaining('No camera'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
