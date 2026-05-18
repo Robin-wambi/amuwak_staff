@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../notifications/notifications_screen.dart';
+import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
 import '../orders/order_list_extensions.dart';
+import '../orders/order_search_screen.dart';
 import '../orders/order_status.dart';
 import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
-import '../shared/widgets/coming_soon_snackbar.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
@@ -173,7 +175,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         actions: [
           IconButton(
             tooltip: 'Notifications',
-            onPressed: () => showComingSoon(context, 'Notifications'),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
         ],
@@ -430,7 +434,9 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'New pickup',
                 icon: Icons.add_location_alt_outlined,
-                onTap: () => showComingSoon(context, 'New pickup'),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => const NewPickupScreen()),
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -438,7 +444,9 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Check order',
                 icon: Icons.search_rounded,
-                onTap: () => showComingSoon(context, 'Check order'),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => const OrderSearchScreen()),
+                ),
               ),
             ),
             const SizedBox(width: 10),
