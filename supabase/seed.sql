@@ -1,0 +1,3 @@
+-- supabase/seed.sql
+-- Data inserted by `supabase db reset` (local) or `supabase db push` (remote).
+-- The valid_transitions matrix is populated by migration 0003.
