@@ -47,10 +47,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     setState(() {
       _order = _order.copyWith(status: nextStatus);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Order moved to ${nextStatus.label}.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('Order moved to ${nextStatus.label}.')),
+      );
   }
+
 
   Future<void> _confirmPickup() async {
     final result = await Navigator.of(context).push<LaundryOrder>(
