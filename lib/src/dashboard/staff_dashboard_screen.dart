@@ -1,15 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
 import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
+import '../orders/proof/barcode_reader.dart';
+import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/coming_soon_snackbar.dart';
 
+typedef RetrieveLostPhotoFn = Future<bool> Function();
+
 class StaffDashboardScreen extends StatefulWidget {
-  const StaffDashboardScreen({super.key});
+  const StaffDashboardScreen({
+    super.key,
+    this.retrieveLostPhoto,
+  });
+
+  // On Android the OS may kill MainActivity while the camera is open, dropping
+  // the photo bytes silently. We check on startup so the rider knows to retry
+  // instead of believing the capture succeeded. iOS is a no-op (empty response).
+  final RetrieveLostPhotoFn? retrieveLostPhoto;
 
   @override
   State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
@@ -63,6 +76,50 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     ),
   ];
 
+  // Backend deferred per SPEC-000: photos live in memory only. Swap for
+  // `createDefaultProofPhotoStorage()` once the upload endpoint is available.
+  final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
+  final ImagePicker _imagePicker = ImagePicker();
+  final CameraViewBuilder _cameraViewBuilder = mobileScannerCameraViewBuilder();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final retriever = widget.retrieveLostPhoto ?? _defaultRetrieveLostPhoto;
+      final lost = await retriever();
+      if (!mounted || !lost) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your last photo capture was interrupted. Please retry.',
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<bool> _defaultRetrieveLostPhoto() async {
+    try {
+      final response = await _imagePicker.retrieveLostData();
+      if (response.isEmpty) return false;
+      return response.file != null ||
+          (response.files?.isNotEmpty ?? false) ||
+          response.exception != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<int>?> _pickPhoto() async {
+    final XFile? file = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 90,
+    );
+    if (file == null) return null;
+    return file.readAsBytes();
+  }
+
   void _replaceUpdatedOrder(LaundryOrder updatedOrder) {
     final orderIndex = _orders.indexWhere(
       (order) => order.orderId == updatedOrder.orderId,
@@ -79,7 +136,14 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
 
   Future<void> _openOrderDetails(LaundryOrder order) async {
     final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
-      MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+      MaterialPageRoute(
+        builder: (_) => OrderDetailsScreen(
+          order: order,
+          photoStorage: _photoStorage,
+          pickPhoto: _pickPhoto,
+          cameraViewBuilder: _cameraViewBuilder,
+        ),
+      ),
     );
 
     if (!mounted) return;

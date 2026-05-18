@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Amuwak Staff uses the camera to scan order QR tags and capture pickup and delivery proof photos.</string>
 </dict>
 </plist>
