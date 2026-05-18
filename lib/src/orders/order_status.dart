@@ -23,16 +23,10 @@ enum OrderStatus {
   final String label;
   final Color color;
 
-  OrderStatus? get nextStatus {
-    switch (this) {
-      case OrderStatus.pendingPickup:
-        return OrderStatus.inProgress;
-      case OrderStatus.inProgress:
-        return OrderStatus.readyForDelivery;
-      case OrderStatus.readyForDelivery:
-        return OrderStatus.completed;
-      case OrderStatus.completed:
-        return null;
-    }
-  }
+  OrderStatus? get nextStatus => switch (this) {
+    OrderStatus.pendingPickup => OrderStatus.inProgress,
+    OrderStatus.inProgress => OrderStatus.readyForDelivery,
+    OrderStatus.readyForDelivery => OrderStatus.completed,
+    OrderStatus.completed => null,
+  };
 }
