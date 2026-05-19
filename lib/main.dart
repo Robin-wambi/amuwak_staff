@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'src/auth/login_screen.dart';
+import 'src/bootstrap/app_bootstrap.dart';
 import 'src/shared/widgets/app_theme.dart';
 
-void main() {
-  runApp(const AmuwakStaffApp());
+Future<void> main() async {
+  await AppBootstrap.initialize();
+  runApp(const ProviderScope(child: AmuwakStaffApp()));
 }
 
 class AmuwakStaffApp extends StatelessWidget {
