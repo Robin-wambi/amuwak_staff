@@ -1,5 +1,15 @@
 # PowerSync Sync Layer Implementation Plan
 
+> **⚠ SUPERSEDED 2026-05-19.** This plan was abandoned mid-execution after
+> the project pivoted to Drift + custom outbox (no third-party sync vendor).
+> See [2026-05-19-drift-outbox-sync-layer.md](2026-05-19-drift-outbox-sync-layer.md)
+> for the replacement plan.
+>
+> Migration 0015 was applied and then reverted by migration 0016. The
+> `powersync/` directory existed briefly between commits `3a47dbe..6812b34`
+> and was removed in the cleanup commit. The plan is kept here as a
+> historical record of the design exploration.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up PowerSync as the offline-sync layer on top of the Supabase project from Plan 1, with a published Postgres replication stream and a deployed `sync-rules.yaml` that routes data to drivers, in-shop staff, and managers.
