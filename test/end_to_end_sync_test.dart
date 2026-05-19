@@ -29,12 +29,6 @@ import 'package:amuwak_staff/src/sync/sync_puller.dart';
 /// Task 11 for the SQL).
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  // Real HTTP — TestWidgetsFlutterBinding installs an HttpOverrides that
-  // returns 400 to every request, which would block Supabase calls.
-  HttpOverrides.global = null;
-  // Stub the shared_preferences plugin channel so supabase_flutter can
-  // persist its session token (returns an empty store in memory).
-  SharedPreferences.setMockInitialValues(<String, Object>{});
 
   AppConfig? cfg;
   try {
@@ -48,6 +42,17 @@ void main() {
   final liveCfg = cfg;
 
   setUpAll(() async {
+    // Both side-effects scoped here so they only run when this test actually
+    // executes. If the credential-skip path above fires, neither runs and
+    // other tests in the suite are unaffected.
+    //
+    // - TestWidgetsFlutterBinding installs an HttpOverrides that returns 400
+    //   to every request; null restores real HTTP for Supabase calls.
+    // - shared_preferences has no plugin channel under flutter_test, so we
+    //   wire its mock (empty store in memory) before Supabase.initialize.
+    HttpOverrides.global = null;
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
     await Supabase.initialize(
       url: liveCfg.supabaseUrl,
       anonKey: liveCfg.supabaseAnonKey,

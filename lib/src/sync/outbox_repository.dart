@@ -43,20 +43,26 @@ class OutboxRepository {
     return (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
   }
 
-  Future<void> markFailed(String id, String error) async {
-    // Drift companions can't reference current values, so increment via
-    // raw SQL after writing the status/error fields.
+  /// Record a failed dispatch attempt for [id]. Bumps `retry_count` and stores
+  /// [error]. Once `retry_count > deadLetterAfter`, the row is flipped to
+  /// `dead_letter` status, which excludes it from [peekPending] so a single
+  /// permanently-failing row cannot head-of-line block the rest of the
+  /// queue. Recovery from dead_letter is a separate manual / UI flow.
+  Future<void> markFailed(String id, String error,
+      {int deadLetterAfter = 5}) async {
+    final row =
+        await (_db.select(_db.outbox)..where((t) => t.id.equals(id)))
+            .getSingleOrNull();
+    if (row == null) return;
+    final nextRetry = row.retryCount + 1;
+    final newStatus = nextRetry > deadLetterAfter ? 'dead_letter' : 'failed';
     await (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
       OutboxCompanion(
+        retryCount: Value(nextRetry),
         lastError: Value(error),
-        status: const Value('failed'),
+        status: Value(newStatus),
         lastAttemptedAt: Value(DateTime.now()),
       ),
-    );
-    await _db.customUpdate(
-      'UPDATE outbox SET retry_count = retry_count + 1 WHERE id = ?',
-      variables: [Variable.withString(id)],
-      updates: {_db.outbox},
     );
   }
 }

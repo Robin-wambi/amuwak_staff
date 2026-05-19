@@ -17,11 +17,17 @@ class OutboxWorker {
     required this.repo,
     required this.dispatch,
     this.batchSize = 25,
+    this.deadLetterAfter = 5,
   });
 
   final OutboxRepository repo;
   final OutboxDispatch dispatch;
   final int batchSize;
+
+  /// After this many failed attempts the row is parked in `dead_letter`
+  /// status so it stops blocking later mutations. A separate UI / admin
+  /// flow surfaces dead-lettered rows for manual review.
+  final int deadLetterAfter;
 
   Timer? _timer;
 
@@ -57,10 +63,12 @@ class OutboxWorker {
         await repo.markSent(row.id);
         sent++;
       } on PostgrestException catch (e) {
-        await repo.markFailed(row.id, '${e.code ?? ''}: ${e.message}');
+        await repo.markFailed(row.id, '${e.code ?? ''}: ${e.message}',
+            deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        await repo.markFailed(row.id, e.toString());
+        await repo.markFailed(row.id, e.toString(),
+            deadLetterAfter: deadLetterAfter);
         return sent;
       }
     }
