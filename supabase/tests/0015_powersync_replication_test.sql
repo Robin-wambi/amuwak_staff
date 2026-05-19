@@ -6,7 +6,7 @@
 BEGIN;
 SET search_path TO extensions, public;
 
-SELECT plan(8);
+SELECT plan(15);
 
 -- 1. Role exists
 SELECT has_role('powersync', 'powersync role exists');
@@ -37,17 +37,17 @@ SELECT is(
    WHERE pubname = 'powersync' AND tablename = 'orders')::int,
   1, 'publication includes orders');
 
--- 7. orders has REPLICA IDENTITY FULL  ('f' in relreplident)
-SELECT is(
-  (SELECT relreplident::text FROM pg_class
-   WHERE oid = 'public.orders'::regclass),
-  'f', 'orders REPLICA IDENTITY is FULL');
-
--- 8. proof_events has REPLICA IDENTITY FULL
-SELECT is(
-  (SELECT relreplident::text FROM pg_class
-   WHERE oid = 'public.proof_events'::regclass),
-  'f', 'proof_events REPLICA IDENTITY is FULL');
+-- 7-15. Every synced table has REPLICA IDENTITY FULL ('f' in relreplident).
+-- relreplident is the "char" type (single byte); cast to text for pgTAP.
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.staff'::regclass),               'f', 'staff REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.customers'::regclass),           'f', 'customers REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.orders'::regclass),              'f', 'orders REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.order_status_events'::regclass), 'f', 'order_status_events REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.proof_events'::regclass),        'f', 'proof_events REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.proof_photos'::regclass),        'f', 'proof_photos REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.issues'::regclass),              'f', 'issues REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.shifts'::regclass),              'f', 'shifts REPLICA IDENTITY is FULL');
+SELECT is((SELECT relreplident::text FROM pg_class WHERE oid='public.valid_transitions'::regclass),   'f', 'valid_transitions REPLICA IDENTITY is FULL');
 
 SELECT * FROM finish();
 ROLLBACK;

@@ -7,6 +7,12 @@
 -- BYPASSRLS is intentional: PowerSync needs to see every row in order to
 -- compute bucket membership per sync rules. Per-user filtering happens in
 -- powersync/sync-rules.yaml, not in Postgres RLS.
+--
+-- WARNING: once the operator sets a LOGIN password on this role, anyone with
+-- that password can SELECT every row in every public table directly — not
+-- just via the replication slot. Treat the password like a service_role key:
+-- store it in a password manager, never reuse it for application connections,
+-- and rotate if the PowerSync instance is rebuilt or compromised.
 
 CREATE ROLE powersync WITH REPLICATION BYPASSRLS NOLOGIN;
 
