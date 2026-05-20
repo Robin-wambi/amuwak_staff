@@ -91,12 +91,14 @@ class SyncPuller {
     return total;
   }
 
-  /// Switch is intentionally limited to the tables in [kSyncTables]. Any
-  /// other table reaching this method is a bug — fall through to a
-  /// StateError so it's visible immediately rather than silently dropped.
-  /// Plan 3 / 4 will re-add cases (and corresponding mappers below) for
-  /// `proof_photos`, `order_status_events`, `issues`, `shifts`, and
-  /// `valid_transitions` once each has the right pull strategy.
+  /// Exhaustive switch over every table in the Drift schema. Anything that
+  /// reaches the default is a typo or a newly-added table without a mapper —
+  /// fail fast so it surfaces in dev rather than silently dropping rows.
+  ///
+  /// TODO: pull-side dead-letter — currently a single malformed row aborts
+  /// the whole batch (the watermark stays put), so the same poison row
+  /// blocks every subsequent pull. Move bad rows to a dead-letter table
+  /// once the schema for that lands.
   void _upsertRow(Batch batch, String table, Map<String, dynamic> row) {
     switch (table) {
       case 'staff':
@@ -110,6 +112,26 @@ class SyncPuller {
         break;
       case 'proof_events':
         batch.insert(db.proofEvents, _proofEventsFromJson(row), mode: InsertMode.insertOrReplace);
+        break;
+      case 'order_status_events':
+        batch.insert(db.orderStatusEvents, _orderStatusEventsFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'proof_photos':
+        batch.insert(db.proofPhotos, _proofPhotosFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'issues':
+        batch.insert(db.issues, _issuesFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'shifts':
+        batch.insert(db.shifts, _shiftsFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'valid_transitions':
+        batch.insert(db.validTransitions, _validTransitionsFromJson(row),
+            mode: InsertMode.insertOrReplace);
         break;
       default:
         throw StateError('SyncPuller has no upsert mapper for table "$table"');
@@ -179,5 +201,64 @@ class SyncPuller {
         createdAt: _dt(r['created_at']),
         updatedAt: _dt(r['updated_at']),
         deletedAt: Value(_dtNullable(r['deleted_at'])),
+      );
+
+  OrderStatusEventsCompanion _orderStatusEventsFromJson(
+          Map<String, dynamic> r) =>
+      OrderStatusEventsCompanion.insert(
+        id: r['id'] as String,
+        orderId: r['order_id'] as String,
+        fromStatus: Value(r['from_status'] as String?),
+        toStatus: r['to_status'] as String,
+        changedBy: r['changed_by'] as String,
+        changedAt: _dt(r['changed_at']),
+        source: r['source'] as String,
+        deviceEventId: Value(r['device_event_id'] as String?),
+      );
+
+  ProofPhotosCompanion _proofPhotosFromJson(Map<String, dynamic> r) =>
+      ProofPhotosCompanion.insert(
+        id: r['id'] as String,
+        proofEventId: r['proof_event_id'] as String,
+        storagePath: r['storage_path'] as String,
+        width: Value(r['width'] as int?),
+        height: Value(r['height'] as int?),
+        bytes: Value(r['bytes'] as int?),
+        uploadedAt: Value(_dtNullable(r['uploaded_at'])),
+        createdAt: _dt(r['created_at']),
+      );
+
+  IssuesCompanion _issuesFromJson(Map<String, dynamic> r) =>
+      IssuesCompanion.insert(
+        id: r['id'] as String,
+        orderId: Value(r['order_id'] as String?),
+        kind: r['kind'] as String,
+        description: r['description'] as String,
+        reportedBy: r['reported_by'] as String,
+        reportedAt: _dt(r['reported_at']),
+        resolvedAt: Value(_dtNullable(r['resolved_at'])),
+        resolvedBy: Value(r['resolved_by'] as String?),
+      );
+
+  ShiftsCompanion _shiftsFromJson(Map<String, dynamic> r) =>
+      ShiftsCompanion.insert(
+        id: r['id'] as String,
+        staffId: r['staff_id'] as String,
+        startedAt: _dt(r['started_at']),
+        startedLat: Value((r['started_lat'] as num?)?.toDouble()),
+        startedLng: Value((r['started_lng'] as num?)?.toDouble()),
+        endedAt: Value(_dtNullable(r['ended_at'])),
+        endedLat: Value((r['ended_lat'] as num?)?.toDouble()),
+        endedLng: Value((r['ended_lng'] as num?)?.toDouble()),
+      );
+
+  ValidTransitionsCompanion _validTransitionsFromJson(
+          Map<String, dynamic> r) =>
+      ValidTransitionsCompanion.insert(
+        id: r['id'] as String,
+        intakeMethod: r['intake_method'] as String,
+        fulfillmentMethod: r['fulfillment_method'] as String,
+        fromStatus: Value(r['from_status'] as String?),
+        toStatus: r['to_status'] as String,
       );
 }
