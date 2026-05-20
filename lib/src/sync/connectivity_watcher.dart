@@ -8,13 +8,25 @@ class ConnectivityWatcher {
   final Connectivity _connectivity;
   StreamSubscription<List<ConnectivityResult>>? _sub;
 
-  /// Calls [onOnline] every time the device transitions from offline to online.
-  void start({required void Function() onOnline}) {
+  /// Subscribes to `connectivity_plus` and dispatches:
+  ///   - [onOnline] whenever the device transitions offline → online,
+  ///   - [onOffline] whenever the device transitions online → offline.
+  ///
+  /// Idempotent: calling [start] a second time cancels the prior
+  /// subscription before installing the new one.
+  void start({
+    required void Function() onOnline,
+    void Function()? onOffline,
+  }) {
     _sub?.cancel();
     bool wasOnline = false;
     _sub = _connectivity.onConnectivityChanged.listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
-      if (online && !wasOnline) onOnline();
+      if (online && !wasOnline) {
+        onOnline();
+      } else if (!online && wasOnline) {
+        onOffline?.call();
+      }
       wasOnline = online;
     });
   }
