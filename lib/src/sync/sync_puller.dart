@@ -3,11 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/app_database.dart';
 import 'sync_registry.dart';
 
-/// Fetches Postgres rows for [forTable] whose `updated_at` is strictly newer
-/// than [since]. Implementations throw on failure; the puller stops the
-/// affected table for this cycle and tries again next cycle.
+/// Fetches Postgres rows for [table] whose configured `watermarkColumn`
+/// is strictly newer than [since]. Implementations throw on failure; the
+/// puller stops the affected table for this cycle and tries again next
+/// cycle.
 typedef SyncFetch = Future<List<Map<String, dynamic>>> Function(
-  String forTable,
+  SyncTable table,
   DateTime since,
 );
 
@@ -22,14 +23,16 @@ class SyncPuller {
 
   static final DateTime _epoch = DateTime.utc(1970);
 
-  /// Default fetcher backed by the real Supabase client.
+  /// Default fetcher backed by the real Supabase client. Uses each
+  /// table's configured [SyncTable.watermarkColumn] for the `.gt(...)`
+  /// comparison and the result ordering.
   static SyncFetch supabaseFetcher(SupabaseClient client) {
-    return (forTable, since) async {
+    return (table, since) async {
       final List<dynamic> rows = await client
-          .from(forTable)
+          .from(table.name)
           .select()
-          .gt('updated_at', since.toIso8601String())
-          .order('updated_at');
+          .gt(table.watermarkColumn, since.toIso8601String())
+          .order(table.watermarkColumn);
       return rows.cast<Map<String, dynamic>>().toList();
     };
   }
@@ -57,33 +60,33 @@ class SyncPuller {
   /// the watermark is **not** advanced — the cycle retries next time. This
   /// prevents the silent-data-loss path where a poison row poisons later
   /// rows in the batch while the watermark advances past all of them.
-  Future<int> pullTable(String name) async {
-    final since = await _readWatermark(name);
-    final rows = await fetch(name, since);
+  Future<int> pullTable(SyncTable table) async {
+    final since = await _readWatermark(table.name);
+    final rows = await fetch(table, since);
     if (rows.isEmpty) return 0;
 
-    DateTime maxUpdated = since;
+    DateTime maxWatermark = since;
     try {
       await db.batch((batch) {
         for (final row in rows) {
-          _upsertRow(batch, name, row);
-          final u = DateTime.parse(row['updated_at'] as String);
-          if (u.isAfter(maxUpdated)) maxUpdated = u;
+          _upsertRow(batch, table.name, row);
+          final u = DateTime.parse(row[table.watermarkColumn] as String);
+          if (u.isAfter(maxWatermark)) maxWatermark = u;
         }
       });
     } catch (e, st) {
       // ignore: avoid_print
-      print('SyncPuller: batch for "$name" failed; watermark not advanced. $e\n$st');
+      print('SyncPuller: batch for "${table.name}" failed; watermark not advanced. $e\n$st');
       return 0;
     }
-    await _writeWatermark(name, maxUpdated);
+    await _writeWatermark(table.name, maxWatermark);
     return rows.length;
   }
 
   Future<int> pullAll() async {
     var total = 0;
     for (final t in kSyncTables) {
-      total += await pullTable(t.name);
+      total += await pullTable(t);
     }
     return total;
   }

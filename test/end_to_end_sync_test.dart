@@ -10,6 +10,7 @@ import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/outbox_worker.dart';
 import 'package:amuwak_staff/src/sync/sync_puller.dart';
+import 'package:amuwak_staff/src/sync/sync_registry.dart';
 
 /// End-to-end smoke test: sign in to the real Supabase project, enqueue a
 /// new customer via the outbox, drain it through the OutboxWorker, then
@@ -118,7 +119,8 @@ void main() {
         reason: 'a successfully-sent row should be removed from the outbox');
 
     // 3. Pull the customers table; the new row should land locally
-    final pulled = await puller.pullTable('customers');
+    final pulled =
+        await puller.pullTable(const SyncTable(name: 'customers'));
     expect(pulled, greaterThan(0));
 
     final local = await (db.select(db.customers)

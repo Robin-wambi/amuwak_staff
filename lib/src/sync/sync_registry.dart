@@ -1,9 +1,20 @@
 /// Declarative list of which Postgres tables to pull and how. The SyncPuller
 /// loops over this list every sync cycle.
 class SyncTable {
-  const SyncTable({required this.name, this.pkColumn = 'id'});
+  const SyncTable({
+    required this.name,
+    this.pkColumn = 'id',
+    this.watermarkColumn = 'updated_at',
+  });
   final String name;
   final String pkColumn;
+
+  /// JSON / Postgres column the puller compares against the per-table
+  /// watermark in `sync_watermarks.last_synced_at`. Defaults to
+  /// `updated_at`; override per table for append-only or static-seed
+  /// tables (e.g. `changed_at` for `order_status_events`, `created_at`
+  /// for `proof_photos`).
+  final String watermarkColumn;
 }
 
 /// Tables the SyncPuller pulls incrementally on every cycle. Only tables
