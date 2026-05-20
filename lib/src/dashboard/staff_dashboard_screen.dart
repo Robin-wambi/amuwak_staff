@@ -12,6 +12,7 @@ import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
+import '../shared/widgets/sync_status_banner.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
@@ -183,34 +184,43 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
           children: [
-            const _DashboardHeader(),
-            const SizedBox(height: 20),
-            _SummaryGrid(
-              totalOrders: totalOrders,
-              pendingPickup: pendingPickup,
-              inProgress: inProgress,
-              readyForDelivery: readyForDelivery,
-              completed: completed,
-            ),
-            const SizedBox(height: 24),
-            _QuickActions(orders: _orders),
-            const SizedBox(height: 24),
-            const Text(
-              'Assigned orders',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                color: amuwakDark,
+            const SyncStatusBanner(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                children: [
+                  const _DashboardHeader(),
+                  const SizedBox(height: 20),
+                  _SummaryGrid(
+                    totalOrders: totalOrders,
+                    pendingPickup: pendingPickup,
+                    inProgress: inProgress,
+                    readyForDelivery: readyForDelivery,
+                    completed: completed,
+                  ),
+                  const SizedBox(height: 24),
+                  _QuickActions(orders: _orders),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Assigned orders',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                      color: amuwakDark,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final order in _orders) ...[
+                    _OrderCard(
+                        order: order,
+                        onTap: () => _openOrderDetails(order)),
+                    const SizedBox(height: 12),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            for (final order in _orders) ...[
-              _OrderCard(order: order, onTap: () => _openOrderDetails(order)),
-              const SizedBox(height: 12),
-            ],
           ],
         ),
       ),
