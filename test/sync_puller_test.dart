@@ -318,6 +318,90 @@ void main() {
       expect(rows[1].endedAt, isNotNull);
     });
 
+    test('pullAll iterates every kSyncTables entry and writes per-table '
+        'watermarks (Plan 3a Task 8 activation)', () async {
+      // Sanity check that the registry now includes order_status_events
+      // and proof_photos. If a future maintainer drops them from the
+      // const list, this assertion catches it before the test that
+      // depends on the puller calling them.
+      expect(
+        kSyncTables.map((t) => t.name).toList(),
+        containsAll(<String>[
+          'staff',
+          'customers',
+          'orders',
+          'proof_events',
+          'order_status_events',
+          'proof_photos',
+        ]),
+      );
+      // Negative check: tables intentionally NOT in the periodic
+      // registry stay out.
+      expect(
+        kSyncTables.map((t) => t.name).toList(),
+        isNot(anyOf(contains('valid_transitions'),
+            contains('issues'), contains('shifts'))),
+      );
+
+      final fake = _FakeFetch();
+      fake.queued['staff'] = [const <Map<String, dynamic>>[]];
+      fake.queued['customers'] = [const <Map<String, dynamic>>[]];
+      fake.queued['orders'] = [const <Map<String, dynamic>>[]];
+      fake.queued['proof_events'] = [const <Map<String, dynamic>>[]];
+      fake.queued['order_status_events'] = [
+        [
+          {
+            'id': 'se-1',
+            'order_id': 'AMW-A',
+            'from_status': null,
+            'to_status': 'pending_pickup',
+            'changed_by': 's-1',
+            'changed_at': '2026-05-19T09:00:00Z',
+            'source': 'mobile',
+            'device_event_id': null,
+          },
+        ],
+      ];
+      fake.queued['proof_photos'] = [
+        [
+          {
+            'id': 'pp-1',
+            'proof_event_id': 'pe-1',
+            'storage_path': 'proofs/pp-1.jpg',
+            'width': null,
+            'height': null,
+            'bytes': null,
+            'uploaded_at': null,
+            'created_at': '2026-05-19T10:30:00Z',
+          },
+        ],
+      ];
+
+      final puller = SyncPuller(db: db, fetch: fake.call);
+      final total = await puller.pullAll();
+
+      expect(total, 2);
+      // Watermark rows exist for both newly-activated tables, with the
+      // right per-table column values.
+      final eventsWm = await (db.select(db.syncWatermarks)
+            ..where((t) => t.forTable.equals('order_status_events')))
+          .getSingle();
+      expect(eventsWm.lastSyncedAt.toUtc().toIso8601String(),
+          '2026-05-19T09:00:00.000Z');
+      final photosWm = await (db.select(db.syncWatermarks)
+            ..where((t) => t.forTable.equals('proof_photos')))
+          .getSingle();
+      expect(photosWm.lastSyncedAt.toUtc().toIso8601String(),
+          '2026-05-19T10:30:00.000Z');
+
+      // Sanity: each kSyncTables entry was queried.
+      final queriedTables = fake.sinceCalls.map((c) => c.key).toSet();
+      expect(queriedTables, containsAll(<String>[
+        'staff', 'customers', 'orders', 'proof_events',
+        'order_status_events', 'proof_photos',
+      ]));
+    });
+
     test('pullTable upserts valid_transitions rows '
         '(including null from_status for initial states)', () async {
       // valid_transitions is static seed; ValidTransitionsLoader (Task 9)
