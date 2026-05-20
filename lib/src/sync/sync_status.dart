@@ -14,8 +14,8 @@ class SyncStatus {
 }
 
 /// Singleton AppDatabase shared by repositories, the OutboxWorker, the
-/// SyncPuller, and the banner widget. Plan 3 will wire this provider into the
-/// app's startup so the same instance is reused everywhere.
+/// SyncPuller, and the banner widget. Tests override this with an
+/// in-memory instance so the rest of the sync graph picks it up.
 final appDatabaseProvider = Provider<AppDatabase>((_) => AppDatabase());
 
 /// Live count of pending + failed outbox rows. Watched via Drift's stream
@@ -30,12 +30,28 @@ final pendingOutboxCountProvider = StreamProvider<int>((ref) {
   return query.watch().map((rows) => rows.first.read(countExpr) ?? 0);
 });
 
-/// Set by ConnectivityWatcher at app bootstrap (Plan 3 wiring).
+/// Newest watermark across every synced table — the most useful "last
+/// time we heard from the server" signal for the banner. Emits `null`
+/// when the local DB has no watermark rows yet (i.e. the very first
+/// sync hasn't completed).
+final lastSyncedAtProvider = StreamProvider<DateTime?>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final maxExpr = db.syncWatermarks.lastSyncedAt.max();
+  final query = db.selectOnly(db.syncWatermarks)..addColumns([maxExpr]);
+  return query.watchSingle().map((row) => row.read(maxExpr));
+});
+
+/// Set by ConnectivityWatcher via SyncOrchestrator at app bootstrap.
 final onlineProvider = StateProvider<bool>((_) => true);
 
 /// Combined sync-status snapshot for the banner widget to consume.
 final syncStatusProvider = Provider<SyncStatus>((ref) {
   final pending = ref.watch(pendingOutboxCountProvider).valueOrNull ?? 0;
+  final lastSynced = ref.watch(lastSyncedAtProvider).valueOrNull;
   final online = ref.watch(onlineProvider);
-  return SyncStatus(pendingCount: pending, lastSyncedAt: null, online: online);
+  return SyncStatus(
+    pendingCount: pending,
+    lastSyncedAt: lastSynced,
+    online: online,
+  );
 });
