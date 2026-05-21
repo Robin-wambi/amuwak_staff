@@ -8,6 +8,7 @@ import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/staff_repository.dart';
+import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/status_events_repository.dart';
 import 'package:amuwak_staff/src/sync/sync_status.dart';
 
@@ -59,6 +60,13 @@ void main() {
     final a = container.read(statusEventsRepositoryProvider);
     final b = container.read(statusEventsRepositoryProvider);
     expect(a, isA<StatusEventsRepository>());
+    expect(identical(a, b), isTrue);
+  });
+
+  test('outboxRepositoryProvider resolves to an OutboxRepository singleton', () {
+    final a = container.read(outboxRepositoryProvider);
+    final b = container.read(outboxRepositoryProvider);
+    expect(a, isA<OutboxRepository>());
     expect(identical(a, b), isTrue);
   });
 
