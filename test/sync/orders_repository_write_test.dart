@@ -102,7 +102,7 @@ void main() {
     test('throws StateError when no row matches the orderId, and writes no outbox row', () async {
       // No seed — empty DB
 
-      expect(
+      await expectLater(
         () => repo.updateStatus('does-not-exist', OrderStatus.completed, actorStaffId: 's-1'),
         throwsA(isA<StateError>()),
       );
@@ -130,11 +130,11 @@ void main() {
         notes: '',
       );
 
-      expect(
+      await expectLater(
         () => readOnlyRepo.upsertOrder(order, actorStaffId: 's-1'),
         throwsA(isA<StateError>()),
       );
-      expect(
+      await expectLater(
         () => readOnlyRepo.updateStatus('AMW-A', OrderStatus.completed, actorStaffId: 's-1'),
         throwsA(isA<StateError>()),
       );

@@ -1,20 +1,94 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
-import '../data/app_database.dart';
+import '../data/app_database.dart' as drift;
+import '../orders/proof_event.dart';
+import 'outbox_repository.dart';
 
-/// Read-side repository for proof events. Returns raw Drift `ProofEvent` rows
-/// — the domain wrapper (`LaundryOrder.proofEvents`) is hydrated by
-/// `OrdersRepository`, not here.
+/// Read/write repository for proof events.
+///
+/// Write methods ([insertEvent]) require an [OutboxRepository] to be supplied
+/// at construction time. Callers that only need the read API can omit it;
+/// attempting a write on a read-only-configured instance throws a [StateError].
 class ProofEventsRepository {
-  ProofEventsRepository(this._db);
+  ProofEventsRepository(
+    this._db, {
+    OutboxRepository? outbox,
+    DateTime Function()? clock,
+    String Function()? uuid,
+  })  : _outbox = outbox,
+        _clock = clock ?? DateTime.now,
+        _uuid = uuid ?? _defaultUuid;
 
-  final AppDatabase _db;
+  final drift.AppDatabase _db;
+  final OutboxRepository? _outbox;
+  final DateTime Function() _clock;
+  final String Function() _uuid;
+
+  static String _defaultUuid() => const Uuid().v4();
+
+  // ----- READ -----
 
   /// Non-deleted proof events for [orderId], ordered by [ProofEvents.capturedAt].
-  Stream<List<ProofEvent>> watchByOrder(String orderId) {
+  Stream<List<drift.ProofEvent>> watchByOrder(String orderId) {
     return (_db.select(_db.proofEvents)
           ..where((t) => t.orderId.equals(orderId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.capturedAt)]))
         .watch();
+  }
+
+  // ----- WRITE -----
+
+  Future<void> insertEvent(
+    ProofEvent event, {
+    required String orderId,
+    required String actorStaffId,
+  }) async {
+    final outbox = _requireOutbox();
+    final now = _clock();
+    await _db.transaction(() async {
+      await _db.into(_db.proofEvents).insert(
+            drift.ProofEventsCompanion.insert(
+              id: event.id,
+              orderId: orderId,
+              type: event.type.name,
+              capturedAt: event.capturedAt,
+              itemCount: event.count,
+              notes: Value(event.notes),
+              capturedBy: actorStaffId,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await outbox.enqueue(
+        id: _uuid(),
+        forTable: 'proof_events',
+        op: 'insert',
+        rowId: event.id,
+        payload: <String, dynamic>{
+          'id': event.id,
+          'order_id': orderId,
+          'type': event.type.name,
+          'captured_at': event.capturedAt.toUtc().toIso8601String(),
+          'item_count': event.count,
+          'notes': event.notes,
+          'captured_by': actorStaffId,
+          'created_at': now.toUtc().toIso8601String(),
+          'updated_at': now.toUtc().toIso8601String(),
+        },
+      );
+    });
+  }
+
+  // ----- PRIVATE HELPERS -----
+
+  OutboxRepository _requireOutbox() {
+    final o = _outbox;
+    if (o == null) {
+      throw StateError(
+          'ProofEventsRepository was constructed without an OutboxRepository; '
+          'insertEvent is unavailable.');
+    }
+    return o;
   }
 }

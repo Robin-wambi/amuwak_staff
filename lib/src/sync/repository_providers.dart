@@ -32,7 +32,10 @@ final staffRepositoryProvider = Provider<StaffRepository>(
 );
 
 final proofEventsRepositoryProvider = Provider<ProofEventsRepository>(
-  (ref) => ProofEventsRepository(ref.watch(appDatabaseProvider)),
+  (ref) => ProofEventsRepository(
+    ref.watch(appDatabaseProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+  ),
 );
 
 final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
