@@ -1211,6 +1211,70 @@ git add lib/src/dashboard/staff_dashboard_screen.dart test/dashboard/staff_dashb
 git commit -m "Swap dashboard to ordersStreamProvider"
 ```
 
+### Task 9a: Refine dashboard loading branch UX
+
+Follow-up polish to Task 9. Task 9's loading branch renders `_DashboardBody(orders: const [])`, which flashes the summary grid at `0 / 0 / 0 / 0 / 0` and a "Assigned orders" section header with no cards for one frame on cold start. NN/g flags zero-state during loading as misleading — it reads as "no data" rather than "loading." Replace the loading subtree with header banner + slim `LinearProgressIndicator` + quick actions (no summary grid, no orders-section header). Chrome stays tappable; the misleading zero counts disappear.
+
+**Files:**
+- Modify: `lib/src/dashboard/staff_dashboard_screen.dart`
+- Modify: `test/dashboard/staff_dashboard_screen_test.dart`
+
+- [ ] **Step 1: Update the loading-branch test**
+
+The existing `'renders an empty list (no crash) while the stream is loading'` test asserts the "Assigned orders" section header is visible during loading — that assertion is wrong under the new layout. Rewrite it to:
+- Assert `find.byType(LinearProgressIndicator)` resolves to a single widget.
+- Assert `find.text('Staff Workspace')` resolves (header banner still rendered).
+- Assert `find.text('New pickup')` resolves (quick action still tappable).
+- Assert `find.text('Assigned')` finds nothing (no zero-count summary tile).
+- Assert `find.text('Assigned orders', skipOffstage: false)` finds nothing (no orders-section header).
+
+Rename the test to `'loading branch shows a progress indicator and no zero-count summary'`.
+
+- [ ] **Step 2: Confirm RED**
+
+`flutter test test/dashboard/staff_dashboard_screen_test.dart` — `find.byType(LinearProgressIndicator)` fails (Task 9's loading branch renders `_DashboardBody`, no indicator anywhere).
+
+- [ ] **Step 3: Implementation** in `lib/src/dashboard/staff_dashboard_screen.dart`:
+
+Extract a new private widget next to `_DashboardBody`:
+
+```dart
+class _DashboardLoadingBody extends StatelessWidget {
+  const _DashboardLoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: const [
+        _DashboardHeader(),
+        SizedBox(height: 20),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: LinearProgressIndicator(),
+        ),
+        SizedBox(height: 24),
+        _QuickActions(orders: []),
+      ],
+    );
+  }
+}
+```
+
+Swap the `.when(loading: …)` callback from `() => _DashboardBody(orders: const [], onOrderTap: _openOrderDetails)` to `() => const _DashboardLoadingBody()`.
+
+- [ ] **Step 4: Confirm GREEN**
+
+`flutter test test/dashboard/staff_dashboard_screen_test.dart`.
+
+- [ ] **Step 5: Analyze + commit**
+
+```bash
+flutter analyze lib/src/dashboard/staff_dashboard_screen.dart test/dashboard/staff_dashboard_screen_test.dart
+git add lib/src/dashboard/staff_dashboard_screen.dart test/dashboard/staff_dashboard_screen_test.dart docs/superpowers/plans/2026-05-21-plan-3b-orders-stream-migration.md
+git commit -m "Refine dashboard loading branch UX (Plan 3b Task 9a)"
+```
+
 ### Task 10: Migrate `OrderDetailsScreen` to write through `OrdersRepository`
 
 **Files:**

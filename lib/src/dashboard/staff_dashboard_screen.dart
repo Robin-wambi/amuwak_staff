@@ -127,10 +127,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                   orders: orders,
                   onOrderTap: _openOrderDetails,
                 ),
-                loading: () => _DashboardBody(
-                  orders: const [],
-                  onOrderTap: _openOrderDetails,
-                ),
+                loading: () => const _DashboardLoadingBody(),
                 error: (_, __) => _ErrorRetry(
                   onRetry: () => ref.invalidate(ordersStreamProvider),
                 ),
@@ -192,6 +189,27 @@ class _DashboardBody extends StatelessWidget {
           _OrderCard(order: order, onTap: () => onOrderTap(order)),
           const SizedBox(height: 12),
         ],
+      ],
+    );
+  }
+}
+
+class _DashboardLoadingBody extends StatelessWidget {
+  const _DashboardLoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: const [
+        _DashboardHeader(),
+        SizedBox(height: 20),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: LinearProgressIndicator(),
+        ),
+        SizedBox(height: 24),
+        _QuickActions(orders: []),
       ],
     );
   }

@@ -207,11 +207,12 @@ void main() {
     expect(find.text('Test', skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('renders an empty list (no crash) while the stream is loading',
+  testWidgets(
+      'loading branch shows a progress indicator and no zero-count summary',
       (tester) async {
-    // Override ordersStreamProvider with a stream that never emits.
-    // Also override the SyncStatusBanner providers to avoid hitting the real
-    // file-system database.
+    // Override ordersStreamProvider with a stream that never emits — keeps
+    // Riverpod's AsyncValue in the loading state.  SyncStatusBanner providers
+    // are also stubbed so no real Drift stream is opened.
     await tester.pumpWidget(ProviderScope(
       overrides: [
         ordersStreamProvider.overrideWith((ref) => const Stream.empty()),
@@ -223,13 +224,21 @@ void main() {
       child: MaterialApp(
           home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
     ));
-    await tester.pumpAndSettle();
-    // `skipOffstage: false` — the header sits below the visible viewport in
-    // the lazy ListView, but is still in the element tree.
-    expect(
-      find.text('Assigned orders', skipOffstage: false),
-      findsOneWidget,
-    );
+    // `LinearProgressIndicator` animates indefinitely — `pumpAndSettle` would
+    // never settle.  A single `pump` is enough to build the loading frame.
+    await tester.pump();
+
+    // Loading affordance is visible.
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    // Chrome stays rendered so staff can tap straight into a new pickup.
+    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.text('New pickup'), findsOneWidget);
+
+    // No zero-count flicker: neither the summary "Assigned" tile nor the
+    // "Assigned orders" section header is in the tree during loading.
+    expect(find.text('Assigned'), findsNothing);
+    expect(find.text('Assigned orders', skipOffstage: false), findsNothing);
   });
 
   testWidgets('shows the retry button when the stream emits an error',
