@@ -5,24 +5,44 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
+import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
+import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_status.dart';
 
-/// Pumps StaffDashboardScreen inside a ProviderScope. Lets each test
-/// override sync providers without restating the boilerplate.
-Future<void> _pumpDashboard(
+/// Pumps StaffDashboardScreen inside a ProviderScope with stubbed sync
+/// providers, so callers can decide what (if anything) to seed via
+/// [extraOverrides].
+///
+/// Drift stream providers ([pendingOutboxCountProvider],
+/// [lastSyncedAtProvider], [ordersStreamProvider]) are overridden with
+/// simple Dart streams so that no Drift `QueryStream` subscriptions are
+/// open at test teardown — this avoids the zero-duration debounce timer
+/// that `StreamQueryStore.markAsClosed` posts when a Drift stream is
+/// cancelled, which would fail the Flutter test framework's
+/// `!timersPending` invariant.
+Future<void> pumpDashboardWithDb(
   WidgetTester tester, {
   bool lostPhoto = false,
-  List<Override> overrides = const [],
+  List<Override> extraOverrides = const [],
 }) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // Provide a trivial in-memory implementation of every Drift-backed
+        // stream so that no real Drift stream subscriptions are opened.
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        ordersStreamProvider
+            .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
+        ...extraOverrides,
+      ],
       child: MaterialApp(
-        home: StaffDashboardScreen(
-          retrieveLostPhoto: () async => lostPhoto,
-        ),
+        home: StaffDashboardScreen(retrieveLostPhoto: () async => lostPhoto),
       ),
     ),
   );
@@ -33,7 +53,7 @@ void main() {
   testWidgets(
     'Surfaces a SnackBar on startup when an in-flight photo capture was lost',
     (tester) async {
-      await _pumpDashboard(tester, lostPhoto: true);
+      await pumpDashboardWithDb(tester, lostPhoto: true);
 
       expect(
         find.textContaining('photo capture was interrupted'),
@@ -45,7 +65,7 @@ void main() {
   testWidgets(
     'Does not show the lost-capture SnackBar when nothing was lost',
     (tester) async {
-      await _pumpDashboard(tester);
+      await pumpDashboardWithDb(tester);
 
       expect(
         find.textContaining('photo capture was interrupted'),
@@ -57,7 +77,7 @@ void main() {
   testWidgets(
     'Tapping the bell opens NotificationsScreen',
     (tester) async {
-      await _pumpDashboard(tester);
+      await pumpDashboardWithDb(tester);
 
       await tester.tap(find.byTooltip('Notifications'));
       await tester.pumpAndSettle();
@@ -69,7 +89,7 @@ void main() {
   testWidgets(
     'Tapping "New pickup" opens NewPickupScreen',
     (tester) async {
-      await _pumpDashboard(tester);
+      await pumpDashboardWithDb(tester);
 
       await tester.ensureVisible(find.text('New pickup'));
       await tester.pumpAndSettle();
@@ -83,7 +103,7 @@ void main() {
   testWidgets(
     'Tapping "Check order" opens OrderSearchScreen',
     (tester) async {
-      await _pumpDashboard(tester);
+      await pumpDashboardWithDb(tester);
 
       await tester.ensureVisible(find.text('Check order'));
       await tester.pumpAndSettle();
@@ -97,7 +117,7 @@ void main() {
   group('SyncStatusBanner mount (Plan 3a Task 14)', () {
     testWidgets('renders the offline banner when onlineProvider is false',
         (tester) async {
-      await _pumpDashboard(tester, overrides: [
+      await pumpDashboardWithDb(tester, extraOverrides: [
         onlineProvider.overrideWith((ref) => false),
       ]);
 
@@ -108,7 +128,7 @@ void main() {
     testWidgets(
       'renders the pending-uploads banner with the count when online',
       (tester) async {
-        await _pumpDashboard(tester, overrides: [
+        await pumpDashboardWithDb(tester, extraOverrides: [
           onlineProvider.overrideWith((ref) => true),
           pendingOutboxCountProvider
               .overrideWith((ref) => Stream<int>.value(3)),
@@ -122,7 +142,7 @@ void main() {
     testWidgets(
       'hides the banner when online and the outbox is empty',
       (tester) async {
-        await _pumpDashboard(tester, overrides: [
+        await pumpDashboardWithDb(tester, extraOverrides: [
           onlineProvider.overrideWith((ref) => true),
           pendingOutboxCountProvider
               .overrideWith((ref) => Stream<int>.value(0)),
@@ -137,7 +157,7 @@ void main() {
     );
 
     testWidgets('banner sits above the dashboard header', (tester) async {
-      await _pumpDashboard(tester, overrides: [
+      await pumpDashboardWithDb(tester, extraOverrides: [
         onlineProvider.overrideWith((ref) => false),
       ]);
 
@@ -145,5 +165,92 @@ void main() {
       final headerTop = tester.getTopLeft(find.text('Welcome back'));
       expect(bannerTop.dy, lessThan(headerTop.dy));
     });
+  });
+
+  // ------------------------------------------------------------------ Task 9
+
+  testWidgets('renders an order card for each row in ordersStreamProvider',
+      (tester) async {
+    // Seed a single order through the stream and verify the dashboard
+    // renders a card for it.  `Stream.value` emits synchronously on subscribe
+    // so the first `pumpAndSettle` after `pumpWidget` is enough.
+    const seeded = LaundryOrder(
+      orderId: 'X',
+      customerName: 'Test',
+      serviceType: 'wash',
+      status: OrderStatus.pendingPickup,
+      timeLabel: '10:00 AM',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+    );
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+      ],
+      child: MaterialApp(
+          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+    ));
+    await tester.pumpAndSettle();
+
+    // The customer name is in the card; `skipOffstage: false` because cards
+    // sit below the visible viewport in the lazy ListView on the default
+    // 800x600 test surface.
+    expect(find.text('Test', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('renders an empty list (no crash) while the stream is loading',
+      (tester) async {
+    // Override ordersStreamProvider with a stream that never emits.
+    // Also override the SyncStatusBanner providers to avoid hitting the real
+    // file-system database.
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        ordersStreamProvider.overrideWith((ref) => const Stream.empty()),
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+      ],
+      child: MaterialApp(
+          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+    ));
+    await tester.pumpAndSettle();
+    // `skipOffstage: false` — the header sits below the visible viewport in
+    // the lazy ListView, but is still in the element tree.
+    expect(
+      find.text('Assigned orders', skipOffstage: false),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows the retry button when the stream emits an error',
+      (tester) async {
+    // Also override the SyncStatusBanner providers to avoid hitting the real
+    // file-system database.
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        ordersStreamProvider
+            .overrideWith((ref) => Stream.error(Exception('boom'))),
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+      ],
+      child: MaterialApp(
+          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('Could not load orders'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
   });
 }

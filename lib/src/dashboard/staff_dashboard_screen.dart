@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../notifications/notifications_screen.dart';
@@ -13,10 +14,11 @@ import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
+import '../sync/repository_providers.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
-class StaffDashboardScreen extends StatefulWidget {
+class StaffDashboardScreen extends ConsumerStatefulWidget {
   const StaffDashboardScreen({
     super.key,
     this.retrieveLostPhoto,
@@ -28,57 +30,11 @@ class StaffDashboardScreen extends StatefulWidget {
   final RetrieveLostPhotoFn? retrieveLostPhoto;
 
   @override
-  State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
+  ConsumerState<StaffDashboardScreen> createState() =>
+      _StaffDashboardScreenState();
 }
 
-class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
-  final List<LaundryOrder> _orders = [
-    const LaundryOrder(
-      orderId: 'AMW-1024',
-      customerName: 'Sarah N.',
-      serviceType: 'Wash & Iron',
-      status: OrderStatus.pendingPickup,
-      timeLabel: 'Pickup: 10:30 AM',
-      itemCount: 8,
-      phone: '+256 700 123 456',
-      address: 'Kikoni, near Makerere western gate',
-      notes: 'Customer requested careful handling for white shirts.',
-    ),
-    const LaundryOrder(
-      orderId: 'AMW-1025',
-      customerName: 'Brian K.',
-      serviceType: 'Dry cleaning',
-      status: OrderStatus.inProgress,
-      timeLabel: 'Due: 2:00 PM',
-      itemCount: 3,
-      phone: '+256 701 456 789',
-      address: 'Wandegeya, opposite main stage',
-      notes: 'Suit jacket and trousers. Keep separate from regular wash.',
-    ),
-    const LaundryOrder(
-      orderId: 'AMW-1026',
-      customerName: 'Grace A.',
-      serviceType: 'Iron only',
-      status: OrderStatus.readyForDelivery,
-      timeLabel: 'Delivery: 4:30 PM',
-      itemCount: 6,
-      phone: '+256 702 222 111',
-      address: 'Nakulabye, close to Shell',
-      notes: 'Call before delivery.',
-    ),
-    const LaundryOrder(
-      orderId: 'AMW-1027',
-      customerName: 'Daniel M.',
-      serviceType: 'Wash only',
-      status: OrderStatus.completed,
-      timeLabel: 'Done: 9:15 AM',
-      itemCount: 5,
-      phone: '+256 703 333 222',
-      address: 'Bwaise, main road',
-      notes: 'Paid in cash at pickup.',
-    ),
-  ];
-
+class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   // Backend deferred per SPEC-000: photos live in memory only. Swap for
   // `createDefaultProofPhotoStorage()` once the upload endpoint is available.
   final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
@@ -123,22 +79,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     return file.readAsBytes();
   }
 
-  void _replaceUpdatedOrder(LaundryOrder updatedOrder) {
-    final orderIndex = _orders.indexWhere(
-      (order) => order.orderId == updatedOrder.orderId,
-    );
-
-    if (orderIndex == -1) {
-      return;
-    }
-
-    setState(() {
-      _orders[orderIndex] = updatedOrder;
-    });
-  }
-
   Future<void> _openOrderDetails(LaundryOrder order) async {
-    final updatedOrder = await Navigator.of(context).push<LaundryOrder>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OrderDetailsScreen(
           order: order,
@@ -148,21 +90,13 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         ),
       ),
     );
-
-    if (!mounted) return;
-    if (updatedOrder != null) {
-      _replaceUpdatedOrder(updatedOrder);
-    }
+    // No-op on return — the stream picks up the write (after Task 10/11/12
+    // wire writes through the repositories).
   }
 
   @override
   Widget build(BuildContext context) {
-    final totalOrders = _orders.length;
-    final pendingPickup = _orders.countByStatus(OrderStatus.pendingPickup);
-    final inProgress = _orders.countByStatus(OrderStatus.inProgress);
-    final readyForDelivery = _orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = _orders.countByStatus(OrderStatus.completed);
-
+    final ordersAsync = ref.watch(ordersStreamProvider);
     return Scaffold(
       backgroundColor: amuwakBackground,
       appBar: AppBar(
@@ -188,37 +122,18 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
           children: [
             const SyncStatusBanner(),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                children: [
-                  const _DashboardHeader(),
-                  const SizedBox(height: 20),
-                  _SummaryGrid(
-                    totalOrders: totalOrders,
-                    pendingPickup: pendingPickup,
-                    inProgress: inProgress,
-                    readyForDelivery: readyForDelivery,
-                    completed: completed,
-                  ),
-                  const SizedBox(height: 24),
-                  _QuickActions(orders: _orders),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Assigned orders',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
-                      color: amuwakDark,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  for (final order in _orders) ...[
-                    _OrderCard(
-                        order: order,
-                        onTap: () => _openOrderDetails(order)),
-                    const SizedBox(height: 12),
-                  ],
-                ],
+              child: ordersAsync.when(
+                data: (orders) => _DashboardBody(
+                  orders: orders,
+                  onOrderTap: _openOrderDetails,
+                ),
+                loading: () => _DashboardBody(
+                  orders: const [],
+                  onOrderTap: _openOrderDetails,
+                ),
+                error: (_, __) => _ErrorRetry(
+                  onRetry: () => ref.invalidate(ordersStreamProvider),
+                ),
               ),
             ),
           ],
@@ -227,6 +142,87 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Private body widgets
+// ---------------------------------------------------------------------------
+
+class _DashboardBody extends StatelessWidget {
+  const _DashboardBody({
+    required this.orders,
+    required this.onOrderTap,
+  });
+
+  final List<LaundryOrder> orders;
+  final void Function(LaundryOrder) onOrderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalOrders = orders.length;
+    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = orders.countByStatus(OrderStatus.completed);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        const _DashboardHeader(),
+        const SizedBox(height: 20),
+        _SummaryGrid(
+          totalOrders: totalOrders,
+          pendingPickup: pendingPickup,
+          inProgress: inProgress,
+          readyForDelivery: readyForDelivery,
+          completed: completed,
+        ),
+        const SizedBox(height: 24),
+        _QuickActions(orders: orders),
+        const SizedBox(height: 24),
+        const Text(
+          'Assigned orders',
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.bold,
+            color: amuwakDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final order in orders) ...[
+          _OrderCard(order: order, onTap: () => onOrderTap(order)),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+}
+
+class _ErrorRetry extends StatelessWidget {
+  const _ErrorRetry({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Could not load orders. Please try again.'),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unchanged private widgets (header, grid, cards, chips, actions)
+// ---------------------------------------------------------------------------
 
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader();
@@ -468,7 +464,7 @@ class _QuickActions extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       // Pass a snapshot so the report reflects counts at the
-                      // moment it was opened, not later dashboard mutations.
+                      // moment it was opened, not later stream emissions.
                       builder: (_) => DailyReportScreen(
                         orders: List<LaundryOrder>.from(orders),
                       ),
