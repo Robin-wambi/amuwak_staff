@@ -17,7 +17,10 @@ import 'sync_status.dart';
 /// override the database with an in-memory instance.
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(
-  (ref) => OrdersRepository(ref.watch(appDatabaseProvider)),
+  (ref) => OrdersRepository(
+    ref.watch(appDatabaseProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+  ),
 );
 
 final customersRepositoryProvider = Provider<CustomersRepository>(
