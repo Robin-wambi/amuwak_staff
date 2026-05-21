@@ -90,7 +90,10 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
         );
         paths.add(path);
       }
+      // TODO(plan-3b-task-12): replace with Uuid().v4() when this screen
+      // gains OrdersRepository/ProofEventsRepository injection.
       final event = ProofEvent(
+        id: 'pe-${DateTime.now().microsecondsSinceEpoch}',
         type: ProofEventType.delivery,
         capturedAt: widget.clock(),
         count: widget.order.pickupProof?.count ?? widget.order.itemCount,

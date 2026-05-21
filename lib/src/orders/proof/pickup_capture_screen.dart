@@ -102,7 +102,10 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         );
         paths.add(path);
       }
+      // TODO(plan-3b-task-11): replace with Uuid().v4() when this screen
+      // gains OrdersRepository/ProofEventsRepository injection.
       final event = ProofEvent(
+        id: 'pe-${DateTime.now().microsecondsSinceEpoch}',
         type: ProofEventType.pickup,
         capturedAt: widget.clock(),
         count: _count,

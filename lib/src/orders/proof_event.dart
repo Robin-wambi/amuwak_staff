@@ -2,6 +2,7 @@ enum ProofEventType { pickup, delivery }
 
 class ProofEvent {
   const ProofEvent({
+    required this.id,
     required this.type,
     required this.capturedAt,
     required this.count,
@@ -9,6 +10,7 @@ class ProofEvent {
     this.notes,
   });
 
+  final String id;
   final ProofEventType type;
   final DateTime capturedAt;
   final int count;
@@ -19,6 +21,7 @@ class ProofEvent {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! ProofEvent) return false;
+    if (id != other.id) return false;
     if (type != other.type) return false;
     if (capturedAt != other.capturedAt) return false;
     if (count != other.count) return false;
@@ -32,6 +35,7 @@ class ProofEvent {
 
   @override
   int get hashCode => Object.hash(
+        id,
         type,
         capturedAt,
         count,

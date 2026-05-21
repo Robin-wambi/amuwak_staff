@@ -36,6 +36,7 @@ LaundryOrder _orderReadyForDelivery() {
     notes: '',
     proofEvents: [
       ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: DateTime(2026, 5, 12, 9, 42),
         count: 12,

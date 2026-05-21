@@ -66,6 +66,7 @@ class LaundryOrder {
       notes: row.notes,
       proofEvents: events
           .map((e) => ProofEvent(
+                id: e.id,
                 type: _proofTypeFromString(e.type),
                 capturedAt: e.capturedAt,
                 count: e.itemCount,

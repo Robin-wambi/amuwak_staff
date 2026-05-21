@@ -154,6 +154,8 @@ void main() {
       expect(mapped.proofEvents[0].count, 8);
       expect(mapped.proofEvents[0].notes, 'Carefully bagged');
       expect(mapped.proofEvents[0].photoPaths, const <String>[]);
+      expect(mapped.proofEvents[0].id, 'pe-1');
+      expect(mapped.proofEvents[1].id, 'pe-2');
       expect(mapped.proofEvents[1].type, ProofEventType.delivery);
       expect(mapped.proofEvents[1].notes, isNull);
       expect(mapped.proofEvents[1].photoPaths, const <String>[]);

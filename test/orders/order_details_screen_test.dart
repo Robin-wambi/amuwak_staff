@@ -68,6 +68,7 @@ void main() {
       status: OrderStatus.readyForDelivery,
       proofEvents: [
         ProofEvent(
+          id: 'pe-test-1',
           type: ProofEventType.pickup,
           capturedAt: DateTime(2026, 5, 12, 9, 42),
           count: 12,
@@ -108,12 +109,14 @@ void main() {
       status: OrderStatus.completed,
       proofEvents: [
         ProofEvent(
+          id: 'pe-test-1',
           type: ProofEventType.pickup,
           capturedAt: DateTime(2026, 5, 12, 9, 42),
           count: 12,
           photoPaths: const ['memory://AMW-0421/pickup_0'],
         ),
         ProofEvent(
+          id: 'pe-test-2',
           type: ProofEventType.delivery,
           capturedAt: DateTime(2026, 5, 12, 16, 13),
           count: 12,
@@ -138,6 +141,7 @@ void main() {
         status: OrderStatus.completed,
         proofEvents: [
           ProofEvent(
+            id: 'pe-test-1',
             type: ProofEventType.pickup,
             capturedAt: DateTime(2026, 5, 12, 9, 42),
             count: 12,
@@ -164,12 +168,14 @@ void main() {
         status: OrderStatus.completed,
         proofEvents: [
           ProofEvent(
+            id: 'pe-test-1',
             type: ProofEventType.pickup,
             capturedAt: DateTime(2026, 5, 11, 22, 15),
             count: 12,
             photoPaths: const ['memory://AMW-0421/pickup_0'],
           ),
           ProofEvent(
+            id: 'pe-test-2',
             type: ProofEventType.delivery,
             capturedAt: DateTime(2026, 5, 12, 8, 30),
             count: 12,

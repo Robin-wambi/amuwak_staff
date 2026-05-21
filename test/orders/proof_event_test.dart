@@ -8,6 +8,7 @@ void main() {
   group('ProofEvent', () {
     test('two ProofEvents with identical fields are equal', () {
       final a = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 12,
@@ -15,6 +16,7 @@ void main() {
         notes: 'gate locked',
       );
       final b = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 12,
@@ -28,12 +30,14 @@ void main() {
 
     test('different type makes events unequal', () {
       final a = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 12,
         photoPaths: const ['a.jpg'],
       );
       final b = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.delivery,
         capturedAt: pickedAt,
         count: 12,
@@ -45,12 +49,14 @@ void main() {
 
     test('different photoPaths order makes events unequal', () {
       final a = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 1,
         photoPaths: const ['a.jpg', 'b.jpg'],
       );
       final b = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 1,
@@ -62,6 +68,7 @@ void main() {
 
     test('notes default to null when omitted', () {
       final a = ProofEvent(
+        id: 'pe-test-1',
         type: ProofEventType.pickup,
         capturedAt: pickedAt,
         count: 1,
@@ -69,6 +76,25 @@ void main() {
       );
 
       expect(a.notes, isNull);
+    });
+
+    test('id is part of equality + hashCode', () {
+      final a = ProofEvent(
+        id: 'pe-1',
+        type: ProofEventType.pickup,
+        capturedAt: DateTime.utc(2026, 5, 21, 10),
+        count: 3,
+        photoPaths: const [],
+      );
+      final b = ProofEvent(
+        id: 'pe-2',
+        type: ProofEventType.pickup,
+        capturedAt: DateTime.utc(2026, 5, 21, 10),
+        count: 3,
+        photoPaths: const [],
+      );
+      expect(a, isNot(b));
+      expect(a.hashCode, isNot(b.hashCode));
     });
   });
 }
