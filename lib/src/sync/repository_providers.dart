@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../orders/order.dart';
 import 'customers_repository.dart';
 import 'orders_repository.dart';
 import 'outbox_repository.dart';
@@ -44,4 +45,8 @@ final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
 
 final outboxRepositoryProvider = Provider<OutboxRepository>(
   (ref) => OutboxRepository(ref.watch(appDatabaseProvider)),
+);
+
+final ordersStreamProvider = StreamProvider<List<LaundryOrder>>(
+  (ref) => ref.watch(ordersRepositoryProvider).watchAll(),
 );
