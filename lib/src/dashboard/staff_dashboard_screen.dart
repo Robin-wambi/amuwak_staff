@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../auth/session.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
@@ -87,6 +88,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           photoStorage: _photoStorage,
           pickPhoto: _pickPhoto,
           cameraViewBuilder: _cameraViewBuilder,
+          ordersRepo: ref.read(ordersRepositoryProvider),
+          proofEventsRepo: ref.read(proofEventsRepositoryProvider),
+          actorStaffId: ref.read(currentUserIdProvider) ?? '',
         ),
       ),
     );
