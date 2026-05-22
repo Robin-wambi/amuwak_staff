@@ -81,18 +81,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
 
   Future<void> _confirmPickup() async {
-    final result = await Navigator.of(context).push<LaundryOrder>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PickupCaptureScreen(
           order: _order,
           photoStorage: widget.photoStorage,
           pickPhoto: widget.pickPhoto,
           clock: widget.clock,
+          ordersRepo: widget.ordersRepo,
+          proofEventsRepo: widget.proofEventsRepo,
+          actorStaffId: widget.actorStaffId,
         ),
       ),
     );
-    if (result != null && mounted) {
-      setState(() => _order = result);
+    if (result == true && mounted) {
+      // Optimistic local update; the orders stream is the source of truth on
+      // the dashboard. History panel won't show the new proof event until a
+      // refetch, which is acceptable for Task 11.
+      setState(() {
+        _order = _order.copyWith(status: OrderStatus.inProgress);
+      });
     }
   }
 

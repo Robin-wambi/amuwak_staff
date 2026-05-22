@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../shared/widgets/app_theme.dart';
+import '../../sync/orders_repository.dart';
+import '../../sync/proof_events_repository.dart';
 import '../order.dart';
 import '../order_status.dart';
 import '../proof_event.dart';
@@ -9,6 +12,7 @@ import 'proof_photo_storage.dart';
 import 'qr_display_widget.dart';
 
 DateTime _defaultClock() => DateTime.now();
+String _defaultUuidV4() => const Uuid().v4();
 
 enum _Stage { collecting, showQr }
 
@@ -18,13 +22,21 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.order,
     required this.photoStorage,
     required this.pickPhoto,
+    required this.ordersRepo,
+    required this.proofEventsRepo,
+    required this.actorStaffId,
     this.clock = _defaultClock,
+    this.proofEventIdGenerator = _defaultUuidV4,
   });
 
   final LaundryOrder order;
   final ProofPhotoStorage photoStorage;
   final PickPhotoFn pickPhoto;
   final DateTime Function() clock;
+  final OrdersRepository ordersRepo;
+  final ProofEventsRepository proofEventsRepo;
+  final String actorStaffId;
+  final String Function() proofEventIdGenerator;
 
   @override
   State<PickupCaptureScreen> createState() => _PickupCaptureScreenState();
@@ -102,24 +114,27 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         );
         paths.add(path);
       }
-      // TODO(plan-3b-task-11): replace with Uuid().v4() when this screen
-      // gains OrdersRepository/ProofEventsRepository injection.
+      final trimmedNotes = _notesController.text.trim();
       final event = ProofEvent(
-        id: 'pe-${DateTime.now().microsecondsSinceEpoch}',
+        id: widget.proofEventIdGenerator(),
         type: ProofEventType.pickup,
         capturedAt: widget.clock(),
         count: _count,
         photoPaths: paths,
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
+        notes: trimmedNotes.isEmpty ? null : trimmedNotes,
       );
-      final updated = widget.order.copyWith(
-        status: OrderStatus.inProgress,
-        proofEvents: [...widget.order.proofEvents, event],
+      await widget.proofEventsRepo.insertEvent(
+        event,
+        orderId: widget.order.orderId,
+        actorStaffId: widget.actorStaffId,
+      );
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.inProgress,
+        actorStaffId: widget.actorStaffId,
       );
       if (!mounted) return;
-      Navigator.pop<LaundryOrder>(context, updated);
+      Navigator.pop<bool>(context, true);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
