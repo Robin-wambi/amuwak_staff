@@ -1475,6 +1475,36 @@ git add lib/src/orders/proof/delivery_capture_screen.dart lib/src/orders/order_d
 git commit -m "Wire DeliveryCaptureScreen through OrdersRepository + ProofEventsRepository"
 ```
 
+### Task 12a: Re-wire the pickup→delivery flow integration test
+
+Discovered during end-to-end verification: `test/orders/proof/pickup_delivery_flow_test.dart` constructs `OrderDetailsScreen` directly and was missed by Tasks 10-12 (not listed in the File Layout above). Compile-broken because of the new required constructor params, AND behavior-broken because its History-panel assertions rely on `_order.proofEvents` being populated from the capture screens — which no longer happens under Plan 3b's "capture screens pop bool, write through repos" contract.
+
+**Files:**
+- Modify: `test/orders/proof/pickup_delivery_flow_test.dart`
+
+- [ ] **Step 1: Rewrite the test as a DB-asserting integration test**
+
+  Use the `_PickupFixture` pattern from `test/orders/proof/pickup_capture_screen_test.dart`: in-memory `AppDatabase` + `OutboxRepository` + `OrdersRepository(db, outbox: …, clock: …, uuid: …)` + `ProofEventsRepository(db, outbox: …, clock: …, uuid: …)`. Seed the initial order via `db.into(db.orders).insert(OrdersCompanion.insert(…status: 'pending_pickup'…))`. Pump `OrderDetailsScreen` with the fixture's repos, `actorStaffId: 's-test'`. Walk pickup → ready → delivery via the existing `_pressButton` helper. After the flow:
+  - Assert `orders.status == 'completed'`.
+  - Assert `proof_events` has 2 rows: one `type == 'pickup'`, one `type == 'delivery'`.
+  - Assert `outbox` has 5 rows: 2 `insert`s on `proof_events` (pickup + delivery) + 3 `update`s on `orders` (pending→in_progress from pickup, in_progress→ready from `_advanceStatusDirectly`, ready→completed from delivery). Use set-based comparison on `forTable:op` since insertion order is not guaranteed without explicit `ORDER BY`.
+  - Keep the photo-storage assertions (`pickupPhotos.length == 1`, `deliveryPhotos.length == 1`).
+  - **Drop** the History-panel assertions (`find.text('History')`, `find.textContaining('Pickup')`, `find.textContaining('Delivery')`) — they no longer reflect reality because `_order.proofEvents` is not reconciled from the DB. The per-screen tests + the repo write tests already cover proof-event content; the flow test's unique value is the multi-phase status transition + DB-row-count check.
+
+  `addTearDown(() async => fixture.db.close())`.
+
+- [ ] **Step 2: Run, confirm GREEN**
+
+  `flutter test test/orders/proof/pickup_delivery_flow_test.dart`.
+
+- [ ] **Step 3: Analyze + commit**
+
+  ```bash
+  flutter analyze test/orders/proof/pickup_delivery_flow_test.dart
+  git add test/orders/proof/pickup_delivery_flow_test.dart docs/superpowers/plans/2026-05-21-plan-3b-orders-stream-migration.md
+  git commit -m "Re-wire pickup→delivery flow test for repo-write architecture (Plan 3b Task 12a)"
+  ```
+
 ---
 
 ## Verification (end-to-end after all tasks)
