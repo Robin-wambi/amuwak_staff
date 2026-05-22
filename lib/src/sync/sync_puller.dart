@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/app_database.dart';
@@ -75,8 +77,12 @@ class SyncPuller {
         }
       });
     } catch (e, st) {
-      // ignore: avoid_print
-      print('SyncPuller: batch for "${table.name}" failed; watermark not advanced. $e\n$st');
+      developer.log(
+        'batch for "${table.name}" failed; watermark not advanced.',
+        name: 'SyncPuller',
+        error: e,
+        stackTrace: st,
+      );
       return 0;
     }
     await _writeWatermark(table.name, maxWatermark);
