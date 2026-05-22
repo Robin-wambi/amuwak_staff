@@ -13,7 +13,9 @@ class Outbox extends Table {
   DateTimeColumn get lastAttemptedAt  => dateTime().named('last_attempted_at').nullable()();
   TextColumn     get lastError        => text().named('last_error').nullable()();
   TextColumn     get status           => text().withDefault(const Constant('pending'))();
-  //  'pending' | 'in_flight' | 'failed' | 'sent'
+  // Written by OutboxRepository: 'pending' (initial) | 'failed' (retryable)
+  // | 'dead_letter' (retries exhausted). Successful syncs delete the row
+  // rather than mark it 'sent'.
 
   @override
   Set<Column> get primaryKey => {id};
