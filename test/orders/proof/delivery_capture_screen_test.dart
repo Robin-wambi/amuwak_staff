@@ -1,15 +1,22 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// Hide Drift's row class `ProofEvent` so the tests can keep referring to the
+// domain `ProofEvent` from `orders/proof_event.dart` without ambiguity.
+import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/delivery_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/sync/orders_repository.dart';
+import 'package:amuwak_staff/src/sync/outbox_repository.dart';
+import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 
 class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   @override
@@ -46,6 +53,80 @@ LaundryOrder _orderReadyForDelivery() {
   );
 }
 
+/// Bundles an in-memory Drift DB + outbox + wired repos for tests that need
+/// to assert the write path lands the right rows.
+class _DeliveryFixture {
+  _DeliveryFixture._(this.db, this.outbox, this.ordersRepo, this.proofEventsRepo);
+
+  final AppDatabase db;
+  final OutboxRepository outbox;
+  final OrdersRepository ordersRepo;
+  final ProofEventsRepository proofEventsRepo;
+
+  static _DeliveryFixture create() {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final outbox = OutboxRepository(db);
+    final ordersRepo = OrdersRepository(
+      db,
+      outbox: outbox,
+      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
+      uuid: () => 'orders-mut',
+    );
+    final proofEventsRepo = ProofEventsRepository(
+      db,
+      outbox: outbox,
+      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
+      uuid: () => 'pe-mut',
+    );
+    return _DeliveryFixture._(db, outbox, ordersRepo, proofEventsRepo);
+  }
+}
+
+/// Seeds an `orders` row matching [order] directly into the Drift DB.
+Future<void> _seedOrder(AppDatabase db, LaundryOrder order) {
+  return db.into(db.orders).insert(OrdersCompanion.insert(
+        id: order.orderId,
+        orderCode: order.orderId,
+        customerName: order.customerName,
+        phone: order.phone,
+        address: order.address,
+        serviceType: order.serviceType,
+        status: order.status.toDbString(),
+        intakeMethod: 'driver_pickup',
+        fulfillmentMethod: 'delivery',
+        itemCount: order.itemCount,
+        intakeRecordedBy: 's-test',
+        createdBy: 's-test',
+      ));
+}
+
+/// Lazily-constructed placeholder DB shared by tests that don't supply repos.
+/// Read-only by construction (no outbox wired), so any accidental write
+/// surfaces as a `StateError` rather than silently succeeding.
+AppDatabase? _placeholderDb;
+AppDatabase _ensurePlaceholderDb() =>
+    _placeholderDb ??= AppDatabase.forTesting(NativeDatabase.memory());
+
+/// Builds a `DeliveryCaptureScreen` with placeholder repos for tests that only
+/// exercise UI (photo picker, notes field, etc.) and never tap "Mark delivered".
+DeliveryCaptureScreen _buildScreen({
+  required LaundryOrder order,
+  required ProofPhotoStorage storage,
+  required Future<List<int>?> Function() pickPhoto,
+  required DateTime Function() clock,
+}) {
+  return DeliveryCaptureScreen(
+    order: order,
+    photoStorage: storage,
+    pickPhoto: pickPhoto,
+    clock: clock,
+    ordersRepo: OrdersRepository(_ensurePlaceholderDb()),
+    proofEventsRepo: ProofEventsRepository(_ensurePlaceholderDb()),
+    actorStaffId: 's-test',
+    proofEventIdGenerator: () => 'pe-test',
+  );
+}
+
 void main() {
   testWidgets('Mark delivered is disabled until a handover photo is captured',
       (tester) async {
@@ -54,9 +135,9 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: DeliveryCaptureScreen(
+        home: _buildScreen(
           order: order,
-          photoStorage: storage,
+          storage: storage,
           pickPhoto: () async => const [1, 2, 3],
           clock: () => DateTime(2026, 5, 12, 16, 13),
         ),
@@ -74,10 +155,16 @@ void main() {
   });
 
   testWidgets(
-      'Mark delivered appends a delivery ProofEvent and pops with status completed',
+      'Tapping Mark delivered flips the order to completed, inserts a delivery '
+      'proof_events row, and enqueues both outbox writes',
       (tester) async {
+    final fixture = _DeliveryFixture.create();
+    addTearDown(() async => fixture.db.close());
+    final order = _orderReadyForDelivery();
+    await _seedOrder(fixture.db, order);
+
     final storage = InMemoryProofPhotoStorage();
-    LaundryOrder? captured;
+    bool? popResult;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -87,14 +174,17 @@ void main() {
               body: Center(
                 child: ElevatedButton(
                   onPressed: () async {
-                    captured =
-                        await Navigator.of(context).push<LaundryOrder>(
+                    popResult = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
                         builder: (_) => DeliveryCaptureScreen(
-                          order: _orderReadyForDelivery(),
+                          order: order,
                           photoStorage: storage,
                           pickPhoto: () async => const [50, 60, 70],
                           clock: () => DateTime(2026, 5, 12, 16, 13),
+                          ordersRepo: fixture.ordersRepo,
+                          proofEventsRepo: fixture.proofEventsRepo,
+                          actorStaffId: 's-test',
+                          proofEventIdGenerator: () => 'pe-task-12',
                         ),
                       ),
                     );
@@ -117,20 +207,48 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
     await tester.pumpAndSettle();
 
-    expect(captured, isNotNull);
-    expect(captured!.status, equals(OrderStatus.completed));
-    expect(captured!.proofEvents, hasLength(2));
-    final delivery = captured!.deliveryProof!;
-    expect(delivery.type, equals(ProofEventType.delivery));
-    expect(delivery.photoPaths, hasLength(1));
+    expect(popResult, isTrue);
+
+    // Orders row was flipped to completed.
+    final orderRow = await (fixture.db.select(fixture.db.orders)
+          ..where((t) => t.id.equals('AMW-0421')))
+        .getSingle();
+    expect(orderRow.status, 'completed');
+
+    // proof_events row landed with the right type + count + actor.
+    final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
+    expect(proofRows, hasLength(1));
+    expect(proofRows.single.id, 'pe-task-12');
+    expect(proofRows.single.orderId, 'AMW-0421');
+    expect(proofRows.single.type, 'delivery');
+    expect(proofRows.single.itemCount, 12);
+    expect(proofRows.single.capturedBy, 's-test');
+
+    // Outbox has the proof_events insert AND the orders update.
+    final outboxRows = await fixture.db.select(fixture.db.outbox).get();
+    expect(outboxRows, hasLength(2));
+    final tableOps = outboxRows.map((r) => '${r.forTable}:${r.op}').toSet();
+    expect(
+      tableOps,
+      containsAll(<String>['proof_events:insert', 'orders:update']),
+    );
+
+    // Photo bytes were actually persisted to storage.
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [50, 60, 70]));
   });
 
   testWidgets(
-    'Mark delivered re-enables itself and surfaces an error when photo save fails',
+    'Mark delivered re-enables itself, surfaces an error, and lands no DB rows '
+    'when photo save fails',
     (tester) async {
-      LaundryOrder? captured;
+      final fixture = _DeliveryFixture.create();
+      addTearDown(() async => fixture.db.close());
+      final order = _orderReadyForDelivery();
+      await _seedOrder(fixture.db, order);
+
+      bool? popResult;
+      var popResolved = false;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -140,16 +258,21 @@ void main() {
                 body: Center(
                   child: ElevatedButton(
                     onPressed: () async {
-                      captured = await Navigator.of(context).push<LaundryOrder>(
+                      popResult = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (_) => DeliveryCaptureScreen(
-                            order: _orderReadyForDelivery(),
+                            order: order,
                             photoStorage: _ThrowingProofPhotoStorage(),
                             pickPhoto: () async => const [50, 60, 70],
                             clock: () => DateTime(2026, 5, 12, 16, 13),
+                            ordersRepo: fixture.ordersRepo,
+                            proofEventsRepo: fixture.proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-task-12',
                           ),
                         ),
                       );
+                      popResolved = true;
                     },
                     child: const Text('Open'),
                   ),
@@ -168,8 +291,11 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
 
-      expect(captured, isNull);
+      // Push has not resolved — the screen did not pop.
+      expect(popResolved, isFalse);
+      expect(popResult, isNull);
       expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
+      // Mark-delivered button is re-enabled so the user can retry.
       final markDelivered = find.widgetWithText(
         ElevatedButton,
         'Mark delivered',
@@ -178,11 +304,24 @@ void main() {
         tester.widget<ElevatedButton>(markDelivered).onPressed,
         isNotNull,
       );
+      // User-facing error feedback is visible.
       expect(
         find.textContaining('Could not save delivery proof'),
         findsOneWidget,
       );
+      // The exception was handled, not left dangling.
       expect(tester.takeException(), isNull);
+
+      // Photo-save failure short-circuited before any repo write:
+      // orders row still ready (for delivery), no proof_events row, no outbox rows.
+      final orderRow = await (fixture.db.select(fixture.db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'ready');
+      final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
+      expect(proofRows, isEmpty);
+      final outboxRows = await fixture.db.select(fixture.db.outbox).get();
+      expect(outboxRows, isEmpty);
     },
   );
 
@@ -192,8 +331,8 @@ void main() {
       // Defensive path: scanner flow normally guarantees a pickup proof, but
       // if the screen is reached for an order without one, the delivery
       // event's count must come from itemCount rather than crash.
-      final storage = InMemoryProofPhotoStorage();
-      LaundryOrder? captured;
+      final fixture = _DeliveryFixture.create();
+      addTearDown(() async => fixture.db.close());
 
       const orderWithoutPickup = LaundryOrder(
         orderId: 'AMW-0999',
@@ -206,6 +345,9 @@ void main() {
         address: '5 Yaba',
         notes: '',
       );
+      await _seedOrder(fixture.db, orderWithoutPickup);
+
+      final storage = InMemoryProofPhotoStorage();
 
       await tester.pumpWidget(
         MaterialApp(
@@ -215,14 +357,17 @@ void main() {
                 body: Center(
                   child: ElevatedButton(
                     onPressed: () async {
-                      captured =
-                          await Navigator.of(context).push<LaundryOrder>(
+                      await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (_) => DeliveryCaptureScreen(
                             order: orderWithoutPickup,
                             photoStorage: storage,
                             pickPhoto: () async => const [50, 60, 70],
                             clock: () => DateTime(2026, 5, 12, 16, 13),
+                            ordersRepo: fixture.ordersRepo,
+                            proofEventsRepo: fixture.proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-task-12b',
                           ),
                         ),
                       );
@@ -247,10 +392,10 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
 
-      expect(captured, isNotNull);
-      final delivery = captured!.deliveryProof!;
-      // Count came from itemCount because pickupProof was null.
-      expect(delivery.count, equals(7));
+      // proof_events row carries itemCount (7) because pickupProof was null.
+      final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
+      expect(proofRows, hasLength(1));
+      expect(proofRows.single.itemCount, 7);
     },
   );
 
@@ -259,9 +404,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: DeliveryCaptureScreen(
+          home: _buildScreen(
             order: _orderReadyForDelivery(),
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async => const [11, 22, 33, 44],
             clock: () => DateTime(2026, 5, 12, 16, 13),
           ),
@@ -285,9 +430,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: DeliveryCaptureScreen(
+          home: _buildScreen(
             order: _orderReadyForDelivery(),
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw Exception('camera permission revoked');
             },
@@ -316,9 +461,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: DeliveryCaptureScreen(
+          home: _buildScreen(
             order: _orderReadyForDelivery(),
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw PlatformException(code: 'camera_access_denied');
             },
@@ -342,9 +487,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: DeliveryCaptureScreen(
+          home: _buildScreen(
             order: _orderReadyForDelivery(),
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw PlatformException(code: 'no_available_camera');
             },
@@ -369,9 +514,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: DeliveryCaptureScreen(
+          home: _buildScreen(
             order: _orderReadyForDelivery(),
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () {
               final c = Completer<List<int>?>();
               completers.add(c);
