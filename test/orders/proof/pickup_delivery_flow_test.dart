@@ -79,7 +79,6 @@ void main() {
         ));
 
     final storage = InMemoryProofPhotoStorage();
-    var pickupEventId = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -121,10 +120,9 @@ void main() {
     await tester.tap(find.byKey(const Key('add_photo')));
     await tester.pumpAndSettle();
     await _pressButton(tester, 'Confirm with customer');
-    // The pickup capture screen's default proofEventIdGenerator uses Uuid().v4()
-    // — that's fine; the DB assertions below don't pin the id, they pin the
-    // type ('pickup' vs 'delivery').
-    pickupEventId++;
+    // The pickup capture screen's default proofEventIdGenerator uses Uuid().v4().
+    // The DB assertions below don't pin the id, they pin the type
+    // ('pickup' vs 'delivery').
     await _pressButton(tester, 'Done');
 
     // OrderDetailsScreen optimistically reflects inProgress.
@@ -201,7 +199,5 @@ void main() {
     // DB and pop bool; OrderDetailsScreen does not reconcile proof events into
     // local `_order.proofEvents`. The History panel would only appear after a
     // re-fetch (e.g. via a watchById stream), which is deferred.
-    // Silence the unused-local warning the analyzer would otherwise raise.
-    expect(pickupEventId, 1);
   });
 }
