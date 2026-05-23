@@ -85,6 +85,33 @@ void main() {
     expect(payload['notes'], isNull);
   });
 
+  test(
+      'insertEvent is idempotent on duplicate event id — second insert is '
+      'a no-op so capture-screen retries do not crash', () async {
+    final event = ProofEvent(
+      id: 'pe-retry',
+      type: ProofEventType.pickup,
+      capturedAt: DateTime.utc(2026, 5, 21, 10, 30),
+      count: 4,
+      photoPaths: const [],
+    );
+
+    // First insert lands a row.
+    await repo.insertEvent(event, orderId: 'AMW-R', actorStaffId: 's-1');
+    final firstRows = await db.select(db.proofEvents).get();
+    expect(firstRows, hasLength(1));
+
+    // A retry with the SAME event id must NOT throw and must NOT create
+    // a second proof_events row. The outbox already uses insertOrIgnore on
+    // the mutation id, but here we pass the SAME mutation id by virtue of
+    // the `seq` counter being deterministic in this fixture's setUp — to
+    // be safe we just assert proof_events stays at hasLength(1).
+    await repo.insertEvent(event, orderId: 'AMW-R', actorStaffId: 's-1');
+    final secondRows = await db.select(db.proofEvents).get();
+    expect(secondRows, hasLength(1),
+        reason: 'duplicate event id must not insert a second row');
+  });
+
   test('insertEvent throws StateError when no outbox is wired', () async {
     final readOnlyRepo = ProofEventsRepository(db); // no outbox
     final event = ProofEvent(

@@ -50,6 +50,23 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   bool _saving = false;
   bool _pickingPhoto = false;
 
+  // Cached across retries so that re-tapping "Done" after a downstream failure
+  // (status update threw, photo save threw between repo calls, etc.) doesn't
+  // generate a fresh UUID and land a second proof_events row in the DB and
+  // outbox.
+  //
+  // [_pendingEventId] / [_pendingPhotoPaths] / [_pendingCapturedAt] hold the
+  // values the FIRST attempt baked into the ProofEvent so the second attempt
+  // is byte-identical. [_proofPersisted] short-circuits the proof insert+
+  // outbox enqueue on retry, because the repository enqueues with a fresh
+  // outbox-mutation UUID each call — a second `insertEvent` would land a
+  // duplicate proof_events outbox row even though the proof_events row
+  // itself is insertOrIgnore on event id.
+  String? _pendingEventId;
+  List<String>? _pendingPhotoPaths;
+  DateTime? _pendingCapturedAt;
+  bool _proofPersisted = false;
+
   static const int _maxPhotos = 3;
 
   bool get _canConfirm =>
@@ -103,38 +120,21 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   Future<void> _onDone() async {
     if (_saving) return;
     setState(() => _saving = true);
+
+    // Photo save — cache the paths so retries don't re-save bytes (and don't
+    // surface fresh storage errors mid-retry for already-persisted photos).
+    final List<String> paths;
     try {
-      final paths = <String>[];
-      for (var i = 0; i < _photoBytes.length; i++) {
-        final path = await widget.photoStorage.save(
-          orderId: widget.order.orderId,
-          type: ProofEventType.pickup,
-          index: i,
-          bytes: _photoBytes[i],
-        );
-        paths.add(path);
-      }
-      final trimmedNotes = _notesController.text.trim();
-      final event = ProofEvent(
-        id: widget.proofEventIdGenerator(),
-        type: ProofEventType.pickup,
-        capturedAt: widget.clock(),
-        count: _count,
-        photoPaths: paths,
-        notes: trimmedNotes.isEmpty ? null : trimmedNotes,
-      );
-      await widget.proofEventsRepo.insertEvent(
-        event,
-        orderId: widget.order.orderId,
-        actorStaffId: widget.actorStaffId,
-      );
-      await widget.ordersRepo.updateStatus(
-        widget.order.orderId,
-        OrderStatus.inProgress,
-        actorStaffId: widget.actorStaffId,
-      );
-      if (!mounted) return;
-      Navigator.pop<bool>(context, true);
+      paths = _pendingPhotoPaths ?? <String>[
+        for (var i = 0; i < _photoBytes.length; i++)
+          await widget.photoStorage.save(
+            orderId: widget.order.orderId,
+            type: ProofEventType.pickup,
+            index: i,
+            bytes: _photoBytes[i],
+          ),
+      ];
+      _pendingPhotoPaths = paths;
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -143,7 +143,68 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
           content: Text('Could not save pickup proof. Please try again.'),
         ),
       );
+      return;
     }
+
+    // Generate / reuse the event id and timestamp ONCE so the proof_events row
+    // (and its outbox payload) is byte-identical across retries.
+    _pendingEventId ??= widget.proofEventIdGenerator();
+    _pendingCapturedAt ??= widget.clock();
+    final trimmedNotes = _notesController.text.trim();
+    final event = ProofEvent(
+      id: _pendingEventId!,
+      type: ProofEventType.pickup,
+      capturedAt: _pendingCapturedAt!,
+      count: _count,
+      photoPaths: paths,
+      notes: trimmedNotes.isEmpty ? null : trimmedNotes,
+    );
+
+    if (!_proofPersisted) {
+      try {
+        await widget.proofEventsRepo.insertEvent(
+          event,
+          orderId: widget.order.orderId,
+          actorStaffId: widget.actorStaffId,
+        );
+        _proofPersisted = true;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save pickup proof. Please try again.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    try {
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.inProgress,
+        actorStaffId: widget.actorStaffId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      // Distinct message: the proof DID save. Re-tapping Done skips the proof
+      // insert entirely (see `_proofPersisted`) and just retries the status
+      // flip.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pickup proof saved, but status update failed. Tap Done again to '
+            'retry.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pop<bool>(context, true);
   }
 
   @override

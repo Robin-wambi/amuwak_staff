@@ -30,6 +30,26 @@ class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   }
 }
 
+/// Wraps a real [OrdersRepository] but rigs `updateStatus` to throw on the
+/// first call and delegate to the real repo on subsequent calls. Used to
+/// exercise the capture-screen retry path: insert proof succeeds, status
+/// update fails, user retries, status update succeeds.
+class _FlakyUpdateOrdersRepo extends OrdersRepository {
+  _FlakyUpdateOrdersRepo(super.db, {required super.outbox});
+
+  int _calls = 0;
+
+  @override
+  Future<void> updateStatus(String orderId, OrderStatus newStatus,
+      {required String actorStaffId}) async {
+    _calls += 1;
+    if (_calls == 1) {
+      throw Exception('transient flake');
+    }
+    return super.updateStatus(orderId, newStatus, actorStaffId: actorStaffId);
+  }
+}
+
 const _baseOrder = LaundryOrder(
   orderId: 'AMW-0421',
   customerName: 'Jane Doe',
@@ -528,6 +548,125 @@ void main() {
       expect(find.byKey(const Key('add_photo')), findsOneWidget);
       expect(find.textContaining('No camera'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Retrying Done after a transient status-update failure lands exactly ONE '
+    'proof_events row and ONE proof_events outbox row (cached event id)',
+    (tester) async {
+      // Critical #2: a fresh UUID per Done-tap would otherwise land a second
+      // proof_events row and outbox enqueue on every retry. With caching, the
+      // proof_events insertOrIgnore is a no-op on the second tap and only the
+      // orders update runs.
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(() async => db.close());
+      final outbox = OutboxRepository(db);
+      final flakyOrdersRepo = _FlakyUpdateOrdersRepo(
+        db,
+        outbox: outbox,
+      );
+      final proofEventsRepo = ProofEventsRepository(db, outbox: outbox);
+      await _seedOrder(db, _baseOrder);
+
+      bool? popResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      popResult = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => PickupCaptureScreen(
+                            order: _baseOrder,
+                            photoStorage: InMemoryProofPhotoStorage(),
+                            pickPhoto: () async => const [10, 20, 30],
+                            clock: () => DateTime(2026, 5, 12, 9, 42),
+                            ordersRepo: flakyOrdersRepo,
+                            proofEventsRepo: proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-retry-once',
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Set count + photo and confirm to reach the QR stage.
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+
+      // First Done — proof insert succeeds, status update throws. Screen does
+      // NOT pop, error SnackBar surfaces.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+      expect(popResult, isNull);
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+      expect(
+        find.textContaining('status update failed'),
+        findsOneWidget,
+      );
+
+      // After the first tap, exactly one proof_events row and one outbox row.
+      var proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1));
+      expect(proofRows.single.id, 'pe-retry-once');
+      var outboxRows = await db.select(db.outbox).get();
+      expect(outboxRows.where((r) => r.forTable == 'proof_events'), hasLength(1));
+      // No successful orders update yet.
+      expect(outboxRows.where((r) => r.forTable == 'orders'), isEmpty);
+      var orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'pending_pickup');
+
+      // Flush the in-flight SnackBar so it doesn't overlap the Done button
+      // on the next tap. SnackBars auto-dismiss after ~4s by default;
+      // pumping forward past that and settling clears the bottom of the
+      // screen.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Second Done — status update succeeds. proof_events stays at 1 (cached
+      // event id + insertOrIgnore). Orders status flips, orders outbox row
+      // lands. Screen pops.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+      expect(popResult, isTrue);
+
+      proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1),
+          reason: 'cached event id must keep proof_events at exactly one row');
+      expect(proofRows.single.id, 'pe-retry-once');
+
+      outboxRows = await db.select(db.outbox).get();
+      expect(outboxRows.where((r) => r.forTable == 'proof_events'), hasLength(1),
+          reason: 'cached event id must keep proof_events outbox at one row');
+      expect(outboxRows.where((r) => r.forTable == 'orders'), hasLength(1));
+
+      orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'in_progress');
     },
   );
 

@@ -30,6 +30,26 @@ class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   }
 }
 
+/// Wraps a real [OrdersRepository] but rigs `updateStatus` to throw on the
+/// first call and delegate on subsequent calls. Used to exercise the
+/// capture-screen retry path: insert proof succeeds, status update fails,
+/// user retries, status update succeeds.
+class _FlakyUpdateOrdersRepo extends OrdersRepository {
+  _FlakyUpdateOrdersRepo(super.db, {required super.outbox});
+
+  int _calls = 0;
+
+  @override
+  Future<void> updateStatus(String orderId, OrderStatus newStatus,
+      {required String actorStaffId}) async {
+    _calls += 1;
+    if (_calls == 1) {
+      throw Exception('transient flake');
+    }
+    return super.updateStatus(orderId, newStatus, actorStaffId: actorStaffId);
+  }
+}
+
 LaundryOrder _orderReadyForDelivery() {
   return LaundryOrder(
     orderId: 'AMW-0421',
@@ -322,6 +342,120 @@ void main() {
       expect(proofRows, isEmpty);
       final outboxRows = await fixture.db.select(fixture.db.outbox).get();
       expect(outboxRows, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'Retrying Mark delivered after a transient status-update failure lands '
+    'exactly ONE proof_events row and ONE proof_events outbox row '
+    '(cached event id + persisted-flag short-circuit)',
+    (tester) async {
+      // Critical #2: without the cached event id + `_proofPersisted` short-
+      // circuit, the second tap would either crash on a duplicate PK or land
+      // a duplicate proof_events outbox row (the outbox enqueue uses a fresh
+      // mutation UUID per call). With the fix the second tap only retries
+      // the orders status flip.
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(() async => db.close());
+      final outbox = OutboxRepository(db);
+      final flakyOrdersRepo = _FlakyUpdateOrdersRepo(db, outbox: outbox);
+      final proofEventsRepo = ProofEventsRepository(db, outbox: outbox);
+      final order = _orderReadyForDelivery();
+      await _seedOrder(db, order);
+
+      bool? popResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      popResult = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => DeliveryCaptureScreen(
+                            order: order,
+                            photoStorage: InMemoryProofPhotoStorage(),
+                            pickPhoto: () async => const [50, 60, 70],
+                            clock: () => DateTime(2026, 5, 12, 16, 13),
+                            ordersRepo: flakyOrdersRepo,
+                            proofEventsRepo: proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-retry-once',
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+
+      // First Mark delivered — proof insert succeeds, status update throws.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+      expect(popResult, isNull);
+      expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
+      expect(
+        find.textContaining('status update failed'),
+        findsOneWidget,
+      );
+
+      var proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1));
+      expect(proofRows.single.id, 'pe-retry-once');
+      var outboxRows = await db.select(db.outbox).get();
+      expect(
+        outboxRows.where((r) => r.forTable == 'proof_events'),
+        hasLength(1),
+      );
+      expect(outboxRows.where((r) => r.forTable == 'orders'), isEmpty);
+      var orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'ready');
+
+      // Flush the in-flight SnackBar so it doesn't overlap the button on the
+      // next tap. SnackBars auto-dismiss after ~4s; pumping past that clears
+      // the bottom of the screen.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Second tap — status update succeeds. proof_events stays at 1.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+      expect(popResult, isTrue);
+
+      proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1),
+          reason:
+              'cached event id + _proofPersisted must keep proof_events at exactly one row');
+      expect(proofRows.single.id, 'pe-retry-once');
+
+      outboxRows = await db.select(db.outbox).get();
+      expect(
+        outboxRows.where((r) => r.forTable == 'proof_events'),
+        hasLength(1),
+        reason:
+            '_proofPersisted short-circuit must keep proof_events outbox at one row',
+      );
+      expect(outboxRows.where((r) => r.forTable == 'orders'), hasLength(1));
+
+      orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'completed');
     },
   );
 

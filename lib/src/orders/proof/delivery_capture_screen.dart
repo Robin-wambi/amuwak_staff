@@ -45,6 +45,15 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
   bool _saving = false;
   bool _pickingPhoto = false;
 
+  // Cached across retries; see PickupCaptureScreen for the full rationale.
+  // Without these a transient failure between the proof insert and the
+  // orders status flip would generate a fresh UUID on the next tap, landing
+  // a duplicate proof_events row + outbox enqueue.
+  String? _pendingEventId;
+  List<String>? _pendingPhotoPaths;
+  DateTime? _pendingCapturedAt;
+  bool _proofPersisted = false;
+
   static const int _maxPhotos = 3;
 
   bool get _canDeliver => _photoBytes.isNotEmpty && !_saving;
@@ -91,38 +100,21 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
   Future<void> _markDelivered() async {
     if (_saving) return;
     setState(() => _saving = true);
+
+    // Photo save — cache the paths so retries don't re-save bytes (and don't
+    // surface fresh storage errors mid-retry for already-persisted photos).
+    final List<String> paths;
     try {
-      final paths = <String>[];
-      for (var i = 0; i < _photoBytes.length; i++) {
-        final path = await widget.photoStorage.save(
-          orderId: widget.order.orderId,
-          type: ProofEventType.delivery,
-          index: i,
-          bytes: _photoBytes[i],
-        );
-        paths.add(path);
-      }
-      final trimmedNotes = _notesController.text.trim();
-      final event = ProofEvent(
-        id: widget.proofEventIdGenerator(),
-        type: ProofEventType.delivery,
-        capturedAt: widget.clock(),
-        count: widget.order.pickupProof?.count ?? widget.order.itemCount,
-        photoPaths: paths,
-        notes: trimmedNotes.isEmpty ? null : trimmedNotes,
-      );
-      await widget.proofEventsRepo.insertEvent(
-        event,
-        orderId: widget.order.orderId,
-        actorStaffId: widget.actorStaffId,
-      );
-      await widget.ordersRepo.updateStatus(
-        widget.order.orderId,
-        OrderStatus.completed,
-        actorStaffId: widget.actorStaffId,
-      );
-      if (!mounted) return;
-      Navigator.pop<bool>(context, true);
+      paths = _pendingPhotoPaths ?? <String>[
+        for (var i = 0; i < _photoBytes.length; i++)
+          await widget.photoStorage.save(
+            orderId: widget.order.orderId,
+            type: ProofEventType.delivery,
+            index: i,
+            bytes: _photoBytes[i],
+          ),
+      ];
+      _pendingPhotoPaths = paths;
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -131,7 +123,66 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
           content: Text('Could not save delivery proof. Please try again.'),
         ),
       );
+      return;
     }
+
+    _pendingEventId ??= widget.proofEventIdGenerator();
+    _pendingCapturedAt ??= widget.clock();
+    final trimmedNotes = _notesController.text.trim();
+    final event = ProofEvent(
+      id: _pendingEventId!,
+      type: ProofEventType.delivery,
+      capturedAt: _pendingCapturedAt!,
+      count: widget.order.pickupProof?.count ?? widget.order.itemCount,
+      photoPaths: paths,
+      notes: trimmedNotes.isEmpty ? null : trimmedNotes,
+    );
+
+    if (!_proofPersisted) {
+      try {
+        await widget.proofEventsRepo.insertEvent(
+          event,
+          orderId: widget.order.orderId,
+          actorStaffId: widget.actorStaffId,
+        );
+        _proofPersisted = true;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save delivery proof. Please try again.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    try {
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.completed,
+        actorStaffId: widget.actorStaffId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      // Distinct message: the proof DID save. Re-tapping skips the proof
+      // insert entirely (see `_proofPersisted`) and just retries the status
+      // flip.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Delivery proof saved, but status update failed. Tap Mark '
+            'delivered again to retry.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pop<bool>(context, true);
   }
 
   @override

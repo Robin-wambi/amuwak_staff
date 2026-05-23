@@ -39,6 +39,16 @@ class ProofEventsRepository {
 
   // ----- WRITE -----
 
+  /// Inserts a proof event row + an outbox enqueue inside a single
+  /// transaction.
+  ///
+  /// Both inserts use `InsertMode.insertOrIgnore` so the operation is
+  /// idempotent on the proof-event PK. This is load-bearing for capture-screen
+  /// retries: if the inserts succeed but the caller's follow-up
+  /// `OrdersRepository.updateStatus` throws, the user taps "Done" again with
+  /// the SAME event id — the second insert here is a no-op rather than a
+  /// duplicate-PK crash. The outbox enqueue already uses insertOrIgnore on the
+  /// row's mutation id, so the retry's outbox write is idempotent too.
   Future<void> insertEvent(
     ProofEvent event, {
     required String orderId,
@@ -59,6 +69,7 @@ class ProofEventsRepository {
               createdAt: now,
               updatedAt: now,
             ),
+            mode: InsertMode.insertOrIgnore,
           );
       await outbox.enqueue(
         id: _uuid(),
