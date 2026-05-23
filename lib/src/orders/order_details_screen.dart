@@ -138,7 +138,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   void _handleBackNavigation() {
-    Navigator.pop(context, _order);
+    // Dashboard pushes this route as `push<bool>`; popping a LaundryOrder
+    // here would mismatch the route's result type and silently coerce to
+    // null. Pop `false` so the awaited result is well-typed for the caller.
+    Navigator.pop<bool>(context, false);
   }
 
   Widget _buildPrimaryAction() {
@@ -198,7 +201,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget build(BuildContext context) {
     final statusColor = _order.status.color;
 
-    return PopScope<LaundryOrder>(
+    return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _handleBackNavigation();
