@@ -47,7 +47,6 @@ class SyncOrchestrator {
 
   Future<void> start() async {
     if (_started) return;
-    _started = true;
 
     worker.start(interval: workerInterval);
     watcher.start(
@@ -55,11 +54,23 @@ class SyncOrchestrator {
       onOffline: _handleOffline,
     );
 
-    final initiallyOnline = await watcher.isOnline();
-    setOnline(initiallyOnline);
+    try {
+      final initiallyOnline = await watcher.isOnline();
+      setOnline(initiallyOnline);
 
-    await transitions.loadOnce();
+      await transitions.loadOnce();
+    } catch (_) {
+      // Tear down the worker + watcher we just armed so a retry (the next
+      // `signedIn` re-emission from auth, typically once the network comes
+      // back) starts from a clean slate. Without this, _started would
+      // remain false but the worker timer and connectivity stream would
+      // keep running and the periodic pull timer would never be created.
+      worker.stop();
+      watcher.dispose();
+      rethrow;
+    }
 
+    _started = true;
     _kickoffPull();
     _pullTimer = Timer.periodic(pullerInterval, (_) => _kickoffPull());
   }

@@ -164,6 +164,34 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 130));
       verify(() => puller.pullAll()).called(greaterThanOrEqualTo(2));
     });
+
+    test(
+        'a failed transitions.loadOnce leaves orchestrator retryable and '
+        'tears down side-effects', () async {
+      var loadCalls = 0;
+      when(() => transitions.loadOnce()).thenAnswer((_) async {
+        loadCalls++;
+        if (loadCalls == 1) {
+          throw StateError('offline at first sign-in');
+        }
+      });
+
+      await expectLater(orchestrator.start(), throwsA(isA<StateError>()));
+
+      // Side-effects from the half-started call must be torn down so the
+      // worker timer and connectivity stream don't keep running.
+      verify(() => worker.stop()).called(1);
+      verify(() => watcher.dispose()).called(1);
+
+      // The retry must fully start the orchestrator — including arming the
+      // periodic pull timer, not just the connectivity-triggered pulls.
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      verify(() => puller.pullAll()).called(1);
+
+      await Future<void>.delayed(const Duration(milliseconds: 130));
+      verify(() => puller.pullAll()).called(greaterThanOrEqualTo(2));
+    });
   });
 
   group('stop()', () {
