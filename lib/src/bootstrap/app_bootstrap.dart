@@ -14,11 +14,20 @@ class AppBootstrap {
       url: config.supabaseUrl,
       anonKey: config.supabaseAnonKey,
     );
-    await runSeed(AppDatabase(), OrdersSeeder());
+    // The seeder runs against its own short-lived AppDatabase instance and
+    // closes it before the Riverpod-managed instance is ever created — this
+    // avoids two long-lived SQLite connections (and the cross-instance
+    // stream-invalidation gap) sharing the same file.
+    final db = AppDatabase();
+    try {
+      await runSeed(db, OrdersSeeder());
+    } finally {
+      await db.close();
+    }
   }
 
   /// Test-visible seed entry — accepts an injected DB + seeder so tests
-  /// don't have to spin up Supabase.
+  /// don't have to spin up Supabase. The caller owns the [db] lifecycle.
   static Future<void> runSeed(AppDatabase db, OrdersSeeder seeder) =>
       seeder.seedIfEmpty(db);
 }
