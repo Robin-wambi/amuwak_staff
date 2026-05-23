@@ -101,6 +101,11 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
     if (_saving) return;
     setState(() => _saving = true);
 
+    // Capture the moment Mark delivered was tapped — BEFORE the photo-save
+    // loop, which can take seconds on slow flash. `??=` so a retry preserves
+    // the first attempt's timestamp.
+    _pendingCapturedAt ??= widget.clock();
+
     // Photo save — cache the paths so retries don't re-save bytes (and don't
     // surface fresh storage errors mid-retry for already-persisted photos).
     final List<String> paths;
@@ -126,8 +131,8 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
       return;
     }
 
+    // `_pendingCapturedAt` is already cached at the top of this method.
     _pendingEventId ??= widget.proofEventIdGenerator();
-    _pendingCapturedAt ??= widget.clock();
     final trimmedNotes = _notesController.text.trim();
     final event = ProofEvent(
       id: _pendingEventId!,
