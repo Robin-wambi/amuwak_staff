@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
@@ -264,6 +265,112 @@ void main() {
     expect(find.textContaining('Could not load orders'), findsOneWidget);
     expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
   });
+
+  testWidgets(
+    'Sign-out menu item invokes the signOut callback and navigates to '
+    'LoginScreen after the user confirms',
+    (tester) async {
+      // Critical #5: signOutAndReset is fully tested in pure-Dart but was
+      // unreachable from the UI until now. This test verifies (a) the menu
+      // item exists, (b) the confirmation dialog gates the action, (c) on
+      // confirm the injected signOut callback fires, and (d) the dashboard
+      // is replaced by the login screen.
+      var signOutCalls = 0;
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          ordersStreamProvider
+              .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
+          pendingOutboxCountProvider
+              .overrideWith((ref) => const Stream<int>.empty()),
+          lastSyncedAtProvider
+              .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        ],
+        child: MaterialApp(
+          home: StaffDashboardScreen(
+            retrieveLostPhoto: () async => false,
+            signOut: (ref) async {
+              signOutCalls += 1;
+            },
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Open the account menu and tap "Sign out".
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sign out'), findsOneWidget);
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+
+      // The confirmation dialog is up; nothing has happened yet.
+      expect(find.text('Sign out?'), findsOneWidget);
+      expect(signOutCalls, 0);
+
+      // Cancel first — dialog dismisses, callback NOT invoked.
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sign out?'), findsNothing);
+      expect(signOutCalls, 0);
+      expect(find.byType(StaffDashboardScreen), findsOneWidget);
+
+      // Open the menu again and this time confirm.
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
+      await tester.pumpAndSettle();
+
+      // signOut callback fired exactly once and the LoginScreen replaced
+      // the dashboard.
+      expect(signOutCalls, 1);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(StaffDashboardScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Sign-out shows a SnackBar and stays on the dashboard when the callback '
+    'throws',
+    (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          ordersStreamProvider
+              .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
+          pendingOutboxCountProvider
+              .overrideWith((ref) => const Stream<int>.empty()),
+          lastSyncedAtProvider
+              .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        ],
+        child: MaterialApp(
+          home: StaffDashboardScreen(
+            retrieveLostPhoto: () async => false,
+            signOut: (ref) async {
+              throw Exception('orchestrator stuck');
+            },
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
+      await tester.pumpAndSettle();
+
+      // Dashboard is still up; LoginScreen was never pushed.
+      expect(find.byType(StaffDashboardScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsNothing);
+      // User-facing failure feedback.
+      expect(find.textContaining('Could not sign out'), findsOneWidget);
+      // The exception was handled, not left dangling.
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
       'Tapping an order card without a current session refuses to open '

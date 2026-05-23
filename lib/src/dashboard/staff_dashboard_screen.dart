@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../auth/login_screen.dart';
 import '../auth/session.dart';
+import '../auth/sign_out.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
@@ -16,19 +18,31 @@ import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
+import '../sync/sync_orchestrator_provider.dart';
+import '../sync/sync_status.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
+
+/// Optional injectable for tests: lets a test pump the dashboard, tap the
+/// sign-out menu item, and observe the call WITHOUT having to override every
+/// transitive Riverpod provider that `signOutAndReset` would resolve through.
+typedef SignOutFn = Future<void> Function(WidgetRef ref);
 
 class StaffDashboardScreen extends ConsumerStatefulWidget {
   const StaffDashboardScreen({
     super.key,
     this.retrieveLostPhoto,
+    this.signOut,
   });
 
   // On Android the OS may kill MainActivity while the camera is open, dropping
   // the photo bytes silently. We check on startup so the rider knows to retry
   // instead of believing the capture succeeded. iOS is a no-op (empty response).
   final RetrieveLostPhotoFn? retrieveLostPhoto;
+
+  /// Test seam — defaults to the real `signOutAndReset(...)` flow wired
+  /// through the auth + orchestrator + database providers.
+  final SignOutFn? signOut;
 
   @override
   ConsumerState<StaffDashboardScreen> createState() =>
@@ -78,6 +92,66 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
     if (file == null) return null;
     return file.readAsBytes();
+  }
+
+  /// Confirms intent, then either runs the injected `signOut` callback (test
+  /// seam) or wires `signOutAndReset` through the real orchestrator / db /
+  /// auth providers. On success, replaces the navigation stack with
+  /// LoginScreen so the user can re-authenticate. On failure, surfaces a
+  /// SnackBar — leaving them on a half-cleared dashboard would be worse.
+  Future<void> _onSignOutPressed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'Sign out and clear local data on this device? Any '
+          'pending uploads will be discarded.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final signOut = widget.signOut ?? _defaultSignOut;
+      await signOut(ref);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not sign out. Please try again.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).pushAndRemoveUntil<void>(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  }
+
+  /// Production wiring: resolves the orchestrator, database, and auth service
+  /// from Riverpod and hands them to [signOutAndReset]. Kept as a static-ish
+  /// method (instance method that only touches `ref`) so the test override
+  /// path can replace this entirely.
+  Future<void> _defaultSignOut(WidgetRef ref) {
+    return signOutAndReset(
+      orchestrator: ref.read(syncOrchestratorProvider),
+      db: ref.read(appDatabaseProvider),
+      auth: ref.read(authServiceProvider),
+    );
   }
 
   Future<void> _openOrderDetails(LaundryOrder order) async {
@@ -132,6 +206,23 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
             icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Account',
+            icon: const Icon(Icons.account_circle_outlined),
+            onSelected: (value) {
+              if (value == 'sign_out') _onSignOutPressed();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem<String>(
+                value: 'sign_out',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Sign out'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
