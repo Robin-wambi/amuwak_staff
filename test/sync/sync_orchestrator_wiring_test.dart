@@ -121,4 +121,46 @@ void main() {
 
     verify(() => orchestrator.stop()).called(1);
   });
+
+  test(
+    'rapid signed-in → signed-out waits for start() before invoking stop()',
+    () async {
+      // Reproduces the race the lifecycle serialisation guards against: if
+      // start() is slow and stop() is fired right after, the two MUST NOT
+      // run concurrently (a concurrent stop() while start()'s _kickoffPull
+      // is still writing would corrupt watermark state).
+      final startCompleter = Completer<void>();
+      var stopCalled = false;
+      when(() => orchestrator.start())
+          .thenAnswer((_) => startCompleter.future);
+      when(() => orchestrator.stop()).thenAnswer((_) async {
+        // If stop() runs while start() is still pending, fail the test.
+        expect(startCompleter.isCompleted, isTrue,
+            reason: 'stop() ran while start() was still in flight');
+        stopCalled = true;
+      });
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+
+      container.read(syncLifecycleProvider);
+      controller.add(_signedIn());
+      await Future<void>.delayed(Duration.zero);
+      controller.add(_signedOut());
+      await Future<void>.delayed(Duration.zero);
+
+      // start() is still pending; stop() must be queued, not yet executed.
+      expect(stopCalled, isFalse);
+
+      // Release start(); stop() should now run after it.
+      startCompleter.complete();
+      await Future<void>.delayed(Duration.zero);
+      // One more pump to let the chained .then() resolve.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(stopCalled, isTrue);
+      verify(() => orchestrator.start()).called(1);
+      verify(() => orchestrator.stop()).called(1);
+    },
+  );
 }

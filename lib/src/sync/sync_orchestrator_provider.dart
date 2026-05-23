@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -47,6 +49,21 @@ final syncLifecycleProvider = Provider<void>((ref) {
   final orchestrator = ref.read(syncOrchestratorProvider);
   bool? lastSignedIn;
 
+  // Single in-flight Future chain — every start()/stop() awaits the previous
+  // one. Without this, a rapid auth flap (signed-in → signed-out before
+  // start() completes) would let stop() tear down state concurrently with
+  // an in-progress _kickoffPull, which could write rows to an
+  // already-truncated DB. Errors are logged but never poison the chain.
+  Future<void> chain = Future.value();
+  void enqueue(String label, Future<void> Function() action) {
+    chain = chain
+        .then((_) => action())
+        .catchError((Object e, StackTrace st) {
+      developer.log(label,
+          name: 'syncLifecycle', error: e, stackTrace: st);
+    });
+  }
+
   ref.listen<AsyncValue<AuthState>>(
     authStateProvider,
     (prev, next) {
@@ -55,17 +72,17 @@ final syncLifecycleProvider = Provider<void>((ref) {
       final wasSignedIn = lastSignedIn;
       lastSignedIn = signedIn;
       if (signedIn) {
-        orchestrator.start();
+        enqueue('orchestrator.start failed', orchestrator.start);
       } else if (wasSignedIn == true) {
         // First-ever emission of signed-out is the initial state; there
         // is nothing to stop yet. Only react to a real signed-in →
         // signed-out transition.
-        orchestrator.stop();
+        enqueue('orchestrator.stop failed', orchestrator.stop);
       }
     },
   );
 
   ref.onDispose(() {
-    orchestrator.stop();
+    enqueue('dispose-time orchestrator.stop failed', orchestrator.stop);
   });
 });
