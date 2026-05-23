@@ -18,6 +18,8 @@ import '../reports/daily_report_screen.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
+import '../sync/sync_errors_provider.dart';
+import '../sync/sync_errors_screen.dart';
 import '../sync/sync_orchestrator_provider.dart';
 import '../sync/sync_status.dart';
 
@@ -206,6 +208,22 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
             icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              final count = ref.watch(syncErrorCountProvider);
+              return IconButton(
+                tooltip: 'Sync errors',
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
+                ),
+                icon: Badge(
+                  label: count > 0 ? Text('$count') : null,
+                  isLabelVisible: count > 0,
+                  child: const Icon(Icons.error_outline_rounded),
+                ),
+              );
+            },
           ),
           PopupMenuButton<String>(
             tooltip: 'Account',

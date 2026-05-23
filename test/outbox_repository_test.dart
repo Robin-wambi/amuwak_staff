@@ -52,6 +52,49 @@ void main() {
     expect(rows.first.status, 'failed');
   });
 
+  group('dead-letter surface (Plan 4 Task 4)', () {
+    test('watchDeadLettered emits rows in dead_letter status', () async {
+      await repo.enqueue(
+        id: 'k-pending', forTable: 'orders', op: 'update', rowId: 'A',
+        payload: const {},
+      );
+      await repo.enqueue(
+        id: 'k-failed', forTable: 'orders', op: 'update', rowId: 'B',
+        payload: const {},
+      );
+      // Push k-failed into dead_letter by failing 6 times.
+      for (var i = 0; i < 6; i++) {
+        await repo.markFailed('k-failed', 'boom $i');
+      }
+
+      final dead = await repo.watchDeadLettered().first;
+      expect(dead.map((r) => r.id).toList(), ['k-failed']);
+    });
+
+    test('requeue resets retry_count + flips status back to pending',
+        () async {
+      await repo.enqueue(
+        id: 'k-stuck', forTable: 'orders', op: 'update', rowId: 'A',
+        payload: const {},
+      );
+      for (var i = 0; i < 6; i++) {
+        await repo.markFailed('k-stuck', 'boom');
+      }
+
+      await repo.requeue('k-stuck');
+
+      final row =
+          await (db.select(db.outbox)..where((t) => t.id.equals('k-stuck')))
+              .getSingle();
+      expect(row.status, 'pending');
+      expect(row.retryCount, 0);
+      expect(row.lastError, isNull);
+      // peekPending should now include it.
+      final pending = await repo.peekPending(limit: 10);
+      expect(pending.map((r) => r.id), contains('k-stuck'));
+    });
+  });
+
   group('dedupKeyFor (Plan 4 Task 2)', () {
     test('produces a stable string from (forTable, op, rowId, extra)', () {
       expect(

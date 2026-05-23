@@ -73,6 +73,29 @@ class OutboxRepository {
     return (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
   }
 
+  /// Live stream of rows currently parked in `dead_letter`, newest-first.
+  /// Drives the dashboard's sync-errors badge and the SyncErrorsScreen.
+  Stream<List<OutboxData>> watchDeadLettered() {
+    return (_db.select(_db.outbox)
+          ..where((t) => t.status.equals('dead_letter'))
+          ..orderBy([(t) => OrderingTerm.desc(t.lastAttemptedAt)]))
+        .watch();
+  }
+
+  /// Resets a dead-lettered row back to `'pending'` so the outbox worker
+  /// picks it up on its next drain.  Retry counter and last-error text are
+  /// cleared so the user-visible counter starts fresh.
+  Future<void> requeue(String id) {
+    return (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+      const OutboxCompanion(
+        status: Value('pending'),
+        retryCount: Value(0),
+        lastError: Value(null),
+        lastAttemptedAt: Value(null),
+      ),
+    );
+  }
+
   /// Record a failed dispatch attempt for [id]. Bumps `retry_count` and stores
   /// [error]. Once `retry_count > deadLetterAfter`, the row is flipped to
   /// `dead_letter` status, which excludes it from [peekPending] so a single

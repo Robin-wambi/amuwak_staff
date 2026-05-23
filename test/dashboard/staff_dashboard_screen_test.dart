@@ -11,8 +11,11 @@ import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
+import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
+import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
 import 'package:amuwak_staff/src/sync/sync_status.dart';
 
 /// Pumps StaffDashboardScreen inside a ProviderScope with stubbed sync
@@ -42,6 +45,10 @@ Future<void> pumpDashboardWithDb(
             .overrideWith((ref) => const Stream<DateTime?>.empty()),
         ordersStreamProvider
             .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
+        outboxDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<OutboxData>>.value(const [])),
+        pullDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ...extraOverrides,
       ],
       child: MaterialApp(
@@ -425,4 +432,57 @@ void main() {
       findsOneWidget,
     );
   });
+
+  // ---------------------------------------------------------------- Plan 4 #3
+
+  testWidgets(
+    'sync-errors badge shows the combined count of outbox + pull dead-letters',
+    (tester) async {
+      OutboxData fakeOutboxRow(String id) => OutboxData(
+            id: id, forTable: 'orders', op: 'update', rowId: 'r-$id',
+            payloadJson: '{}',
+            createdAt: DateTime.utc(2026, 5, 23),
+            retryCount: 6,
+            lastAttemptedAt: DateTime.utc(2026, 5, 23),
+            lastError: 'boom',
+            status: 'dead_letter',
+          );
+      PullDeadLetterData fakePullRow(String id) => PullDeadLetterData(
+            id: id, forTable: 'orders',
+            rowPayloadJson: '{}',
+            errorText: 'mapper boom',
+            recordedAt: DateTime.utc(2026, 5, 23),
+          );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        outboxDeadLetteredProvider.overrideWith((ref) =>
+            Stream<List<OutboxData>>.value([
+              fakeOutboxRow('a'),
+              fakeOutboxRow('b'),
+            ])),
+        pullDeadLetteredProvider.overrideWith((ref) =>
+            Stream<List<PullDeadLetterData>>.value([
+              fakePullRow('p1'),
+              fakePullRow('p2'),
+              fakePullRow('p3'),
+            ])),
+      ]);
+
+      // Badge label text equals the combined count (2 + 3).
+      expect(find.byTooltip('Sync errors'), findsOneWidget);
+      expect(find.text('5'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tapping the sync-errors badge opens SyncErrorsScreen',
+    (tester) async {
+      await pumpDashboardWithDb(tester);
+
+      await tester.tap(find.byTooltip('Sync errors'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SyncErrorsScreen), findsOneWidget);
+    },
+  );
 }
