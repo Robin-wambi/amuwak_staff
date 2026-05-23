@@ -34,4 +34,18 @@ void main() {
     final outboxRows = await db.select(db.outbox).get();
     expect(outboxRows, isEmpty);
   });
+
+  test('seedIfEmpty is a no-op when skipInRelease is true', () async {
+    // Production release builds skip the seeder entirely so demo data never
+    // leaks into a real rider's dashboard. `kReleaseMode` is `false` in
+    // tests, so we have to inject the gate explicitly.
+    final seeder = OrdersSeeder(
+      clock: () => DateTime.utc(2026, 5, 21, 8),
+      skipInRelease: true,
+    );
+    await seeder.seedIfEmpty(db);
+
+    final rows = await db.select(db.orders).get();
+    expect(rows, isEmpty);
+  });
 }

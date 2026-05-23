@@ -1,11 +1,20 @@
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'app_database.dart';
 
 class OrdersSeeder {
-  OrdersSeeder({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  OrdersSeeder({DateTime Function()? clock, bool? skipInRelease})
+      : _clock = clock ?? DateTime.now,
+        _skipInRelease = skipInRelease ?? kReleaseMode;
   final DateTime Function() _clock;
+  // Production release builds skip seeding so the four fake-but-plausible
+  // Ugandan demo orders (AMW-1024..1027) never leak into a real rider's
+  // dashboard — including after a sign-out truncate. Tests run in debug
+  // and pass `skipInRelease: false` only if they explicitly need to bypass.
+  final bool _skipInRelease;
 
   Future<void> seedIfEmpty(AppDatabase db) async {
+    if (_skipInRelease) return;
     final existing = await (db.select(db.orders)..limit(1)).get();
     if (existing.isNotEmpty) return;
     final now = _clock();
