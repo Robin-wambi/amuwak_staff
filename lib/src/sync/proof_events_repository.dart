@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 
 import '../data/app_database.dart' as drift;
 import '../orders/proof_event.dart';
-import '../shared/uuid.dart';
 import 'outbox_repository.dart';
 
 /// Read/write repository for proof events.
@@ -15,15 +14,12 @@ class ProofEventsRepository {
     this._db, {
     OutboxRepository? outbox,
     DateTime Function()? clock,
-    String Function()? uuid,
   })  : _outbox = outbox,
-        _clock = clock ?? DateTime.now,
-        _uuid = uuid ?? defaultUuidV4;
+        _clock = clock ?? DateTime.now;
 
   final drift.AppDatabase _db;
   final OutboxRepository? _outbox;
   final DateTime Function() _clock;
-  final String Function() _uuid;
 
   // ----- READ -----
 
@@ -70,7 +66,11 @@ class ProofEventsRepository {
             mode: InsertMode.insertOrIgnore,
           );
       await outbox.enqueue(
-        id: _uuid(),
+        id: OutboxRepository.dedupKeyFor(
+          forTable: 'proof_events',
+          op: 'insert',
+          rowId: event.id,
+        ),
         forTable: 'proof_events',
         op: 'insert',
         rowId: event.id,

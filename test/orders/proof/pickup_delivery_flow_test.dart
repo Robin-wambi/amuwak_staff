@@ -38,19 +38,15 @@ class _FlowFixture {
   static _FlowFixture create() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final outbox = OutboxRepository(db);
-    var ordersMut = 0;
-    var proofMut = 0;
     final ordersRepo = OrdersRepository(
       db,
       outbox: outbox,
       clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-      uuid: () => 'orders-mut-${++ordersMut}',
     );
     final proofEventsRepo = ProofEventsRepository(
       db,
       outbox: outbox,
       clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-      uuid: () => 'pe-mut-${++proofMut}',
     );
     return _FlowFixture._(db, outbox, ordersRepo, proofEventsRepo);
   }

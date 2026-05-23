@@ -49,22 +49,20 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   bool _saving = false;
   bool _pickingPhoto = false;
 
-  // Cached across retries so that re-tapping "Done" after a downstream failure
-  // (status update threw, photo save threw between repo calls, etc.) doesn't
-  // generate a fresh UUID and land a second proof_events row in the DB and
-  // outbox.
+  // Cached across retries so re-tapping "Done" after a downstream failure
+  // produces a byte-identical ProofEvent + outbox payload. With the outbox's
+  // deterministic dedup key (Plan 4 Task 2) AND the proof_events row's
+  // insertOrIgnore on event id, both layers absorb the retry as no-ops —
+  // no UI-side `_proofPersisted` flag needed.
   //
-  // [_pendingEventId] / [_pendingPhotoPaths] / [_pendingCapturedAt] hold the
-  // values the FIRST attempt baked into the ProofEvent so the second attempt
-  // is byte-identical. [_proofPersisted] short-circuits the proof insert+
-  // outbox enqueue on retry, because the repository enqueues with a fresh
-  // outbox-mutation UUID each call — a second `insertEvent` would land a
-  // duplicate proof_events outbox row even though the proof_events row
-  // itself is insertOrIgnore on event id.
+  // [_pendingUpdatedAt] is the stable timestamp passed to
+  // `ordersRepo.updateStatus(updatedAt:)`. Used in the outbox dedup key for
+  // `orders:update:<id>:<updatedAt>`; without it, two retries would mint
+  // distinct keys and double-enqueue.
   String? _pendingEventId;
   List<String>? _pendingPhotoPaths;
   DateTime? _pendingCapturedAt;
-  bool _proofPersisted = false;
+  DateTime? _pendingUpdatedAt;
 
   static const int _maxPhotos = 3;
 
@@ -164,38 +162,36 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
       notes: trimmedNotes.isEmpty ? null : trimmedNotes,
     );
 
-    if (!_proofPersisted) {
-      try {
-        await widget.proofEventsRepo.insertEvent(
-          event,
-          orderId: widget.order.orderId,
-          actorStaffId: widget.actorStaffId,
-        );
-        _proofPersisted = true;
-      } catch (_) {
-        if (!mounted) return;
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save pickup proof. Please try again.'),
-          ),
-        );
-        return;
-      }
-    }
-
     try {
-      await widget.ordersRepo.updateStatus(
-        widget.order.orderId,
-        OrderStatus.inProgress,
+      await widget.proofEventsRepo.insertEvent(
+        event,
+        orderId: widget.order.orderId,
         actorStaffId: widget.actorStaffId,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      // Distinct message: the proof DID save. Re-tapping Done skips the proof
-      // insert entirely (see `_proofPersisted`) and just retries the status
-      // flip.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save pickup proof. Please try again.'),
+        ),
+      );
+      return;
+    }
+
+    // Cache the stable updatedAt for the orders-update outbox key so retries
+    // dedup at the SQL layer (Plan 4 Task 2).
+    _pendingUpdatedAt ??= widget.clock();
+    try {
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.inProgress,
+        actorStaffId: widget.actorStaffId,
+        updatedAt: _pendingUpdatedAt,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(

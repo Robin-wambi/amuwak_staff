@@ -51,4 +51,50 @@ void main() {
     expect(rows.first.lastError, 'network timeout');
     expect(rows.first.status, 'failed');
   });
+
+  group('dedupKeyFor (Plan 4 Task 2)', () {
+    test('produces a stable string from (forTable, op, rowId, extra)', () {
+      expect(
+        OutboxRepository.dedupKeyFor(
+          forTable: 'orders',
+          op: 'update',
+          rowId: 'AMW-A',
+          extra: '2026-05-23T12:00:00.000Z',
+        ),
+        'orders:update:AMW-A:2026-05-23T12:00:00.000Z',
+      );
+    });
+
+    test('omits the trailing segment when extra is absent', () {
+      expect(
+        OutboxRepository.dedupKeyFor(
+          forTable: 'proof_events',
+          op: 'insert',
+          rowId: 'pe-42',
+        ),
+        'proof_events:insert:pe-42',
+      );
+    });
+
+    test('two enqueue calls with the same dedupKey produce one outbox row',
+        () async {
+      final key = OutboxRepository.dedupKeyFor(
+        forTable: 'orders',
+        op: 'update',
+        rowId: 'AMW-A',
+        extra: '2026-05-23T12:00:00.000Z',
+      );
+      await repo.enqueue(
+        id: key, forTable: 'orders', op: 'update', rowId: 'AMW-A',
+        payload: const <String, dynamic>{'status': 'ready'},
+      );
+      await repo.enqueue(
+        id: key, forTable: 'orders', op: 'update', rowId: 'AMW-A',
+        payload: const <String, dynamic>{'status': 'ready'},
+      );
+
+      final rows = await db.select(db.outbox).get();
+      expect(rows, hasLength(1));
+    });
+  });
 }

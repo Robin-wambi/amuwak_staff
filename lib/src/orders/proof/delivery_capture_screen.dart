@@ -45,13 +45,13 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
   bool _pickingPhoto = false;
 
   // Cached across retries; see PickupCaptureScreen for the full rationale.
-  // Without these a transient failure between the proof insert and the
-  // orders status flip would generate a fresh UUID on the next tap, landing
-  // a duplicate proof_events row + outbox enqueue.
+  // The outbox's deterministic dedup key (Plan 4 Task 2) plus the
+  // proof_events row's insertOrIgnore on event id make both layers idempotent
+  // on retry — no UI-side `_proofPersisted` flag needed.
   String? _pendingEventId;
   List<String>? _pendingPhotoPaths;
   DateTime? _pendingCapturedAt;
-  bool _proofPersisted = false;
+  DateTime? _pendingUpdatedAt;
 
   static const int _maxPhotos = 3;
 
@@ -142,38 +142,36 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
       notes: trimmedNotes.isEmpty ? null : trimmedNotes,
     );
 
-    if (!_proofPersisted) {
-      try {
-        await widget.proofEventsRepo.insertEvent(
-          event,
-          orderId: widget.order.orderId,
-          actorStaffId: widget.actorStaffId,
-        );
-        _proofPersisted = true;
-      } catch (_) {
-        if (!mounted) return;
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save delivery proof. Please try again.'),
-          ),
-        );
-        return;
-      }
-    }
-
     try {
-      await widget.ordersRepo.updateStatus(
-        widget.order.orderId,
-        OrderStatus.completed,
+      await widget.proofEventsRepo.insertEvent(
+        event,
+        orderId: widget.order.orderId,
         actorStaffId: widget.actorStaffId,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      // Distinct message: the proof DID save. Re-tapping skips the proof
-      // insert entirely (see `_proofPersisted`) and just retries the status
-      // flip.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save delivery proof. Please try again.'),
+        ),
+      );
+      return;
+    }
+
+    // Cache the stable updatedAt for the orders-update outbox key so retries
+    // dedup at the SQL layer (Plan 4 Task 2).
+    _pendingUpdatedAt ??= widget.clock();
+    try {
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.completed,
+        actorStaffId: widget.actorStaffId,
+        updatedAt: _pendingUpdatedAt,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(

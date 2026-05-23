@@ -3,7 +3,6 @@ import 'package:drift/drift.dart' show Value;
 import '../data/app_database.dart';
 import '../orders/order.dart';
 import '../orders/order_status.dart';
-import '../shared/uuid.dart';
 import 'outbox_repository.dart';
 
 /// Read/write repository for orders.
@@ -24,15 +23,12 @@ class OrdersRepository {
     this._db, {
     OutboxRepository? outbox,
     DateTime Function()? clock,
-    String Function()? uuid,
   })  : _outbox = outbox,
-        _clock = clock ?? DateTime.now,
-        _uuid = uuid ?? defaultUuidV4;
+        _clock = clock ?? DateTime.now;
 
   final AppDatabase _db;
   final OutboxRepository? _outbox;
   final DateTime Function() _clock;
-  final String Function() _uuid;
 
   // ----- READ -----
 
@@ -86,7 +82,12 @@ class OrdersRepository {
             _toCompanion(order, actorStaffId, now: now),
           );
       await outbox.enqueue(
-        id: _uuid(),
+        id: OutboxRepository.dedupKeyFor(
+          forTable: 'orders',
+          op: 'insert',
+          rowId: order.orderId,
+          extra: now.toUtc().toIso8601String(),
+        ),
         forTable: 'orders',
         op: 'insert',
         rowId: order.orderId,
@@ -95,10 +96,20 @@ class OrdersRepository {
     });
   }
 
-  Future<void> updateStatus(String orderId, OrderStatus newStatus,
-      {required String actorStaffId}) async {
+  /// Updates an order's status.
+  ///
+  /// [updatedAt] is optional: callers that may retry the SAME logical
+  /// status change (e.g. capture screens after a network blip) MUST pass a
+  /// stable [updatedAt] so the deterministic outbox key matches across
+  /// retries. Production fresh-tap callers can omit it and get `_clock()`.
+  Future<void> updateStatus(
+    String orderId,
+    OrderStatus newStatus, {
+    required String actorStaffId,
+    DateTime? updatedAt,
+  }) async {
     final outbox = _requireOutbox();
-    final now = _clock();
+    final now = updatedAt ?? _clock();
     final dbStatus = newStatus.toDbString();
     await _db.transaction(() async {
       final affected = await (_db.update(_db.orders)
@@ -108,7 +119,17 @@ class OrdersRepository {
         throw StateError('updateStatus: no order with id "$orderId"');
       }
       await outbox.enqueue(
-        id: _uuid(),
+        // Include target status in the dedup key so two distinct status
+        // changes that happen to share an updated_at (e.g. fixed-clock
+        // tests, or back-to-back transitions in the same microsecond) get
+        // distinct outbox rows. Retries of the SAME (rowId, target,
+        // updatedAt) still dedup.
+        id: OutboxRepository.dedupKeyFor(
+          forTable: 'orders',
+          op: 'update',
+          rowId: orderId,
+          extra: '$dbStatus:${now.toUtc().toIso8601String()}',
+        ),
         forTable: 'orders',
         op: 'update',
         rowId: orderId,

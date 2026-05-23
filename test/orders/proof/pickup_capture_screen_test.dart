@@ -40,13 +40,22 @@ class _FlakyUpdateOrdersRepo extends OrdersRepository {
   int _calls = 0;
 
   @override
-  Future<void> updateStatus(String orderId, OrderStatus newStatus,
-      {required String actorStaffId}) async {
+  Future<void> updateStatus(
+    String orderId,
+    OrderStatus newStatus, {
+    required String actorStaffId,
+    DateTime? updatedAt,
+  }) async {
     _calls += 1;
     if (_calls == 1) {
       throw Exception('transient flake');
     }
-    return super.updateStatus(orderId, newStatus, actorStaffId: actorStaffId);
+    return super.updateStatus(
+      orderId,
+      newStatus,
+      actorStaffId: actorStaffId,
+      updatedAt: updatedAt,
+    );
   }
 }
 
@@ -79,13 +88,11 @@ class _PickupFixture {
       db,
       outbox: outbox,
       clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-      uuid: () => 'orders-mut',
     );
     final proofEventsRepo = ProofEventsRepository(
       db,
       outbox: outbox,
       clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-      uuid: () => 'pe-mut',
     );
     return _PickupFixture._(db, outbox, ordersRepo, proofEventsRepo);
   }

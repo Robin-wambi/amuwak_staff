@@ -12,14 +12,11 @@ void main() {
   late OutboxRepository outbox;
   late OrdersRepository repo;
   DateTime clock() => DateTime.utc(2026, 5, 21, 12, 0);
-  var nextId = 0;
-  String uuid() => 'mut-${++nextId}';
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     outbox = OutboxRepository(db);
-    repo = OrdersRepository(db, outbox: outbox, clock: clock, uuid: uuid);
-    nextId = 0;
+    repo = OrdersRepository(db, outbox: outbox, clock: clock);
   });
   tearDown(() async => db.close());
 
@@ -66,7 +63,10 @@ void main() {
       expect(payload['created_by'], 's-1');
       expect(payload['created_at'], '2026-05-21T12:00:00.000Z');
       expect(payload['updated_at'], '2026-05-21T12:00:00.000Z');
-      expect(outboxRows.single.id, 'mut-1');
+      expect(
+        outboxRows.single.id,
+        'orders:insert:AMW-A:2026-05-21T12:00:00.000Z',
+      );
     });
   });
 
@@ -110,6 +110,43 @@ void main() {
       // Confirm no outbox row leaked through despite the throw
       final outboxRows = await db.select(db.outbox).get();
       expect(outboxRows, isEmpty);
+    });
+
+    test(
+        'called twice with the same updatedAt enqueues ONE outbox row (Plan 4 dedup)',
+        () async {
+      // Seed an orders row.
+      await db.into(db.orders).insert(OrdersCompanion.insert(
+            id: 'AMW-A',
+            orderCode: 'AMW-A',
+            customerName: 'Sarah',
+            phone: '+256', address: 'addr', serviceType: 'wash',
+            status: 'in_progress',
+            intakeMethod: 'driver_pickup', fulfillmentMethod: 'delivery',
+            itemCount: 3,
+            intakeRecordedBy: 's-1', createdBy: 's-1',
+          ));
+
+      final stableUpdatedAt = DateTime.utc(2026, 5, 21, 12, 0);
+      await repo.updateStatus(
+        'AMW-A',
+        OrderStatus.readyForDelivery,
+        actorStaffId: 's-1',
+        updatedAt: stableUpdatedAt,
+      );
+      await repo.updateStatus(
+        'AMW-A',
+        OrderStatus.readyForDelivery,
+        actorStaffId: 's-1',
+        updatedAt: stableUpdatedAt,
+      );
+
+      final rows = await db.select(db.outbox).get();
+      expect(rows, hasLength(1));
+      expect(
+        rows.single.id,
+        'orders:update:AMW-A:ready:2026-05-21T12:00:00.000Z',
+      );
     });
   });
 

@@ -12,6 +12,25 @@ class OutboxRepository {
   OutboxRepository(this._db);
   final AppDatabase _db;
 
+  /// Builds a deterministic outbox key. Callers that may retry the same
+  /// logical mutation (e.g. capture screens after a network blip) MUST pass
+  /// the SAME key on retry — the outbox's [InsertMode.insertOrIgnore] then
+  /// makes the second enqueue a SQL-level no-op.
+  ///
+  /// Format: `forTable:op:rowId[:extra]`. `extra` is typically the row's
+  /// `updated_at` ISO string so that genuinely-distinct mutations to the
+  /// same row (e.g. two successive status changes) get distinct keys.
+  static String dedupKeyFor({
+    required String forTable,
+    required String op,
+    required String rowId,
+    String? extra,
+  }) {
+    return extra == null
+        ? '$forTable:$op:$rowId'
+        : '$forTable:$op:$rowId:$extra';
+  }
+
   /// Enqueues a pending mutation, keyed by [id].
   ///
   /// Uses [InsertMode.insertOrIgnore] **intentionally**: callers MAY pass the

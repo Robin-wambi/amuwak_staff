@@ -46,7 +46,6 @@ class _AdvanceFixture {
       db,
       outbox: outbox,
       clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-      uuid: () => 'mut-test',
     );
     final proofEventsRepo = ProofEventsRepository(db, outbox: outbox);
     return _AdvanceFixture._(db, outbox, ordersRepo, proofEventsRepo);

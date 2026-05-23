@@ -12,17 +12,13 @@ void main() {
   late drift.AppDatabase db;
   late OutboxRepository outbox;
   late ProofEventsRepository repo;
-  var seq = 0;
-
   setUp(() {
     db = drift.AppDatabase.forTesting(NativeDatabase.memory());
     outbox = OutboxRepository(db);
-    seq = 0;
     repo = ProofEventsRepository(
       db,
       outbox: outbox,
       clock: fixedClock,
-      uuid: () => 'mut-${++seq}',
     );
   });
   tearDown(() async => db.close());
@@ -53,7 +49,7 @@ void main() {
     expect(outboxRows.single.forTable, 'proof_events');
     expect(outboxRows.single.op, 'insert');
     expect(outboxRows.single.rowId, 'pe-1');
-    expect(outboxRows.single.id, 'mut-1');
+    expect(outboxRows.single.id, 'proof_events:insert:pe-1');
     final payload = jsonDecode(outboxRows.single.payloadJson) as Map;
     expect(payload['id'], 'pe-1');
     expect(payload['order_id'], 'AMW-A');
