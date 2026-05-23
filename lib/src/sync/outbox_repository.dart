@@ -12,6 +12,17 @@ class OutboxRepository {
   OutboxRepository(this._db);
   final AppDatabase _db;
 
+  /// Enqueues a pending mutation, keyed by [id].
+  ///
+  /// Uses [InsertMode.insertOrIgnore] **intentionally**: callers MAY pass the
+  /// same [id] across retries (e.g. capture screens that cache a mutation id
+  /// in widget state so a partial-failure retry doesn't double-enqueue). On
+  /// a duplicate id the insert silently no-ops at the SQL layer — the
+  /// already-queued row remains intact with its earlier payload.
+  ///
+  /// Implication: callers MUST NOT mutate the payload between retries and
+  /// then expect the new payload to land — only the first enqueue wins. If
+  /// you need a different payload, use a different [id].
   Future<void> enqueue({
     required String id,
     required String forTable,
