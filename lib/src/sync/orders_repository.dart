@@ -39,7 +39,12 @@ class OrdersRepository {
   // ----- READ -----
 
   Stream<List<LaundryOrder>> watchAll() {
-    return _db.select(_db.orders).watch().asyncMap((rows) async {
+    // Soft-deleted orders (back-office tombstones synced via deletedAt) must
+    // not surface to the rider. Matches the deletedAt filter on the other
+    // read repos (CustomersRepository, StaffRepository, ProofEventsRepository).
+    return (_db.select(_db.orders)..where((t) => t.deletedAt.isNull()))
+        .watch()
+        .asyncMap((rows) async {
       if (rows.isEmpty) return const <LaundryOrder>[];
       final ids = rows.map((r) => r.id).toList();
       final events = await (_db.select(_db.proofEvents)
@@ -56,7 +61,12 @@ class OrdersRepository {
   }
 
   Stream<LaundryOrder?> watchById(String orderId) {
-    return (_db.select(_db.orders)..where((t) => t.id.equals(orderId)))
+    // Two chained `..where(...)` clauses AND together; avoids needing the `&`
+    // operator from drift's full import (kept narrow on this file via `show
+    // Value`).
+    return (_db.select(_db.orders)
+          ..where((t) => t.id.equals(orderId))
+          ..where((t) => t.deletedAt.isNull()))
         .watchSingleOrNull()
         .asyncMap((row) async {
       if (row == null) return null;

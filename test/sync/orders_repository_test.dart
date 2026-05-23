@@ -175,4 +175,26 @@ void main() {
       expect(value!.proofEvents, isEmpty);
     });
   });
+
+  group('soft-delete filtering', () {
+    test('watchAll omits orders with a non-null deletedAt', () async {
+      await _insertOrder(db, id: 'AMW-LIVE', status: 'pending_pickup');
+      await _insertOrder(db, id: 'AMW-GONE', status: 'pending_pickup');
+      await (db.update(db.orders)..where((t) => t.id.equals('AMW-GONE')))
+          .write(OrdersCompanion(
+              deletedAt: Value(DateTime.utc(2026, 5, 22, 12, 0))));
+
+      final list = await repo.watchAll().first;
+      expect(list.map((o) => o.orderId), ['AMW-LIVE']);
+    });
+
+    test('watchById returns null for a soft-deleted order', () async {
+      await _insertOrder(db, id: 'AMW-GONE', status: 'pending_pickup');
+      await (db.update(db.orders)..where((t) => t.id.equals('AMW-GONE')))
+          .write(OrdersCompanion(deletedAt: Value(DateTime.utc(2026, 5, 22))));
+
+      final value = await repo.watchById('AMW-GONE').first;
+      expect(value, isNull);
+    });
+  });
 }
