@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
-import 'package:uuid/uuid.dart';
 
 import '../data/app_database.dart' as drift;
 import '../orders/proof_event.dart';
+import '../shared/uuid.dart';
 import 'outbox_repository.dart';
 
 /// Read/write repository for proof events.
@@ -18,14 +18,12 @@ class ProofEventsRepository {
     String Function()? uuid,
   })  : _outbox = outbox,
         _clock = clock ?? DateTime.now,
-        _uuid = uuid ?? _defaultUuid;
+        _uuid = uuid ?? defaultUuidV4;
 
   final drift.AppDatabase _db;
   final OutboxRepository? _outbox;
   final DateTime Function() _clock;
   final String Function() _uuid;
-
-  static String _defaultUuid() => const Uuid().v4();
 
   // ----- READ -----
 

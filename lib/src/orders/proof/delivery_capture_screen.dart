@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';
 
+import '../../shared/uuid.dart';
 import '../../shared/widgets/app_theme.dart';
 import '../../sync/orders_repository.dart';
 import '../../sync/proof_events_repository.dart';
@@ -11,7 +11,6 @@ import '../proof_event.dart';
 import 'proof_photo_storage.dart';
 
 DateTime _defaultClock() => DateTime.now();
-String _defaultUuidV4() => const Uuid().v4();
 
 class DeliveryCaptureScreen extends StatefulWidget {
   const DeliveryCaptureScreen({
@@ -23,7 +22,7 @@ class DeliveryCaptureScreen extends StatefulWidget {
     required this.proofEventsRepo,
     required this.actorStaffId,
     this.clock = _defaultClock,
-    this.proofEventIdGenerator = _defaultUuidV4,
+    this.proofEventIdGenerator = defaultUuidV4,
   });
 
   final LaundryOrder order;

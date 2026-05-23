@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';
 
+import '../../shared/uuid.dart';
 import '../../shared/widgets/app_theme.dart';
 import '../../sync/orders_repository.dart';
 import '../../sync/proof_events_repository.dart';
@@ -12,7 +12,6 @@ import 'proof_photo_storage.dart';
 import 'qr_display_widget.dart';
 
 DateTime _defaultClock() => DateTime.now();
-String _defaultUuidV4() => const Uuid().v4();
 
 enum _Stage { collecting, showQr }
 
@@ -26,7 +25,7 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.proofEventsRepo,
     required this.actorStaffId,
     this.clock = _defaultClock,
-    this.proofEventIdGenerator = _defaultUuidV4,
+    this.proofEventIdGenerator = defaultUuidV4,
   });
 
   final LaundryOrder order;

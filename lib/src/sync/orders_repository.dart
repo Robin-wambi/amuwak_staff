@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart' show Value;
-import 'package:uuid/uuid.dart';
 
 import '../data/app_database.dart';
 import '../orders/order.dart';
 import '../orders/order_status.dart';
+import '../shared/uuid.dart';
 import 'outbox_repository.dart';
 
 /// Read/write repository for orders.
@@ -27,14 +27,12 @@ class OrdersRepository {
     String Function()? uuid,
   })  : _outbox = outbox,
         _clock = clock ?? DateTime.now,
-        _uuid = uuid ?? _defaultUuid;
+        _uuid = uuid ?? defaultUuidV4;
 
   final AppDatabase _db;
   final OutboxRepository? _outbox;
   final DateTime Function() _clock;
   final String Function() _uuid;
-
-  static String _defaultUuid() => const Uuid().v4();
 
   // ----- READ -----
 
