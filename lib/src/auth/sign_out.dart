@@ -46,5 +46,6 @@ Future<void> _truncateAllTables(AppDatabase db) async {
     await db.delete(db.issues).go();
     await db.delete(db.shifts).go();
     await db.delete(db.validTransitions).go();
+    await db.delete(db.pullDeadLetter).go();
   });
 }

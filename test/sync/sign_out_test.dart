@@ -99,6 +99,12 @@ Future<void> _seedAllTables(AppDatabase db) async {
         forTable: 'customers',
         lastSyncedAt: now,
       ));
+  await db.into(db.pullDeadLetter).insert(PullDeadLetterCompanion.insert(
+        id: 'orders:bad-row:1',
+        forTable: 'orders',
+        rowPayloadJson: '{"id":"bad-row"}',
+        errorText: 'null value in non-null column',
+      ));
 }
 
 Future<List<int>> _rowCounts(AppDatabase db) async => Future.wait([
@@ -113,6 +119,7 @@ Future<List<int>> _rowCounts(AppDatabase db) async => Future.wait([
       db.select(db.validTransitions).get().then((r) => r.length),
       db.select(db.outbox).get().then((r) => r.length),
       db.select(db.syncWatermarks).get().then((r) => r.length),
+      db.select(db.pullDeadLetter).get().then((r) => r.length),
     ]);
 
 void main() {
