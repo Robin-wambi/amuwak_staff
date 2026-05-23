@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/app_database.dart';
+import 'pull_dead_letter_repository.dart';
 import 'sync_registry.dart';
 
 /// Fetches Postgres rows for [table] whose configured `watermarkColumn`
@@ -18,10 +19,17 @@ typedef SyncFetch = Future<List<Map<String, dynamic>>> Function(
 /// them into the local Drift database. Used by the periodic puller and on
 /// reconnect.
 class SyncPuller {
-  SyncPuller({required this.db, required this.fetch});
+  SyncPuller({required this.db, required this.fetch, this.deadLetter});
 
   final AppDatabase db;
   final SyncFetch fetch;
+
+  /// Optional sink for rows the mapper couldn't ingest.  When supplied, the
+  /// puller per-row try/catches around `_upsertRow` and quarantines failures
+  /// here, letting good rows in the same batch land and the watermark
+  /// advance.  When null (legacy behaviour, no Plan-4 wiring), a single bad
+  /// row still aborts the whole batch — preserved for tests that don't care.
+  final PullDeadLetterRepository? deadLetter;
 
   static final DateTime _epoch = DateTime.utc(1970);
 
@@ -55,38 +63,131 @@ class SyncPuller {
         );
   }
 
-  /// Pull a single table. Returns the number of rows upserted.
+  /// Pull a single table. Returns the number of rows successfully upserted.
   ///
-  /// If any row in the batch fails to upsert (mapper exception, malformed
-  /// timestamp, unhandled column, etc.), the entire batch is aborted and
-  /// the watermark is **not** advanced — the cycle retries next time. This
-  /// prevents the silent-data-loss path where a poison row poisons later
-  /// rows in the batch while the watermark advances past all of them.
+  /// With a [deadLetter] wired, each row is upserted independently inside a
+  /// transaction; mapper failures are quarantined in `pull_dead_letter` and
+  /// the watermark advances past every row we SAW (good or bad) so the next
+  /// cycle doesn't re-fetch the poison row forever.
+  ///
+  /// Without [deadLetter], legacy behaviour applies: any row's failure
+  /// aborts the whole batch and leaves the watermark put.
   Future<int> pullTable(SyncTable table) async {
     final since = await _readWatermark(table.name);
     final rows = await fetch(table, since);
     if (rows.isEmpty) return 0;
 
-    DateTime maxWatermark = since;
-    try {
-      await db.batch((batch) {
-        for (final row in rows) {
-          _upsertRow(batch, table.name, row);
-          final u = DateTime.parse(row[table.watermarkColumn] as String);
-          if (u.isAfter(maxWatermark)) maxWatermark = u;
-        }
-      });
-    } catch (e, st) {
-      developer.log(
-        'batch for "${table.name}" failed; watermark not advanced.',
-        name: 'SyncPuller',
-        error: e,
-        stackTrace: st,
-      );
-      return 0;
+    if (deadLetter == null) {
+      // Legacy all-or-nothing path.
+      DateTime maxWatermark = since;
+      try {
+        await db.batch((batch) {
+          for (final row in rows) {
+            _upsertRow(batch, table.name, row);
+            final u = DateTime.parse(row[table.watermarkColumn] as String);
+            if (u.isAfter(maxWatermark)) maxWatermark = u;
+          }
+        });
+      } catch (e, st) {
+        developer.log(
+          'batch for "${table.name}" failed; watermark not advanced.',
+          name: 'SyncPuller',
+          error: e,
+          stackTrace: st,
+        );
+        return 0;
+      }
+      await _writeWatermark(table.name, maxWatermark);
+      return rows.length;
     }
-    await _writeWatermark(table.name, maxWatermark);
-    return rows.length;
+
+    // Per-row path with dead-letter quarantine.
+    //
+    // Watermark advances past EVERY row we saw, including the bad ones —
+    // otherwise next cycle re-fetches the poison row and re-dead-letters it
+    // forever.  Failed rows are buffered and written outside the transaction
+    // so a single bad row can't roll back successful upserts.
+    DateTime maxWatermark = since;
+    final failed = <_FailedRow>[];
+    var written = 0;
+
+    await db.transaction(() async {
+      for (final row in rows) {
+        try {
+          await _upsertRowSingle(table.name, row);
+          written += 1;
+        } catch (e, st) {
+          failed.add(_FailedRow(table.name, row, e, st));
+        }
+        // Advance watermark for both successful and dead-lettered rows.
+        final ts = _parseTimestampOrNull(row[table.watermarkColumn]);
+        if (ts != null && ts.isAfter(maxWatermark)) maxWatermark = ts;
+      }
+    });
+
+    for (final f in failed) {
+      await deadLetter!.insert(
+        forTable: f.tableName,
+        rowPayload: f.row,
+        errorText: '${f.error}\n${f.stack}',
+      );
+    }
+    if (maxWatermark.isAfter(since)) {
+      await _writeWatermark(table.name, maxWatermark);
+    }
+    return written;
+  }
+
+  DateTime? _parseTimestampOrNull(Object? v) {
+    if (v is! String) return null;
+    return DateTime.tryParse(v);
+  }
+
+  /// Upserts ONE row outside a `batch`.  Mirrors `_upsertRow` but uses the
+  /// single-row insert API so we can catch per-row failures.
+  Future<void> _upsertRowSingle(String table, Map<String, dynamic> row) async {
+    switch (table) {
+      case 'staff':
+        await db.into(db.staff).insert(_staffFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'customers':
+        await db.into(db.customers).insert(_customersFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'orders':
+        await db.into(db.orders).insert(_ordersFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'proof_events':
+        await db.into(db.proofEvents).insert(_proofEventsFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'order_status_events':
+        await db.into(db.orderStatusEvents)
+            .insert(_orderStatusEventsFromJson(row),
+                mode: InsertMode.insertOrReplace);
+        break;
+      case 'proof_photos':
+        await db.into(db.proofPhotos).insert(_proofPhotosFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'issues':
+        await db.into(db.issues).insert(_issuesFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'shifts':
+        await db.into(db.shifts).insert(_shiftsFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      case 'valid_transitions':
+        await db.into(db.validTransitions).insert(_validTransitionsFromJson(row),
+            mode: InsertMode.insertOrReplace);
+        break;
+      default:
+        throw StateError(
+            'SyncPuller has no upsert mapper for table "$table"');
+    }
   }
 
   Future<int> pullAll() async {
@@ -100,11 +201,6 @@ class SyncPuller {
   /// Exhaustive switch over every table in the Drift schema. Anything that
   /// reaches the default is a typo or a newly-added table without a mapper —
   /// fail fast so it surfaces in dev rather than silently dropping rows.
-  ///
-  /// TODO: pull-side dead-letter — currently a single malformed row aborts
-  /// the whole batch (the watermark stays put), so the same poison row
-  /// blocks every subsequent pull. Move bad rows to a dead-letter table
-  /// once the schema for that lands.
   void _upsertRow(Batch batch, String table, Map<String, dynamic> row) {
     switch (table) {
       case 'staff':
@@ -267,4 +363,12 @@ class SyncPuller {
         fromStatus: Value(r['from_status'] as String?),
         toStatus: r['to_status'] as String,
       );
+}
+
+class _FailedRow {
+  _FailedRow(this.tableName, this.row, this.error, this.stack);
+  final String tableName;
+  final Map<String, dynamic> row;
+  final Object error;
+  final StackTrace stack;
 }

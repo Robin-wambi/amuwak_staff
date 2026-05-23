@@ -6106,6 +6106,375 @@ class SyncWatermarksCompanion extends UpdateCompanion<SyncWatermark> {
   }
 }
 
+class $PullDeadLetterTable extends PullDeadLetter
+    with TableInfo<$PullDeadLetterTable, PullDeadLetterData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PullDeadLetterTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _forTableMeta = const VerificationMeta(
+    'forTable',
+  );
+  @override
+  late final GeneratedColumn<String> forTable = GeneratedColumn<String>(
+    'table_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rowPayloadJsonMeta = const VerificationMeta(
+    'rowPayloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> rowPayloadJson = GeneratedColumn<String>(
+    'row_payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _errorTextMeta = const VerificationMeta(
+    'errorText',
+  );
+  @override
+  late final GeneratedColumn<String> errorText = GeneratedColumn<String>(
+    'error_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _recordedAtMeta = const VerificationMeta(
+    'recordedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> recordedAt = GeneratedColumn<DateTime>(
+    'recorded_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    forTable,
+    rowPayloadJson,
+    errorText,
+    recordedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pull_dead_letter';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PullDeadLetterData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('table_name')) {
+      context.handle(
+        _forTableMeta,
+        forTable.isAcceptableOrUnknown(data['table_name']!, _forTableMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_forTableMeta);
+    }
+    if (data.containsKey('row_payload_json')) {
+      context.handle(
+        _rowPayloadJsonMeta,
+        rowPayloadJson.isAcceptableOrUnknown(
+          data['row_payload_json']!,
+          _rowPayloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_rowPayloadJsonMeta);
+    }
+    if (data.containsKey('error_text')) {
+      context.handle(
+        _errorTextMeta,
+        errorText.isAcceptableOrUnknown(data['error_text']!, _errorTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_errorTextMeta);
+    }
+    if (data.containsKey('recorded_at')) {
+      context.handle(
+        _recordedAtMeta,
+        recordedAt.isAcceptableOrUnknown(data['recorded_at']!, _recordedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PullDeadLetterData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PullDeadLetterData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      forTable: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}table_name'],
+      )!,
+      rowPayloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}row_payload_json'],
+      )!,
+      errorText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_text'],
+      )!,
+      recordedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}recorded_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PullDeadLetterTable createAlias(String alias) {
+    return $PullDeadLetterTable(attachedDatabase, alias);
+  }
+}
+
+class PullDeadLetterData extends DataClass
+    implements Insertable<PullDeadLetterData> {
+  final String id;
+  final String forTable;
+  final String rowPayloadJson;
+  final String errorText;
+  final DateTime recordedAt;
+  const PullDeadLetterData({
+    required this.id,
+    required this.forTable,
+    required this.rowPayloadJson,
+    required this.errorText,
+    required this.recordedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['table_name'] = Variable<String>(forTable);
+    map['row_payload_json'] = Variable<String>(rowPayloadJson);
+    map['error_text'] = Variable<String>(errorText);
+    map['recorded_at'] = Variable<DateTime>(recordedAt);
+    return map;
+  }
+
+  PullDeadLetterCompanion toCompanion(bool nullToAbsent) {
+    return PullDeadLetterCompanion(
+      id: Value(id),
+      forTable: Value(forTable),
+      rowPayloadJson: Value(rowPayloadJson),
+      errorText: Value(errorText),
+      recordedAt: Value(recordedAt),
+    );
+  }
+
+  factory PullDeadLetterData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PullDeadLetterData(
+      id: serializer.fromJson<String>(json['id']),
+      forTable: serializer.fromJson<String>(json['forTable']),
+      rowPayloadJson: serializer.fromJson<String>(json['rowPayloadJson']),
+      errorText: serializer.fromJson<String>(json['errorText']),
+      recordedAt: serializer.fromJson<DateTime>(json['recordedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'forTable': serializer.toJson<String>(forTable),
+      'rowPayloadJson': serializer.toJson<String>(rowPayloadJson),
+      'errorText': serializer.toJson<String>(errorText),
+      'recordedAt': serializer.toJson<DateTime>(recordedAt),
+    };
+  }
+
+  PullDeadLetterData copyWith({
+    String? id,
+    String? forTable,
+    String? rowPayloadJson,
+    String? errorText,
+    DateTime? recordedAt,
+  }) => PullDeadLetterData(
+    id: id ?? this.id,
+    forTable: forTable ?? this.forTable,
+    rowPayloadJson: rowPayloadJson ?? this.rowPayloadJson,
+    errorText: errorText ?? this.errorText,
+    recordedAt: recordedAt ?? this.recordedAt,
+  );
+  PullDeadLetterData copyWithCompanion(PullDeadLetterCompanion data) {
+    return PullDeadLetterData(
+      id: data.id.present ? data.id.value : this.id,
+      forTable: data.forTable.present ? data.forTable.value : this.forTable,
+      rowPayloadJson: data.rowPayloadJson.present
+          ? data.rowPayloadJson.value
+          : this.rowPayloadJson,
+      errorText: data.errorText.present ? data.errorText.value : this.errorText,
+      recordedAt: data.recordedAt.present
+          ? data.recordedAt.value
+          : this.recordedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PullDeadLetterData(')
+          ..write('id: $id, ')
+          ..write('forTable: $forTable, ')
+          ..write('rowPayloadJson: $rowPayloadJson, ')
+          ..write('errorText: $errorText, ')
+          ..write('recordedAt: $recordedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, forTable, rowPayloadJson, errorText, recordedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PullDeadLetterData &&
+          other.id == this.id &&
+          other.forTable == this.forTable &&
+          other.rowPayloadJson == this.rowPayloadJson &&
+          other.errorText == this.errorText &&
+          other.recordedAt == this.recordedAt);
+}
+
+class PullDeadLetterCompanion extends UpdateCompanion<PullDeadLetterData> {
+  final Value<String> id;
+  final Value<String> forTable;
+  final Value<String> rowPayloadJson;
+  final Value<String> errorText;
+  final Value<DateTime> recordedAt;
+  final Value<int> rowid;
+  const PullDeadLetterCompanion({
+    this.id = const Value.absent(),
+    this.forTable = const Value.absent(),
+    this.rowPayloadJson = const Value.absent(),
+    this.errorText = const Value.absent(),
+    this.recordedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PullDeadLetterCompanion.insert({
+    required String id,
+    required String forTable,
+    required String rowPayloadJson,
+    required String errorText,
+    this.recordedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       forTable = Value(forTable),
+       rowPayloadJson = Value(rowPayloadJson),
+       errorText = Value(errorText);
+  static Insertable<PullDeadLetterData> custom({
+    Expression<String>? id,
+    Expression<String>? forTable,
+    Expression<String>? rowPayloadJson,
+    Expression<String>? errorText,
+    Expression<DateTime>? recordedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (forTable != null) 'table_name': forTable,
+      if (rowPayloadJson != null) 'row_payload_json': rowPayloadJson,
+      if (errorText != null) 'error_text': errorText,
+      if (recordedAt != null) 'recorded_at': recordedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PullDeadLetterCompanion copyWith({
+    Value<String>? id,
+    Value<String>? forTable,
+    Value<String>? rowPayloadJson,
+    Value<String>? errorText,
+    Value<DateTime>? recordedAt,
+    Value<int>? rowid,
+  }) {
+    return PullDeadLetterCompanion(
+      id: id ?? this.id,
+      forTable: forTable ?? this.forTable,
+      rowPayloadJson: rowPayloadJson ?? this.rowPayloadJson,
+      errorText: errorText ?? this.errorText,
+      recordedAt: recordedAt ?? this.recordedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (forTable.present) {
+      map['table_name'] = Variable<String>(forTable.value);
+    }
+    if (rowPayloadJson.present) {
+      map['row_payload_json'] = Variable<String>(rowPayloadJson.value);
+    }
+    if (errorText.present) {
+      map['error_text'] = Variable<String>(errorText.value);
+    }
+    if (recordedAt.present) {
+      map['recorded_at'] = Variable<DateTime>(recordedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PullDeadLetterCompanion(')
+          ..write('id: $id, ')
+          ..write('forTable: $forTable, ')
+          ..write('rowPayloadJson: $rowPayloadJson, ')
+          ..write('errorText: $errorText, ')
+          ..write('recordedAt: $recordedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6123,6 +6492,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncWatermarksTable syncWatermarks = $SyncWatermarksTable(this);
+  late final $PullDeadLetterTable pullDeadLetter = $PullDeadLetterTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6139,6 +6509,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     validTransitions,
     outbox,
     syncWatermarks,
+    pullDeadLetter,
   ];
   @override
   DriftDatabaseOptions get options =>
@@ -9170,6 +9541,216 @@ typedef $$SyncWatermarksTableProcessedTableManager =
       SyncWatermark,
       PrefetchHooks Function()
     >;
+typedef $$PullDeadLetterTableCreateCompanionBuilder =
+    PullDeadLetterCompanion Function({
+      required String id,
+      required String forTable,
+      required String rowPayloadJson,
+      required String errorText,
+      Value<DateTime> recordedAt,
+      Value<int> rowid,
+    });
+typedef $$PullDeadLetterTableUpdateCompanionBuilder =
+    PullDeadLetterCompanion Function({
+      Value<String> id,
+      Value<String> forTable,
+      Value<String> rowPayloadJson,
+      Value<String> errorText,
+      Value<DateTime> recordedAt,
+      Value<int> rowid,
+    });
+
+class $$PullDeadLetterTableFilterComposer
+    extends Composer<_$AppDatabase, $PullDeadLetterTable> {
+  $$PullDeadLetterTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get forTable => $composableBuilder(
+    column: $table.forTable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rowPayloadJson => $composableBuilder(
+    column: $table.rowPayloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorText => $composableBuilder(
+    column: $table.errorText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PullDeadLetterTableOrderingComposer
+    extends Composer<_$AppDatabase, $PullDeadLetterTable> {
+  $$PullDeadLetterTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get forTable => $composableBuilder(
+    column: $table.forTable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rowPayloadJson => $composableBuilder(
+    column: $table.rowPayloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorText => $composableBuilder(
+    column: $table.errorText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PullDeadLetterTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PullDeadLetterTable> {
+  $$PullDeadLetterTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get forTable =>
+      $composableBuilder(column: $table.forTable, builder: (column) => column);
+
+  GeneratedColumn<String> get rowPayloadJson => $composableBuilder(
+    column: $table.rowPayloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get errorText =>
+      $composableBuilder(column: $table.errorText, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$PullDeadLetterTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PullDeadLetterTable,
+          PullDeadLetterData,
+          $$PullDeadLetterTableFilterComposer,
+          $$PullDeadLetterTableOrderingComposer,
+          $$PullDeadLetterTableAnnotationComposer,
+          $$PullDeadLetterTableCreateCompanionBuilder,
+          $$PullDeadLetterTableUpdateCompanionBuilder,
+          (
+            PullDeadLetterData,
+            BaseReferences<
+              _$AppDatabase,
+              $PullDeadLetterTable,
+              PullDeadLetterData
+            >,
+          ),
+          PullDeadLetterData,
+          PrefetchHooks Function()
+        > {
+  $$PullDeadLetterTableTableManager(
+    _$AppDatabase db,
+    $PullDeadLetterTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PullDeadLetterTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PullDeadLetterTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PullDeadLetterTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> forTable = const Value.absent(),
+                Value<String> rowPayloadJson = const Value.absent(),
+                Value<String> errorText = const Value.absent(),
+                Value<DateTime> recordedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PullDeadLetterCompanion(
+                id: id,
+                forTable: forTable,
+                rowPayloadJson: rowPayloadJson,
+                errorText: errorText,
+                recordedAt: recordedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String forTable,
+                required String rowPayloadJson,
+                required String errorText,
+                Value<DateTime> recordedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PullDeadLetterCompanion.insert(
+                id: id,
+                forTable: forTable,
+                rowPayloadJson: rowPayloadJson,
+                errorText: errorText,
+                recordedAt: recordedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PullDeadLetterTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PullDeadLetterTable,
+      PullDeadLetterData,
+      $$PullDeadLetterTableFilterComposer,
+      $$PullDeadLetterTableOrderingComposer,
+      $$PullDeadLetterTableAnnotationComposer,
+      $$PullDeadLetterTableCreateCompanionBuilder,
+      $$PullDeadLetterTableUpdateCompanionBuilder,
+      (
+        PullDeadLetterData,
+        BaseReferences<_$AppDatabase, $PullDeadLetterTable, PullDeadLetterData>,
+      ),
+      PullDeadLetterData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9196,4 +9777,6 @@ class $AppDatabaseManager {
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncWatermarksTableTableManager get syncWatermarks =>
       $$SyncWatermarksTableTableManager(_db, _db.syncWatermarks);
+  $$PullDeadLetterTableTableManager get pullDeadLetter =>
+      $$PullDeadLetterTableTableManager(_db, _db.pullDeadLetter);
 }

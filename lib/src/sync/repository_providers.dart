@@ -5,6 +5,7 @@ import 'customers_repository.dart';
 import 'orders_repository.dart';
 import 'outbox_repository.dart';
 import 'proof_events_repository.dart';
+import 'pull_dead_letter_repository.dart';
 import 'staff_repository.dart';
 import 'status_events_repository.dart';
 import 'sync_status.dart';
@@ -45,6 +46,11 @@ final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
 
 final outboxRepositoryProvider = Provider<OutboxRepository>(
   (ref) => OutboxRepository(ref.watch(appDatabaseProvider)),
+);
+
+final pullDeadLetterRepositoryProvider =
+    Provider<PullDeadLetterRepository>(
+  (ref) => PullDeadLetterRepository(ref.watch(appDatabaseProvider)),
 );
 
 final ordersStreamProvider = StreamProvider<List<LaundryOrder>>(

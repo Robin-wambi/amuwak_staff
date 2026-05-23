@@ -7,6 +7,7 @@ import '../auth/session.dart';
 import 'connectivity_watcher.dart';
 import 'outbox_repository.dart';
 import 'outbox_worker.dart';
+import 'repository_providers.dart';
 import 'sync_orchestrator.dart';
 import 'sync_puller.dart';
 import 'sync_status.dart';
@@ -25,7 +26,11 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
       repo: OutboxRepository(db),
       dispatch: OutboxWorker.supabaseDispatcher(supabase),
     ),
-    puller: SyncPuller(db: db, fetch: SyncPuller.supabaseFetcher(supabase)),
+    puller: SyncPuller(
+      db: db,
+      fetch: SyncPuller.supabaseFetcher(supabase),
+      deadLetter: ref.watch(pullDeadLetterRepositoryProvider),
+    ),
     watcher: ConnectivityWatcher(),
     transitions: ValidTransitionsLoader(
       db: db,

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/sync/pull_dead_letter_repository.dart';
 import 'package:amuwak_staff/src/sync/sync_puller.dart';
 import 'package:amuwak_staff/src/sync/sync_registry.dart';
 
@@ -446,5 +447,108 @@ void main() {
       expect(rows[1].fromStatus, 'ready');
       expect(rows[1].toStatus, 'out_for_delivery');
     });
+  });
+
+  group('Plan 4 Task 3 — per-row dead-letter', () {
+    test(
+      'a row whose mapper throws is dead-lettered; good rows still upsert; '
+      'watermark advances past the bad row',
+      () async {
+        final fake = _FakeFetch();
+        fake.queued['orders'] = [
+          [
+            // Good row — full payload.
+            {
+              'id': 'AMW-OK',
+              'order_code': 'AMW-OK',
+              'customer_name': 'OK Person',
+              'phone': '+256', 'address': 'addr', 'service_type': 'wash',
+              'status': 'pending_pickup',
+              'intake_method': 'driver_pickup',
+              'fulfillment_method': 'delivery',
+              'item_count': 1,
+              'intake_recorded_by': 's-1', 'created_by': 's-1',
+              'created_at': '2026-05-23T10:00:00Z',
+              'updated_at': '2026-05-23T10:00:00Z',
+            },
+            // Bad row — `status` is null, mapper throws on `as String`.
+            {
+              'id': 'AMW-BAD',
+              'order_code': 'AMW-BAD',
+              'customer_name': 'Bad Person',
+              'phone': '+256', 'address': 'addr', 'service_type': 'wash',
+              'status': null,
+              'intake_method': 'driver_pickup',
+              'fulfillment_method': 'delivery',
+              'item_count': 1,
+              'intake_recorded_by': 's-1', 'created_by': 's-1',
+              'created_at': '2026-05-23T10:01:00Z',
+              'updated_at': '2026-05-23T10:01:00Z',
+            },
+          ],
+        ];
+
+        final dlq = PullDeadLetterRepository(db);
+        final puller =
+            SyncPuller(db: db, fetch: fake.call, deadLetter: dlq);
+        final written = await puller.pullTable(
+            const SyncTable(name: 'orders', watermarkColumn: 'updated_at'));
+
+        // Good row upserted; bad row not.
+        expect(written, 1);
+        final ok = await (db.select(db.orders)
+              ..where((t) => t.id.equals('AMW-OK')))
+            .getSingle();
+        expect(ok.customerName, 'OK Person');
+        final bad = await (db.select(db.orders)
+              ..where((t) => t.id.equals('AMW-BAD')))
+            .getSingleOrNull();
+        expect(bad, isNull);
+
+        // Bad row was quarantined.
+        final dead = await dlq.watchAll().first;
+        expect(dead, hasLength(1));
+        expect(dead.single.forTable, 'orders');
+        expect(dead.single.rowPayloadJson, contains('AMW-BAD'));
+
+        // Watermark advanced past the bad row's updated_at so next cycle
+        // doesn't re-fetch and re-dead-letter the same poison row forever.
+        final wm = await (db.select(db.syncWatermarks)
+              ..where((t) => t.forTable.equals('orders')))
+            .getSingle();
+        expect(
+          wm.lastSyncedAt.toUtc().toIso8601String(),
+          '2026-05-23T10:01:00.000Z',
+        );
+      },
+    );
+
+    test(
+      'without a deadLetter wired, legacy all-or-nothing behaviour is preserved',
+      () async {
+        final fake = _FakeFetch();
+        fake.queued['orders'] = [
+          [
+            {
+              'id': 'AMW-BAD',
+              // Missing required columns — mapper throws.
+              'status': null,
+              'updated_at': '2026-05-23T10:00:00Z',
+            },
+          ],
+        ];
+
+        final puller = SyncPuller(db: db, fetch: fake.call);
+        final written = await puller.pullTable(
+            const SyncTable(name: 'orders', watermarkColumn: 'updated_at'));
+
+        expect(written, 0);
+        // Watermark NOT advanced — legacy aborts the whole batch.
+        final wm = await (db.select(db.syncWatermarks)
+              ..where((t) => t.forTable.equals('orders')))
+            .getSingleOrNull();
+        expect(wm, isNull);
+      },
+    );
   });
 }
