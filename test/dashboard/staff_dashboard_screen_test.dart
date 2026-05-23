@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
+import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
@@ -261,5 +263,59 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Could not load orders'), findsOneWidget);
     expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Tapping an order card without a current session refuses to open '
+      'OrderDetailsScreen and surfaces a session-expired SnackBar',
+      (tester) async {
+    // Critical #1: when currentUserIdProvider yields null (cold-start race,
+    // expired session) the dashboard must NOT push OrderDetailsScreen — its
+    // downstream writes would otherwise persist an empty actorStaffId into
+    // intake_recorded_by/created_by, FK-failing the outbox dispatch and
+    // silently dead-lettering the row.
+    const seeded = LaundryOrder(
+      orderId: 'AMW-NULL',
+      customerName: 'No Session',
+      serviceType: 'wash',
+      status: OrderStatus.pendingPickup,
+      timeLabel: '10:00 AM',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+    );
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        currentUserIdProvider.overrideWith((ref) => null),
+      ],
+      child: MaterialApp(
+          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+    ));
+    await tester.pumpAndSettle();
+
+    // Tap the card. ListView is lazy so we need to scroll the card on-screen
+    // first.
+    await tester.scrollUntilVisible(find.text('No Session'), 200);
+    await tester.tap(find.text('No Session'));
+    await tester.pumpAndSettle();
+
+    // OrderDetailsScreen must not be in the tree.
+    expect(find.byType(OrderDetailsScreen), findsNothing);
+    // Dashboard is still visible.
+    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+    // Session-expired SnackBar surfaced.
+    expect(
+      find.textContaining('Session expired'),
+      findsOneWidget,
+    );
   });
 }

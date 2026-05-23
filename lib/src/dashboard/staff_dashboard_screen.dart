@@ -81,6 +81,20 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   }
 
   Future<void> _openOrderDetails(LaundryOrder order) async {
+    // Critical: actorStaffId must NEVER be empty downstream. Postgres has
+    // intake_recorded_by/created_by as NOT NULL REFERENCES staff(id), so an
+    // empty string would FK-fail the outbox dispatch and silently dead-letter
+    // the row. Refuse to open details if the session hasn't hydrated yet
+    // (cold-start race) or has expired.
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session expired — please sign in again.'),
+        ),
+      );
+      return;
+    }
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OrderDetailsScreen(
@@ -90,7 +104,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           cameraViewBuilder: _cameraViewBuilder,
           ordersRepo: ref.read(ordersRepositoryProvider),
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
-          actorStaffId: ref.read(currentUserIdProvider) ?? '',
+          actorStaffId: staffId,
         ),
       ),
     );
