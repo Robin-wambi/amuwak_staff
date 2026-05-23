@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +26,22 @@ void main() {
   });
 
   test('ordersStreamProvider emits orders inserted through OrdersRepository', () async {
+    // Listen for the post-write emission via container.listen — completes a
+    // Completer the moment AsyncData lands with at least one row. Avoids
+    // the previous `Future.delayed(30ms)` polling, which was flaky on slow CI.
+    final firstNonEmpty = Completer<List<LaundryOrder>>();
+    final sub = container.listen<AsyncValue<List<LaundryOrder>>>(
+      ordersStreamProvider,
+      (prev, next) {
+        final value = next.valueOrNull;
+        if (value != null && value.isNotEmpty && !firstNonEmpty.isCompleted) {
+          firstNonEmpty.complete(value);
+        }
+      },
+      fireImmediately: true,
+    );
+    addTearDown(sub.close);
+
     // Initial emission — empty.
     final firstFrame = await container.read(ordersStreamProvider.future);
     expect(firstFrame, isEmpty);
@@ -44,10 +62,9 @@ void main() {
       actorStaffId: 's-1',
     );
 
-    // Allow Drift's stream notification to propagate.
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-    final next = container.read(ordersStreamProvider).valueOrNull;
-    expect(next, isNotNull);
-    expect(next!.single.orderId, 'AMW-A');
+    final latest =
+        await firstNonEmpty.future.timeout(const Duration(seconds: 2));
+    expect(latest, hasLength(1));
+    expect(latest.single.orderId, 'AMW-A');
   });
 }
