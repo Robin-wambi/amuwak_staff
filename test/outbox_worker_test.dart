@@ -113,4 +113,42 @@ void main() {
   test('stop() is safe to call when no drain is in flight', () async {
     await expectLater(worker.stop(), completes);
   });
+
+  test(
+      'drainOnce is re-entrancy guarded: a concurrent call is a no-op and '
+      'does not re-dispatch', () async {
+    final blocker = Completer<void>();
+    recorder.blockOn = blocker;
+
+    await repo.enqueue(
+      id: 'm1', forTable: 'orders', op: 'insert',
+      rowId: 'r1', payload: const {},
+    );
+
+    // First call starts and blocks in dispatch.
+    final first = worker.drainOnce();
+    await Future<void>.delayed(Duration.zero);
+    expect(recorder.calls, hasLength(1),
+        reason: 'first drain should have dispatched one row');
+
+    // Second call while first is in flight must be a no-op.
+    final second = await worker.drainOnce();
+    expect(second, 0,
+        reason: 'concurrent drain should report nothing sent');
+    expect(recorder.calls, hasLength(1),
+        reason: 'concurrent drain must NOT trigger another dispatch');
+
+    // Release; first completes normally.
+    blocker.complete();
+    expect(await first, 1);
+
+    // After completion the guard clears: a fresh drain works normally.
+    recorder.blockOn = null;
+    await repo.enqueue(
+      id: 'm2', forTable: 'orders', op: 'insert',
+      rowId: 'r2', payload: const {},
+    );
+    expect(await worker.drainOnce(), 1);
+    expect(recorder.calls, hasLength(2));
+  });
 }
