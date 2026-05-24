@@ -52,9 +52,18 @@ class SyncErrorsScreen extends ConsumerWidget {
                     for (final row in outboxRows)
                       _OutboxErrorTile(
                         row: row,
-                        onRetry: () => ref
-                            .read(outboxRepositoryProvider)
-                            .requeue(row.id),
+                        onRetry: () async {
+                          try {
+                            await ref
+                                .read(outboxRepositoryProvider)
+                                .requeue(row.id);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Retry failed: $e')),
+                            );
+                          }
+                        },
                       ),
                   ],
                   if (pullRows.isNotEmpty) ...[

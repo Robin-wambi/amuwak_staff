@@ -134,6 +134,39 @@ void main() {
   );
 
   testWidgets(
+    'a failing requeue surfaces a SnackBar instead of being swallowed',
+    (tester) async {
+      final mockOutbox = _MockOutboxRepo();
+      when(() => mockOutbox.requeue(any()))
+          .thenThrow(StateError('local drift write failed'));
+
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-1',
+            forTable: 'orders',
+            op: 'update',
+            rowId: 'AMW-A',
+            lastError: 'network down',
+          ),
+        ],
+        pullRows: const [],
+        outboxRepoOverride: mockOutbox,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+      // Pump enough for the async retry + SnackBar animation to settle.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Retry failed'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'renders pull dead-letter rows with no Retry button (server-side fix)',
     (tester) async {
       await _pumpScreen(
