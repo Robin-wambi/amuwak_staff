@@ -5,11 +5,14 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
+import 'package:amuwak_staff/src/sync/pull_dead_letter_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
 
 class _MockOutboxRepo extends Mock implements OutboxRepository {}
+
+class _MockPullRepo extends Mock implements PullDeadLetterRepository {}
 
 /// Stub `OutboxData` row — we only assert against forTable / op / rowId /
 /// lastError / id, so the rest are sensible defaults.
@@ -53,6 +56,7 @@ Future<void> _pumpScreen(
   required List<OutboxData> outboxRows,
   required List<PullDeadLetterData> pullRows,
   OutboxRepository? outboxRepoOverride,
+  PullDeadLetterRepository? pullRepoOverride,
 }) {
   return tester.pumpWidget(
     ProviderScope(
@@ -65,6 +69,9 @@ Future<void> _pumpScreen(
         ),
         if (outboxRepoOverride != null)
           outboxRepositoryProvider.overrideWithValue(outboxRepoOverride),
+        if (pullRepoOverride != null)
+          pullDeadLetterRepositoryProvider
+              .overrideWithValue(pullRepoOverride),
       ],
       child: const MaterialApp(home: SyncErrorsScreen()),
     ),
@@ -127,7 +134,7 @@ void main() {
   );
 
   testWidgets(
-    'renders pull dead-letter rows as read-only (no Retry button)',
+    'renders pull dead-letter rows with no Retry button (server-side fix)',
     (tester) async {
       await _pumpScreen(
         tester,
@@ -146,6 +153,35 @@ void main() {
       expect(find.textContaining('TypeError'), findsOneWidget);
       expect(find.widgetWithText(TextButton, 'Retry'), findsNothing);
       expect(find.text('Server fix required'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'pull dead-letter tile has a Dismiss button that deletes the row',
+    (tester) async {
+      final mockPull = _MockPullRepo();
+      when(() => mockPull.delete(any())).thenAnswer((_) async {});
+
+      await _pumpScreen(
+        tester,
+        outboxRows: const [],
+        pullRows: [
+          _stubPullRow(
+            id: 'orders:AMW-Z:123',
+            forTable: 'orders',
+            errorText: 'TypeError: null is not a String',
+          ),
+        ],
+        pullRepoOverride: mockPull,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextButton, 'Dismiss'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Dismiss'));
+      await tester.pump();
+
+      verify(() => mockPull.delete('orders:AMW-Z:123')).called(1);
     },
   );
 }

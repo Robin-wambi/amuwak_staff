@@ -45,4 +45,13 @@ class PullDeadLetterRepository {
           ..orderBy([(t) => OrderingTerm.desc(t.recordedAt)]))
         .watch();
   }
+
+  /// Dismisses a quarantined row. The puller's watermark has already
+  /// advanced past it so the row won't reappear unless its server copy
+  /// changes (which would generate a new synthetic id).
+  Future<void> delete(String id) {
+    return (_db.delete(_db.pullDeadLetter)
+          ..where((t) => t.id.equals(id)))
+        .go();
+  }
 }

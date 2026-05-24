@@ -69,4 +69,44 @@ void main() {
       expect(rows.map((r) => r.errorText).toList(), ['new', 'old']);
     },
   );
+
+  test('delete removes a quarantined row by id', () async {
+    await repo.insert(
+      forTable: 'orders',
+      rowPayload: <String, dynamic>{'id': 'AMW-X'},
+      errorText: 'err',
+      recordedAt: DateTime.utc(2026, 5, 23, 12, 0),
+    );
+    await repo.insert(
+      forTable: 'orders',
+      rowPayload: <String, dynamic>{'id': 'AMW-Y'},
+      errorText: 'other err',
+      recordedAt: DateTime.utc(2026, 5, 23, 12, 1),
+    );
+
+    final before = await repo.watchAll().first;
+    expect(before, hasLength(2));
+    final toDelete =
+        before.firstWhere((r) => r.errorText == 'err').id;
+
+    await repo.delete(toDelete);
+
+    final after = await repo.watchAll().first;
+    expect(after, hasLength(1));
+    expect(after.single.errorText, 'other err');
+  });
+
+  test('delete on an unknown id is a no-op', () async {
+    await repo.insert(
+      forTable: 'orders',
+      rowPayload: <String, dynamic>{'id': 'AMW-X'},
+      errorText: 'err',
+      recordedAt: DateTime.utc(2026, 5, 23, 12, 0),
+    );
+
+    await repo.delete('does-not-exist');
+
+    final after = await repo.watchAll().first;
+    expect(after, hasLength(1));
+  });
 }

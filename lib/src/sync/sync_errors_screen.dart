@@ -60,7 +60,13 @@ class SyncErrorsScreen extends ConsumerWidget {
                   if (pullRows.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     const _SectionHeader('Server-side data (read-only)'),
-                    for (final row in pullRows) _PullErrorTile(row: row),
+                    for (final row in pullRows)
+                      _PullErrorTile(
+                        row: row,
+                        onDismiss: () => ref
+                            .read(pullDeadLetterRepositoryProvider)
+                            .delete(row.id),
+                      ),
                   ],
                 ],
               );
@@ -118,8 +124,9 @@ class _OutboxErrorTile extends StatelessWidget {
 }
 
 class _PullErrorTile extends StatelessWidget {
-  const _PullErrorTile({required this.row});
+  const _PullErrorTile({required this.row, required this.onDismiss});
   final PullDeadLetterData row;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -132,11 +139,20 @@ class _PullErrorTile extends StatelessWidget {
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: const Chip(
-          label: Text(
-            'Server fix required',
-            style: TextStyle(fontSize: 11),
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Chip(
+              label: Text(
+                'Server fix required',
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+            TextButton(
+              onPressed: onDismiss,
+              child: const Text('Dismiss'),
+            ),
+          ],
         ),
       ),
     );
