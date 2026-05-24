@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +10,7 @@ import 'package:amuwak_staff/src/sync/outbox_worker.dart';
 class _DispatchRecorder {
   final List<List<dynamic>> calls = [];
   Object? throwThis;
+  Completer<void>? blockOn;
 
   Future<void> dispatch(
     String forTable,
@@ -16,6 +19,7 @@ class _DispatchRecorder {
     Map<String, dynamic> payload,
   ) async {
     calls.add([forTable, op, rowId, payload]);
+    if (blockOn != null) await blockOn!.future;
     if (throwThis != null) throw throwThis!;
   }
 }
@@ -74,5 +78,39 @@ void main() {
     expect(pending.first.status, 'failed');
     expect(recorder.calls, hasLength(1),
         reason: 'second row should not be dispatched after first fails');
+  });
+
+  test('stop() awaits an in-flight drainOnce before returning', () async {
+    // Block dispatch in flight so drainOnce can't complete on its own.
+    final blocker = Completer<void>();
+    recorder.blockOn = blocker;
+
+    await repo.enqueue(
+      id: 'm1', forTable: 'orders', op: 'insert',
+      rowId: 'r1', payload: const {},
+    );
+
+    final draining = worker.drainOnce();
+    // Let drainOnce reach the awaited dispatch.
+    await Future<void>.delayed(Duration.zero);
+    expect(recorder.calls, hasLength(1),
+        reason: 'dispatch should have started');
+
+    var stopDone = false;
+    final stopFuture = worker.stop().whenComplete(() => stopDone = true);
+
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(stopDone, isFalse,
+        reason: 'stop should be waiting on the in-flight drain');
+
+    // Release; both drain and stop should now finish.
+    blocker.complete();
+    await draining;
+    await stopFuture;
+    expect(stopDone, isTrue);
+  });
+
+  test('stop() is safe to call when no drain is in flight', () async {
+    await expectLater(worker.stop(), completes);
   });
 }

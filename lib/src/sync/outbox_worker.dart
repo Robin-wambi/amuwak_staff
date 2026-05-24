@@ -31,6 +31,11 @@ class OutboxWorker {
 
   Timer? _timer;
 
+  /// Tracks the currently-running drainOnce so [stop] can await it. Without
+  /// this, a sign-out fired during a slow dispatch would let `_truncateAllTables`
+  /// run concurrently with the worker's `markSent` / `markFailed` write.
+  Future<void>? _inFlightDrain;
+
   /// Default dispatcher backed by the real Supabase client.
   static OutboxDispatch supabaseDispatcher(SupabaseClient client) {
     return (forTable, op, rowId, payload) async {
@@ -53,7 +58,13 @@ class OutboxWorker {
 
   /// Pump one batch of pending mutations. Returns the count successfully sent.
   /// Stops on the first failure to avoid hammering a flaky backend.
-  Future<int> drainOnce() async {
+  Future<int> drainOnce() {
+    final work = _drainOnce();
+    _inFlightDrain = work.then((_) {}, onError: (_) {});
+    return work;
+  }
+
+  Future<int> _drainOnce() async {
     final batch = await repo.peekPending(limit: batchSize);
     var sent = 0;
     for (final row in batch) {
@@ -81,8 +92,10 @@ class OutboxWorker {
     _timer = Timer.periodic(interval, (_) => drainOnce());
   }
 
-  void stop() {
+  Future<void> stop() async {
     _timer?.cancel();
     _timer = null;
+    final inflight = _inFlightDrain;
+    if (inflight != null) await inflight;
   }
 }

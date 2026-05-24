@@ -65,7 +65,7 @@ class SyncOrchestrator {
       // back) starts from a clean slate. Without this, _started would
       // remain false but the worker timer and connectivity stream would
       // keep running and the periodic pull timer would never be created.
-      worker.stop();
+      await worker.stop();
       watcher.dispose();
       rethrow;
     }
@@ -81,7 +81,7 @@ class SyncOrchestrator {
 
     _pullTimer?.cancel();
     _pullTimer = null;
-    worker.stop();
+    await worker.stop();
     watcher.dispose();
 
     final inflight = _inFlightPull;

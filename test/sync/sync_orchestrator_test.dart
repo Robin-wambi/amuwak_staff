@@ -41,7 +41,7 @@ void main() {
     capturedOnOffline = null;
 
     when(() => worker.start(interval: any(named: 'interval'))).thenReturn(null);
-    when(() => worker.stop()).thenReturn(null);
+    when(() => worker.stop()).thenAnswer((_) async {});
     when(() => puller.pullAll()).thenAnswer((_) async => 0);
     when(() => transitions.loadOnce()).thenAnswer((_) async {});
     when(() => watcher.isOnline()).thenAnswer((_) async => true);
