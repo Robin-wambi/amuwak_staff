@@ -126,10 +126,19 @@ class SyncPuller {
     });
 
     for (final f in failed) {
+      // Stack stays in dev logs (debugger, `flutter logs`); the rider-visible
+      // errorText is the message only so file paths and frame numbers don't
+      // leak through the SyncErrorsScreen.
+      developer.log(
+        'pull dead-letter: ${f.tableName}',
+        name: 'SyncPuller',
+        error: f.error,
+        stackTrace: f.stack,
+      );
       await deadLetter!.insert(
         forTable: f.tableName,
         rowPayload: f.row,
-        errorText: '${f.error}\n${f.stack}',
+        errorText: f.error.toString(),
       );
     }
     if (maxWatermark.isAfter(since)) {

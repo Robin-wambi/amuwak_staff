@@ -524,6 +524,53 @@ void main() {
     );
 
     test(
+      'dead-letter errorText is the error message only — no Dart stack frames',
+      () async {
+        // A row whose mapper throws (status is null where the mapper does
+        // `as String`). We assert the stored errorText does not include
+        // stack-frame markers that would leak file paths to a rider.
+        final fake = _FakeFetch();
+        fake.queued['orders'] = [
+          [
+            {
+              'id': 'AMW-BAD',
+              'order_code': 'AMW-BAD',
+              'customer_name': 'X',
+              'phone': '+', 'address': 'a', 'service_type': 'wash',
+              'status': null,
+              'intake_method': 'driver_pickup',
+              'fulfillment_method': 'delivery',
+              'item_count': 1,
+              'intake_recorded_by': 's-1', 'created_by': 's-1',
+              'created_at': '2026-05-23T10:00:00Z',
+              'updated_at': '2026-05-23T10:00:00Z',
+            },
+          ],
+        ];
+
+        final dlq = PullDeadLetterRepository(db);
+        final puller =
+            SyncPuller(db: db, fetch: fake.call, deadLetter: dlq);
+        await puller.pullTable(
+            const SyncTable(name: 'orders', watermarkColumn: 'updated_at'));
+
+        final dead = await dlq.watchAll().first;
+        expect(dead, hasLength(1));
+        expect(
+          dead.single.errorText,
+          isNot(contains('package:')),
+          reason: 'errorText must not include file paths from a stack frame',
+        );
+        expect(
+          dead.single.errorText,
+          isNot(contains('#0')),
+          reason: 'errorText must not include numbered stack frames',
+        );
+        expect(dead.single.errorText, isNotEmpty);
+      },
+    );
+
+    test(
       'without a deadLetter wired, legacy all-or-nothing behaviour is preserved',
       () async {
         final fake = _FakeFetch();
