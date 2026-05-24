@@ -31,10 +31,10 @@ CREATE TABLE orders (
 CREATE INDEX orders_status_idx          ON orders (status)          WHERE deleted_at IS NULL;
 CREATE INDEX orders_assigned_driver_idx ON orders (assigned_driver) WHERE deleted_at IS NULL;
 
--- valid_transitions: synthetic PK (required for PowerSync sync of reference
--- data) plus a UNIQUE NULLS NOT DISTINCT on the natural key so we can store
--- NULL in `from_status` to mean "initial state allowed". NULLS NOT DISTINCT is
--- a Postgres 15+ feature; Supabase ships Postgres 15+.
+-- valid_transitions: synthetic PK plus a UNIQUE NULLS NOT DISTINCT on the
+-- natural key so we can store NULL in `from_status` to mean "initial state
+-- allowed". NULLS NOT DISTINCT is a Postgres 15+ feature; Supabase ships
+-- Postgres 15+.
 CREATE TABLE valid_transitions (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   intake_method       text NOT NULL,

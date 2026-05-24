@@ -1,7 +1,8 @@
 # Supabase backend — Amuwak Staff
 
-Supabase (Postgres + Auth + Storage) is the backend. PowerSync will sit on top
-of it later for bidirectional offline sync to the Flutter app (see Plan 2).
+Supabase (Postgres + Auth + Storage) is the backend. Bidirectional offline
+sync to the Flutter app is handled by the in-app outbox + watermarked puller
+(see Plan 2); PowerSync was evaluated and dropped in migration `0016`.
 The schema, RLS policies, triggers, storage configuration, and auth claim hook
 all live as versioned SQL migrations in `migrations/`.
 
