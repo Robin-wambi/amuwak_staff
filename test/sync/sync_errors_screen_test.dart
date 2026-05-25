@@ -217,4 +217,35 @@ void main() {
       verify(() => mockPull.delete('orders:AMW-Z:123')).called(1);
     },
   );
+
+  testWidgets(
+    'a failing dismiss surfaces a SnackBar instead of being swallowed',
+    (tester) async {
+      final mockPull = _MockPullRepo();
+      when(() => mockPull.delete(any()))
+          .thenThrow(StateError('local drift delete failed'));
+
+      await _pumpScreen(
+        tester,
+        outboxRows: const [],
+        pullRows: [
+          _stubPullRow(
+            id: 'orders:AMW-Z:123',
+            forTable: 'orders',
+            errorText: 'TypeError: null is not a String',
+          ),
+        ],
+        pullRepoOverride: mockPull,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Dismiss'));
+      // Pump enough for the async delete + SnackBar animation to settle.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Dismiss failed'), findsOneWidget);
+    },
+  );
 }

@@ -72,9 +72,18 @@ class SyncErrorsScreen extends ConsumerWidget {
                     for (final row in pullRows)
                       _PullErrorTile(
                         row: row,
-                        onDismiss: () => ref
-                            .read(pullDeadLetterRepositoryProvider)
-                            .delete(row.id),
+                        onDismiss: () async {
+                          try {
+                            await ref
+                                .read(pullDeadLetterRepositoryProvider)
+                                .delete(row.id);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Dismiss failed: $e')),
+                            );
+                          }
+                        },
                       ),
                   ],
                 ],
