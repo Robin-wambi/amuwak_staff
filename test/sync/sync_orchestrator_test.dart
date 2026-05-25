@@ -253,5 +253,64 @@ void main() {
 
       verify(() => puller.pullAll()).called(1);
     });
+
+    test(
+        'coalesces onto an in-flight periodic pull rather than orphaning it '
+        'from stop()\'s view', () async {
+      final blocker = Completer<int>();
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => blocker.future);
+
+      await orchestrator.start();
+      // Pull #1 (from start()) is now in flight and tracked by
+      // _inFlightPull.
+      await Future<void>.delayed(Duration.zero);
+      verify(() => puller.pullAll()).called(1);
+
+      // Manual refresh while a pull is already running: must NOT start
+      // a second pullAll. Otherwise _inFlightPull gets overwritten and
+      // the original pull is orphaned from stop()'s view, which can
+      // race with _truncateAllTables on sign-out.
+      final syncFuture = orchestrator.syncNow();
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => puller.pullAll());
+
+      // Releasing the in-flight pull completes syncNow().
+      blocker.complete(0);
+      await syncFuture;
+    });
+  });
+
+  group('re-entrancy guard on _kickoffPull', () {
+    test(
+        'a connectivity online edge while a pull is in flight does NOT '
+        'start a second pullAll', () async {
+      final blocker = Completer<int>();
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => blocker.future);
+
+      await orchestrator.start();
+      // Pull #1 from startup is now in flight.
+      await Future<void>.delayed(Duration.zero);
+      verify(() => puller.pullAll()).called(1);
+
+      // Online edge tries to kick off another pull — must be a no-op
+      // while a pull is still running. Otherwise the periodic timer
+      // and connectivity edge can compound to N concurrent pulls and
+      // stop() only awaits the most recent one.
+      capturedOnOnline!();
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => puller.pullAll());
+
+      // After the in-flight pull completes the guard clears: the next
+      // edge produces a fresh pull.
+      blocker.complete(0);
+      await Future<void>.delayed(Duration.zero);
+      when(() => puller.pullAll()).thenAnswer((_) async => 0);
+
+      capturedOnOnline!();
+      await Future<void>.delayed(Duration.zero);
+      verify(() => puller.pullAll()).called(1);
+    });
   });
 }

@@ -41,8 +41,11 @@ class SyncOrchestrator {
 
   /// Tracks the currently-running pullAll (immediate, periodic, or
   /// connectivity-triggered) so [stop] can wait for it to settle before
-  /// returning. Prevents the sign-out path (Task 15) from truncating
-  /// Drift mid-write.
+  /// returning AND so a concurrent [_kickoffPull] (next timer tick fires
+  /// while the previous pull is still in flight) skips re-entry. Without
+  /// the latter the orphaned earlier pull is no longer tracked, and
+  /// [stop] only awaits the most recent one — letting the orphan race
+  /// with `_truncateAllTables` on sign-out (Task 15).
   Future<void>? _inFlightPull;
 
   Future<void> start() async {
@@ -89,11 +92,14 @@ class SyncOrchestrator {
   }
 
   /// Manual refresh — pull every registered table now. Used by a "swipe
-  /// to refresh" affordance (Plan 3b) and by integration tests.
+  /// to refresh" affordance (Plan 3b) and by integration tests. If a
+  /// pull is already in flight (periodic or connectivity-triggered)
+  /// this coalesces onto it rather than starting a second concurrent
+  /// pull — keeping the single-pull invariant that [stop] relies on.
   Future<void> syncNow() async {
-    final f = puller.pullAll();
-    _inFlightPull = f.then((_) {}, onError: (_) {});
-    await f;
+    _kickoffPull();
+    final inflight = _inFlightPull;
+    if (inflight != null) await inflight;
   }
 
   void _handleOnline() {
@@ -106,7 +112,11 @@ class SyncOrchestrator {
   }
 
   void _kickoffPull() {
+    if (_inFlightPull != null) return;
     final f = puller.pullAll();
-    _inFlightPull = f.then((_) {}, onError: (_) {});
+    _inFlightPull = f.then(
+      (_) => _inFlightPull = null,
+      onError: (Object _) => _inFlightPull = null,
+    );
   }
 }
