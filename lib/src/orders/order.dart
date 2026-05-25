@@ -6,6 +6,8 @@ import 'service_type.dart';
 class LaundryOrder {
   const LaundryOrder({
     required this.orderId,
+    String? orderCode,
+    this.customerId,
     required this.customerName,
     required this.serviceType,
     required this.status,
@@ -14,10 +16,15 @@ class LaundryOrder {
     required this.phone,
     required this.address,
     required this.notes,
+    this.intakeMethod = 'driver_pickup',
+    this.fulfillmentMethod = 'delivery',
+    this.scheduledFor,
     this.proofEvents = const [],
-  });
+  }) : orderCode = orderCode ?? orderId;
 
   final String orderId;
+  final String orderCode;
+  final String? customerId;
   final String customerName;
   final ServiceType serviceType;
   final OrderStatus status;
@@ -26,6 +33,9 @@ class LaundryOrder {
   final String phone;
   final String address;
   final String notes;
+  final String intakeMethod;
+  final String fulfillmentMethod;
+  final DateTime? scheduledFor;
   final List<ProofEvent> proofEvents;
 
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
@@ -57,6 +67,8 @@ class LaundryOrder {
   ) {
     return LaundryOrder(
       orderId: row.id,
+      orderCode: row.orderCode,
+      customerId: row.customerId,
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
       status: _statusFromString(row.status),
@@ -65,6 +77,9 @@ class LaundryOrder {
       phone: row.phone,
       address: row.address,
       notes: row.notes,
+      intakeMethod: row.intakeMethod,
+      fulfillmentMethod: row.fulfillmentMethod,
+      scheduledFor: row.scheduledFor,
       proofEvents: events
           .map((e) => ProofEvent(
                 id: e.id,
@@ -105,6 +120,8 @@ class LaundryOrder {
 
   LaundryOrder copyWith({
     String? orderId,
+    String? orderCode,
+    String? customerId,
     String? customerName,
     ServiceType? serviceType,
     OrderStatus? status,
@@ -113,10 +130,15 @@ class LaundryOrder {
     String? phone,
     String? address,
     String? notes,
+    String? intakeMethod,
+    String? fulfillmentMethod,
+    DateTime? scheduledFor,
     List<ProofEvent>? proofEvents,
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
+      orderCode: orderCode ?? this.orderCode,
+      customerId: customerId ?? this.customerId,
       customerName: customerName ?? this.customerName,
       serviceType: serviceType ?? this.serviceType,
       status: status ?? this.status,
@@ -125,6 +147,9 @@ class LaundryOrder {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       notes: notes ?? this.notes,
+      intakeMethod: intakeMethod ?? this.intakeMethod,
+      fulfillmentMethod: fulfillmentMethod ?? this.fulfillmentMethod,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
       proofEvents: proofEvents ?? this.proofEvents,
     );
   }
@@ -134,6 +159,8 @@ class LaundryOrder {
     if (identical(this, other)) return true;
     if (other is! LaundryOrder) return false;
     if (other.orderId != orderId ||
+        other.orderCode != orderCode ||
+        other.customerId != customerId ||
         other.customerName != customerName ||
         other.serviceType != serviceType ||
         other.status != status ||
@@ -141,7 +168,10 @@ class LaundryOrder {
         other.itemCount != itemCount ||
         other.phone != phone ||
         other.address != address ||
-        other.notes != notes) {
+        other.notes != notes ||
+        other.intakeMethod != intakeMethod ||
+        other.fulfillmentMethod != fulfillmentMethod ||
+        other.scheduledFor != scheduledFor) {
       return false;
     }
     if (proofEvents.length != other.proofEvents.length) return false;
@@ -154,6 +184,8 @@ class LaundryOrder {
   @override
   int get hashCode => Object.hash(
         orderId,
+        orderCode,
+        customerId,
         customerName,
         serviceType,
         status,
@@ -162,6 +194,9 @@ class LaundryOrder {
         phone,
         address,
         notes,
+        intakeMethod,
+        fulfillmentMethod,
+        scheduledFor,
         Object.hashAll(proofEvents),
       );
 }

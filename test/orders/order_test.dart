@@ -97,4 +97,141 @@ void main() {
       expect(updated.proofEvents, equals([pickupEvent]));
     });
   });
+
+  group('LaundryOrder new fields (Plan PR-B)', () {
+    test('orderCode defaults to orderId when not specified', () {
+      const o = LaundryOrder(
+        orderId: 'AMW-X1',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.orderCode, 'AMW-X1');
+    });
+
+    test('orderCode can be set distinctly from orderId', () {
+      const o = LaundryOrder(
+        orderId: 'uuid-1',
+        orderCode: 'AMW-123',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.orderCode, 'AMW-123');
+      expect(o.orderId, 'uuid-1');
+    });
+
+    test('intakeMethod defaults to driver_pickup', () {
+      const o = LaundryOrder(
+        orderId: 'X',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.intakeMethod, 'driver_pickup');
+    });
+
+    test('fulfillmentMethod defaults to delivery', () {
+      const o = LaundryOrder(
+        orderId: 'X',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.fulfillmentMethod, 'delivery');
+    });
+
+    test('customerId and scheduledFor default to null', () {
+      const o = LaundryOrder(
+        orderId: 'X',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.customerId, isNull);
+      expect(o.scheduledFor, isNull);
+    });
+
+    test('copyWith preserves new fields when omitted', () {
+      final scheduled = DateTime(2026, 6, 1, 9);
+      final o = LaundryOrder(
+        orderId: 'uuid-1',
+        orderCode: 'AMW-123',
+        customerId: 'cust-1',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+        intakeMethod: 'walk_in',
+        fulfillmentMethod: 'walk_out',
+        scheduledFor: scheduled,
+      );
+      final copy = o.copyWith(itemCount: 2);
+      expect(copy.orderCode, 'AMW-123');
+      expect(copy.customerId, 'cust-1');
+      expect(copy.intakeMethod, 'walk_in');
+      expect(copy.fulfillmentMethod, 'walk_out');
+      expect(copy.scheduledFor, scheduled);
+      expect(copy.itemCount, 2);
+    });
+
+    test('equality includes the new fields', () {
+      const base = LaundryOrder(
+        orderId: 'X',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      final withCode = base.copyWith();
+      expect(withCode, equals(base));
+
+      const differentCode = LaundryOrder(
+        orderId: 'X',
+        orderCode: 'AMW-OTHER',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(differentCode, isNot(equals(base)));
+    });
+  });
 }

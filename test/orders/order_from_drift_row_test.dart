@@ -202,5 +202,37 @@ void main() {
       expect(mapped.address, 'Bwaise');
       expect(mapped.notes, 'Paid in cash at pickup.');
     });
+
+    test('plumbs orderCode, customerId, intakeMethod, fulfillmentMethod, '
+        'scheduledFor from the Drift row onto the LaundryOrder', () {
+      final scheduled = DateTime(2026, 6, 1, 9);
+      final row = drift.Order(
+        id: 'uuid-order-1',
+        orderCode: 'AMW-9999',
+        customerId: 'cust-xyz',
+        customerName: 'Daniel M.',
+        phone: '+256 703 333 222',
+        address: 'Bwaise',
+        serviceType: 'Wash only',
+        status: 'pending_pickup',
+        intakeMethod: 'walk_in',
+        fulfillmentMethod: 'walk_out',
+        itemCount: 5,
+        notes: '',
+        scheduledFor: scheduled,
+        assignedDriver: null,
+        intakeRecordedBy: 's-1',
+        createdBy: 's-1',
+        createdAt: DateTime(2026, 5, 25, 10),
+        updatedAt: DateTime(2026, 5, 25, 10),
+        deletedAt: null,
+      );
+      final mapped = LaundryOrder.fromDriftRow(row, const []);
+      expect(mapped.orderCode, equals(row.orderCode));
+      expect(mapped.customerId, equals(row.customerId));
+      expect(mapped.intakeMethod, equals(row.intakeMethod));
+      expect(mapped.fulfillmentMethod, equals(row.fulfillmentMethod));
+      expect(mapped.scheduledFor, equals(row.scheduledFor));
+    });
   });
 }
