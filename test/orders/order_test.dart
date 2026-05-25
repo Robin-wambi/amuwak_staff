@@ -43,12 +43,14 @@ void main() {
 
   group('LaundryOrder.proofEvents', () {
     final pickupEvent = ProofEvent(
+      id: 'pe-test-1',
       type: ProofEventType.pickup,
       capturedAt: DateTime(2026, 5, 12, 9, 42),
       count: 12,
       photoPaths: const ['pickup_0.jpg'],
     );
     final deliveryEvent = ProofEvent(
+      id: 'pe-test-2',
       type: ProofEventType.delivery,
       capturedAt: DateTime(2026, 5, 12, 16, 13),
       count: 12,

@@ -1,3 +1,4 @@
+import '../data/app_database.dart' as drift;
 import 'order_status.dart';
 import 'proof_event.dart';
 
@@ -36,6 +37,69 @@ class LaundryOrder {
       if (event.type == type) return event;
     }
     return null;
+  }
+
+  /// Hydrates a [LaundryOrder] from a Drift `orders` row plus its joined
+  /// `proof_events` rows.
+  ///
+  /// Postgres has six order-status strings; the UI enum has four. `received`
+  /// folds into `inProgress` and `out_for_delivery` folds into
+  /// `readyForDelivery` — TODO(plan-3b-status-chips): split these out once
+  /// the dashboard chip set is expanded.
+  ///
+  /// Photos are intentionally dropped here — `photoPaths` is always
+  /// `const []` because the photo binaries live in Supabase Storage and
+  /// aren't pulled to the device until Plan 4.
+  factory LaundryOrder.fromDriftRow(
+    drift.Order row,
+    List<drift.ProofEvent> events,
+  ) {
+    return LaundryOrder(
+      orderId: row.id,
+      customerName: row.customerName,
+      serviceType: row.serviceType,
+      status: _statusFromString(row.status),
+      timeLabel: _formatTime(row.scheduledFor ?? row.createdAt),
+      itemCount: row.itemCount,
+      phone: row.phone,
+      address: row.address,
+      notes: row.notes,
+      proofEvents: events
+          .map((e) => ProofEvent(
+                id: e.id,
+                type: _proofTypeFromString(e.type),
+                capturedAt: e.capturedAt,
+                count: e.itemCount,
+                photoPaths: const [],
+                notes: e.notes,
+              ))
+          .toList(growable: false),
+    );
+  }
+
+  static OrderStatus _statusFromString(String s) => switch (s) {
+        'pending_pickup' => OrderStatus.pendingPickup,
+        'received' || 'in_progress' => OrderStatus.inProgress,
+        'ready' || 'out_for_delivery' => OrderStatus.readyForDelivery,
+        'completed' => OrderStatus.completed,
+        _ => throw StateError('Unknown order status: "$s"'),
+      };
+
+  static ProofEventType _proofTypeFromString(String s) => switch (s) {
+        'pickup' => ProofEventType.pickup,
+        'delivery' => ProofEventType.delivery,
+        _ => throw StateError('Unknown proof event type: "$s"'),
+      };
+
+  static String _formatTime(DateTime t) {
+    final hour12 = switch (t.hour) {
+      0 => 12,
+      final h when h > 12 => h - 12,
+      final h => h,
+    };
+    final minute = t.minute.toString().padLeft(2, '0');
+    final ampm = t.hour < 12 ? 'AM' : 'PM';
+    return '$hour12:$minute $ampm';
   }
 
   LaundryOrder copyWith({

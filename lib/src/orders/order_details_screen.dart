@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../shared/widgets/app_theme.dart';
+import '../sync/orders_repository.dart';
+import '../sync/proof_events_repository.dart';
 import 'order.dart';
 import 'order_status.dart';
 import 'proof_event.dart';
@@ -19,6 +21,9 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.photoStorage,
     required this.pickPhoto,
     required this.cameraViewBuilder,
+    required this.ordersRepo,
+    required this.proofEventsRepo,
+    required this.actorStaffId,
     this.clock = _defaultClock,
   });
 
@@ -26,6 +31,9 @@ class OrderDetailsScreen extends StatefulWidget {
   final ProofPhotoStorage photoStorage;
   final PickPhotoFn pickPhoto;
   final CameraViewBuilder cameraViewBuilder;
+  final OrdersRepository ordersRepo;
+  final ProofEventsRepository proofEventsRepo;
+  final String actorStaffId;
   final DateTime Function() clock;
 
   @override
@@ -41,33 +49,58 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     _order = widget.order;
   }
 
-  void _advanceStatusDirectly() {
+  Future<void> _advanceStatusDirectly() async {
     final nextStatus = _order.status.nextStatus;
     if (nextStatus == null) return;
-    setState(() {
-      _order = _order.copyWith(status: nextStatus);
-    });
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text('Order moved to ${nextStatus.label}.')),
+    try {
+      await widget.ordersRepo.updateStatus(
+        _order.orderId,
+        nextStatus,
+        actorStaffId: widget.actorStaffId,
       );
+      if (!mounted) return;
+      // Optimistic local update — the orders stream will reconcile this screen
+      // is plain StatefulWidget and not subscribed to the stream itself.
+      setState(() {
+        _order = _order.copyWith(status: nextStatus);
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text('Order moved to ${nextStatus.label}.')),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save status change — please retry.'),
+        ),
+      );
+    }
   }
 
 
   Future<void> _confirmPickup() async {
-    final result = await Navigator.of(context).push<LaundryOrder>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PickupCaptureScreen(
           order: _order,
           photoStorage: widget.photoStorage,
           pickPhoto: widget.pickPhoto,
           clock: widget.clock,
+          ordersRepo: widget.ordersRepo,
+          proofEventsRepo: widget.proofEventsRepo,
+          actorStaffId: widget.actorStaffId,
         ),
       ),
     );
-    if (result != null && mounted) {
-      setState(() => _order = result);
+    if (result == true && mounted) {
+      // Optimistic local update; the orders stream is the source of truth on
+      // the dashboard. History panel won't show the new proof event until a
+      // refetch, which is acceptable for Task 11.
+      setState(() {
+        _order = _order.copyWith(status: OrderStatus.inProgress);
+      });
     }
   }
 
@@ -81,23 +114,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
     );
     if (scanOk != true || !mounted) return;
-    final result = await Navigator.of(context).push<LaundryOrder>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => DeliveryCaptureScreen(
           order: _order,
           photoStorage: widget.photoStorage,
           pickPhoto: widget.pickPhoto,
           clock: widget.clock,
+          ordersRepo: widget.ordersRepo,
+          proofEventsRepo: widget.proofEventsRepo,
+          actorStaffId: widget.actorStaffId,
         ),
       ),
     );
-    if (result != null && mounted) {
-      setState(() => _order = result);
+    if (result == true && mounted) {
+      // Optimistic local update; the orders stream is the source of truth on
+      // the dashboard. Delivery proof event won't show in the history panel
+      // until a refetch, which is acceptable for Task 12.
+      setState(() {
+        _order = _order.copyWith(status: OrderStatus.completed);
+      });
     }
   }
 
   void _handleBackNavigation() {
-    Navigator.pop(context, _order);
+    // Dashboard pushes this route as `push<bool>`; popping a LaundryOrder
+    // here would mismatch the route's result type and silently coerce to
+    // null. Pop `false` so the awaited result is well-typed for the caller.
+    Navigator.pop<bool>(context, false);
   }
 
   Widget _buildPrimaryAction() {
@@ -116,7 +160,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         );
       case OrderStatus.inProgress:
         return ElevatedButton(
-          onPressed: _advanceStatusDirectly,
+          onPressed: () => _advanceStatusDirectly(),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -157,7 +201,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget build(BuildContext context) {
     final statusColor = _order.status.color;
 
-    return PopScope<LaundryOrder>(
+    return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _handleBackNavigation();
