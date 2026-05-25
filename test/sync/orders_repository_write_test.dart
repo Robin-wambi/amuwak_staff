@@ -69,6 +69,40 @@ void main() {
         'orders:insert:AMW-A:2026-05-21T12:00:00.000Z',
       );
     });
+
+    test('plumbs orderCode, customerId, intakeMethod, '
+        'fulfillmentMethod, and scheduledFor through to the orders row',
+        () async {
+      final scheduled = DateTime(2026, 6, 1, 9, 0);
+      final order = LaundryOrder(
+        orderId: 'uuid-test-1',
+        orderCode: 'AMW-9999',
+        customerId: 'cust-test-1',
+        customerName: 'X',
+        serviceType: ServiceType.dryCleaning,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 3,
+        phone: '+256 700 000 001',
+        address: 'Test address',
+        notes: 'gate locked',
+        intakeMethod: 'driver_pickup',
+        fulfillmentMethod: 'delivery',
+        scheduledFor: scheduled,
+      );
+
+      await repo.upsertOrder(order, actorStaffId: 'staff-1');
+
+      final row =
+          await (db.select(db.orders)..where((t) => t.id.equals('uuid-test-1')))
+              .getSingle();
+      expect(row.orderCode, 'AMW-9999');
+      expect(row.customerId, 'cust-test-1');
+      expect(row.serviceType, ServiceType.dryCleaning.toDbString());
+      expect(row.intakeMethod, 'driver_pickup');
+      expect(row.fulfillmentMethod, 'delivery');
+      expect(row.scheduledFor, scheduled);
+    });
   });
 
   group('updateStatus', () {

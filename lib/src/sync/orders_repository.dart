@@ -158,19 +158,18 @@ class OrdersRepository {
       {required DateTime now}) {
     return OrdersCompanion(
       id: Value(order.orderId),
-      orderCode: Value(order.orderId),
+      orderCode: Value(order.orderCode),
+      customerId: Value(order.customerId),
       customerName: Value(order.customerName),
       phone: Value(order.phone),
       address: Value(order.address),
       serviceType: Value(order.serviceType.toDbString()),
       status: Value(order.status.toDbString()),
-      // TODO(pr-b-new-pickup-form): intake_method/fulfillment_method are not
-      // part of LaundryOrder yet; default to driver_pickup/delivery until the
-      // New Pickup form (PR-B) adds them.
-      intakeMethod: const Value('driver_pickup'),
-      fulfillmentMethod: const Value('delivery'),
+      intakeMethod: Value(order.intakeMethod),
+      fulfillmentMethod: Value(order.fulfillmentMethod),
       itemCount: Value(order.itemCount),
       notes: Value(order.notes),
+      scheduledFor: Value(order.scheduledFor),
       intakeRecordedBy: Value(actorStaffId),
       createdBy: Value(actorStaffId),
       createdAt: Value(now),
@@ -182,17 +181,18 @@ class OrdersRepository {
       {required DateTime now}) =>
       {
         'id': order.orderId,
-        'order_code': order.orderId,
+        'order_code': order.orderCode,
+        'customer_id': order.customerId,
         'customer_name': order.customerName,
         'phone': order.phone,
         'address': order.address,
         'service_type': order.serviceType.toDbString(),
         'status': order.status.toDbString(),
-        // TODO(pr-b-new-pickup-form): see _toCompanion above.
-        'intake_method': 'driver_pickup',
-        'fulfillment_method': 'delivery',
+        'intake_method': order.intakeMethod,
+        'fulfillment_method': order.fulfillmentMethod,
         'item_count': order.itemCount,
         'notes': order.notes,
+        'scheduled_for': order.scheduledFor?.toUtc().toIso8601String(),
         'intake_recorded_by': actorStaffId,
         'created_by': actorStaffId,
         'created_at': now.toUtc().toIso8601String(),
