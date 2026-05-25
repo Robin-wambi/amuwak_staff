@@ -10,6 +10,7 @@ import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
@@ -20,7 +21,7 @@ import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 const _pendingPickup = LaundryOrder(
   orderId: 'AMW-0421',
   customerName: 'Jane',
-  serviceType: 'Wash',
+  serviceType: ServiceType.washOnly,
   status: OrderStatus.pendingPickup,
   timeLabel: 't',
   itemCount: 12,
@@ -62,7 +63,7 @@ Future<void> _seedOrder(AppDatabase db, LaundryOrder order) {
         customerName: order.customerName,
         phone: order.phone,
         address: order.address,
-        serviceType: order.serviceType,
+        serviceType: order.serviceType.toDbString(),
         status: order.status.toDbString(),
         intakeMethod: 'driver_pickup',
         fulfillmentMethod: 'delivery',

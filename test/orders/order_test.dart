@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 
 void main() {
   const a = LaundryOrder(
     orderId: 'AMW-1',
     customerName: 'A',
-    serviceType: 'Wash',
+    serviceType: ServiceType.washOnly,
     status: OrderStatus.pendingPickup,
     timeLabel: 't',
     itemCount: 1,
@@ -21,7 +22,7 @@ void main() {
     const b = LaundryOrder(
       orderId: 'AMW-1',
       customerName: 'A',
-      serviceType: 'Wash',
+      serviceType: ServiceType.washOnly,
       status: OrderStatus.pendingPickup,
       timeLabel: 't',
       itemCount: 1,

@@ -4,6 +4,7 @@ import 'package:amuwak_staff/src/data/app_database.dart' as drift;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 
 drift.Order _orderRow({
   String id = 'AMW-1024',
@@ -195,7 +196,7 @@ void main() {
       final mapped = LaundryOrder.fromDriftRow(row, const []);
       expect(mapped.orderId, 'AMW-1027');
       expect(mapped.customerName, 'Daniel M.');
-      expect(mapped.serviceType, 'Wash only');
+      expect(mapped.serviceType, ServiceType.washOnly);
       expect(mapped.itemCount, 5);
       expect(mapped.phone, '+256 703 333 222');
       expect(mapped.address, 'Bwaise');

@@ -11,6 +11,7 @@ import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
@@ -187,7 +188,7 @@ void main() {
     const seeded = LaundryOrder(
       orderId: 'X',
       customerName: 'Test',
-      serviceType: 'wash',
+      serviceType: ServiceType.washOnly,
       status: OrderStatus.pendingPickup,
       timeLabel: '10:00 AM',
       itemCount: 1,
@@ -391,7 +392,7 @@ void main() {
     const seeded = LaundryOrder(
       orderId: 'AMW-NULL',
       customerName: 'No Session',
-      serviceType: 'wash',
+      serviceType: ServiceType.washOnly,
       status: OrderStatus.pendingPickup,
       timeLabel: '10:00 AM',
       itemCount: 1,

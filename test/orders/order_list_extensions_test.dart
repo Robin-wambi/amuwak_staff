@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_list_extensions.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 
 LaundryOrder _orderWith(OrderStatus status, {int items = 1}) {
   return LaundryOrder(
     orderId: 'X',
     customerName: 'X',
-    serviceType: 'X',
+    serviceType: ServiceType.washOnly,
     status: status,
     timeLabel: 'X',
     itemCount: items,

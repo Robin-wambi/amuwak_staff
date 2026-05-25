@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show kReleaseMode;
+import '../orders/service_type.dart';
 import 'app_database.dart';
 
 class OrdersSeeder {
@@ -39,7 +40,7 @@ class OrdersSeeder {
       customerName: 'Sarah N.',
       phone: '+256 700 123 456',
       address: 'Kikoni, near Makerere western gate',
-      serviceType: 'Wash & Iron',
+      serviceType: ServiceType.washAndIron.toDbString(),
       status: 'pending_pickup',
       intakeMethod: 'driver_pickup',
       fulfillmentMethod: 'delivery',
@@ -56,7 +57,7 @@ class OrdersSeeder {
       customerName: 'Brian K.',
       phone: '+256 701 456 789',
       address: 'Wandegeya, opposite main stage',
-      serviceType: 'Dry cleaning',
+      serviceType: ServiceType.dryCleaning.toDbString(),
       status: 'in_progress',
       intakeMethod: 'driver_pickup',
       fulfillmentMethod: 'delivery',
@@ -73,7 +74,7 @@ class OrdersSeeder {
       customerName: 'Grace A.',
       phone: '+256 702 222 111',
       address: 'Nakulabye, close to Shell',
-      serviceType: 'Iron only',
+      serviceType: ServiceType.ironOnly.toDbString(),
       status: 'ready',
       intakeMethod: 'driver_pickup',
       fulfillmentMethod: 'delivery',
@@ -90,7 +91,7 @@ class OrdersSeeder {
       customerName: 'Daniel M.',
       phone: '+256 703 333 222',
       address: 'Bwaise, main road',
-      serviceType: 'Wash only',
+      serviceType: ServiceType.washOnly.toDbString(),
       status: 'completed',
       intakeMethod: 'driver_pickup',
       fulfillmentMethod: 'delivery',

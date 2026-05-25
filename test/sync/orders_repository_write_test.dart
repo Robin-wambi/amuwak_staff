@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 
@@ -25,7 +26,7 @@ void main() {
       const order = LaundryOrder(
         orderId: 'AMW-A',
         customerName: 'Sarah',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly,
         status: OrderStatus.pendingPickup,
         timeLabel: '10:00 AM',
         itemCount: 3,
@@ -54,7 +55,7 @@ void main() {
       expect(payload['customer_name'], 'Sarah');
       expect(payload['phone'], '+256');
       expect(payload['address'], 'addr');
-      expect(payload['service_type'], 'wash');
+      expect(payload['service_type'], ServiceType.washOnly.toDbString());
       expect(payload['intake_method'], 'driver_pickup');
       expect(payload['fulfillment_method'], 'delivery');
       expect(payload['item_count'], 3);
@@ -77,7 +78,7 @@ void main() {
         id: 'AMW-A',
         orderCode: 'AMW-A',
         customerName: 'Sarah',
-        phone: '+256', address: 'addr', serviceType: 'wash',
+        phone: '+256', address: 'addr', serviceType: ServiceType.washOnly.toDbString(),
         status: 'in_progress',
         intakeMethod: 'driver_pickup', fulfillmentMethod: 'delivery',
         itemCount: 3,
@@ -120,7 +121,7 @@ void main() {
             id: 'AMW-A',
             orderCode: 'AMW-A',
             customerName: 'Sarah',
-            phone: '+256', address: 'addr', serviceType: 'wash',
+            phone: '+256', address: 'addr', serviceType: ServiceType.washOnly.toDbString(),
             status: 'in_progress',
             intakeMethod: 'driver_pickup', fulfillmentMethod: 'delivery',
             itemCount: 3,
@@ -158,7 +159,7 @@ void main() {
       const order = LaundryOrder(
         orderId: 'AMW-A',
         customerName: 'Sarah',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly,
         status: OrderStatus.pendingPickup,
         timeLabel: '10:00 AM',
         itemCount: 3,

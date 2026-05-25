@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/auth/auth_service.dart';
 import 'package:amuwak_staff/src/auth/sign_out.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/sync_orchestrator.dart';
 
 class _MockOrchestrator extends Mock implements SyncOrchestrator {}
@@ -35,7 +36,7 @@ Future<void> _seedAllTables(AppDatabase db) async {
         customerName: 'Sarah',
         phone: '+256',
         address: 'addr',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly.toDbString(),
         status: 'in_progress',
         intakeMethod: 'driver_pickup',
         fulfillmentMethod: 'delivery',

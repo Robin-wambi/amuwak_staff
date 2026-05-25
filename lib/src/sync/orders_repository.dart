@@ -162,7 +162,7 @@ class OrdersRepository {
       customerName: Value(order.customerName),
       phone: Value(order.phone),
       address: Value(order.address),
-      serviceType: Value(order.serviceType),
+      serviceType: Value(order.serviceType.toDbString()),
       status: Value(order.status.toDbString()),
       // TODO(pr-b-new-pickup-form): intake_method/fulfillment_method are not
       // part of LaundryOrder yet; default to driver_pickup/delivery until the
@@ -186,7 +186,7 @@ class OrdersRepository {
         'customer_name': order.customerName,
         'phone': order.phone,
         'address': order.address,
-        'service_type': order.serviceType,
+        'service_type': order.serviceType.toDbString(),
         'status': order.status.toDbString(),
         // TODO(pr-b-new-pickup-form): see _toCompanion above.
         'intake_method': 'driver_pickup',

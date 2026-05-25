@@ -1,6 +1,7 @@
 import '../data/app_database.dart' as drift;
 import 'order_status.dart';
 import 'proof_event.dart';
+import 'service_type.dart';
 
 class LaundryOrder {
   const LaundryOrder({
@@ -18,7 +19,7 @@ class LaundryOrder {
 
   final String orderId;
   final String customerName;
-  final String serviceType;
+  final ServiceType serviceType;
   final OrderStatus status;
   final String timeLabel;
   final int itemCount;
@@ -57,7 +58,7 @@ class LaundryOrder {
     return LaundryOrder(
       orderId: row.id,
       customerName: row.customerName,
-      serviceType: row.serviceType,
+      serviceType: ServiceType.fromDbString(row.serviceType),
       status: _statusFromString(row.status),
       timeLabel: _formatTime(row.scheduledFor ?? row.createdAt),
       itemCount: row.itemCount,
@@ -105,7 +106,7 @@ class LaundryOrder {
   LaundryOrder copyWith({
     String? orderId,
     String? customerName,
-    String? serviceType,
+    ServiceType? serviceType,
     OrderStatus? status,
     String? timeLabel,
     int? itemCount,

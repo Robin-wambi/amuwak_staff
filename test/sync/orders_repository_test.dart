@@ -6,6 +6,7 @@ import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
 Future<void> _insertOrder(
@@ -24,7 +25,7 @@ Future<void> _insertOrder(
         customerName: customerName,
         phone: '+256 700 000 000',
         address: 'Kikoni',
-        serviceType: 'Wash & Iron',
+        serviceType: ServiceType.washAndIron.toDbString(),
         status: status,
         intakeMethod: 'driver_pickup',
         fulfillmentMethod: 'delivery',

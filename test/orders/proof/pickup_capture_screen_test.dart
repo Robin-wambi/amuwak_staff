@@ -13,6 +13,7 @@ import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
@@ -61,7 +62,7 @@ class _FlakyUpdateOrdersRepo extends OrdersRepository {
 const _baseOrder = LaundryOrder(
   orderId: 'AMW-0421',
   customerName: 'Jane Doe',
-  serviceType: 'Wash & iron',
+  serviceType: ServiceType.washAndIron,
   status: OrderStatus.pendingPickup,
   timeLabel: 'Today, 09:00',
   itemCount: 12,
@@ -105,7 +106,7 @@ Future<void> _seedOrder(AppDatabase db, LaundryOrder order) {
         customerName: order.customerName,
         phone: order.phone,
         address: order.address,
-        serviceType: order.serviceType,
+        serviceType: order.serviceType.toDbString(),
         status: order.status.toDbString(),
         intakeMethod: 'driver_pickup',
         fulfillmentMethod: 'delivery',
