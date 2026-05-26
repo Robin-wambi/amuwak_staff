@@ -204,6 +204,40 @@ void main() {
       expect(copy.itemCount, 2);
     });
 
+    test('copyWith with clearScheduledFor: true nulls out scheduledFor', () {
+      final o = LaundryOrder(
+        orderId: 'X',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+        scheduledFor: DateTime(2026, 6, 1, 9),
+      );
+      final cleared = o.copyWith(clearScheduledFor: true);
+      expect(cleared.scheduledFor, isNull);
+    });
+
+    test('copyWith with clearCustomerId: true nulls out customerId', () {
+      const o = LaundryOrder(
+        orderId: 'X',
+        customerId: 'cust-9',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      final cleared = o.copyWith(clearCustomerId: true);
+      expect(cleared.customerId, isNull);
+    });
+
     test('equality includes the new fields', () {
       const base = LaundryOrder(
         orderId: 'X',

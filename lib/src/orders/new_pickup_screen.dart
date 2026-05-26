@@ -47,6 +47,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
+  // Cached IDs survive an upsertOrder-fail retry so the rider doesn't
+  // create a duplicate customer row by tapping "Create pickup" again.
+  String? _pendingCustomerId;
+  String? _pendingOrderId;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
   bool _optionalExpanded = false;
@@ -182,8 +186,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (!_canSubmit) return;
     setState(() => _saving = true);
     final now = widget.clock();
+    final customerId = _matchedCustomerId ??
+        (_pendingCustomerId ??= widget.customerIdGenerator());
     final customer = Customer(
-      id: _matchedCustomerId ?? widget.customerIdGenerator(),
+      id: customerId,
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
@@ -203,7 +209,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       );
       return;
     }
-    final orderId = widget.orderIdGenerator();
+    final orderId = _pendingOrderId ??= widget.orderIdGenerator();
     final scheduled = _scheduledFor;
     final order = LaundryOrder(
       orderId: orderId,
@@ -281,7 +287,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               focusNode: _phoneFocus,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Phone'),
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() {
+                _matchedCustomerId = null;
+              }),
             ),
             const SizedBox(height: 12),
             Align(

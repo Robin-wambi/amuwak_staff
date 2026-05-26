@@ -186,13 +186,23 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
-    final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
+    // The order was just written to Drift; the stream emits asynchronously
+    // after the transaction settles. Poll the snapshot a few times before
+    // giving up — without this the first pickup after app start lands on
+    // the dashboard instead of PickupCaptureScreen because the stream
+    // hadn't pre-emitted the order yet.
     LaundryOrder? newOrder;
-    for (final o in orders) {
-      if (o.orderId == result.orderId) {
-        newOrder = o;
-        break;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
+      for (final o in orders) {
+        if (o.orderId == result.orderId) {
+          newOrder = o;
+          break;
+        }
       }
+      if (newOrder != null) break;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (!mounted) return;
     }
     if (newOrder == null || !mounted) return;
     await Navigator.of(context).push<bool>(
@@ -784,7 +794,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${order.orderId} - ${order.serviceType}',
+                          '${order.orderId} - ${order.serviceType.label}',
                           style: const TextStyle(
                             color: Colors.black54,
                             fontSize: 13,

@@ -133,12 +133,14 @@ class LaundryOrder {
     String? intakeMethod,
     String? fulfillmentMethod,
     DateTime? scheduledFor,
+    bool clearCustomerId = false,
+    bool clearScheduledFor = false,
     List<ProofEvent>? proofEvents,
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
       orderCode: orderCode ?? this.orderCode,
-      customerId: customerId ?? this.customerId,
+      customerId: clearCustomerId ? null : (customerId ?? this.customerId),
       customerName: customerName ?? this.customerName,
       serviceType: serviceType ?? this.serviceType,
       status: status ?? this.status,
@@ -149,7 +151,8 @@ class LaundryOrder {
       notes: notes ?? this.notes,
       intakeMethod: intakeMethod ?? this.intakeMethod,
       fulfillmentMethod: fulfillmentMethod ?? this.fulfillmentMethod,
-      scheduledFor: scheduledFor ?? this.scheduledFor,
+      scheduledFor:
+          clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
       proofEvents: proofEvents ?? this.proofEvents,
     );
   }

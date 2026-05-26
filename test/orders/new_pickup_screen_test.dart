@@ -190,6 +190,52 @@ void main() {
     expect(orders.single.customerId, 'existing-cust-2');
   });
 
+  testWidgets(
+      'Editing the phone field after accepting a customer match drops the '
+      'cached customer id so submit does not overwrite the matched row',
+      (tester) async {
+    await customersRepo.upsertCustomer(Customer(
+      id: 'existing-cust-edited',
+      name: 'Carol Original',
+      phone: '+256 702 333 444',
+      address: 'Original address',
+      notes: null,
+      createdAt: DateTime(2026, 5, 20, 9),
+      updatedAt: DateTime(2026, 5, 20, 9),
+      deletedAt: null,
+    ));
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 702 333 444');
+    await tester.tap(find.byKey(const Key('np_name')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this customer'));
+    await tester.pumpAndSettle();
+    // Rider realises the wrong customer was matched and edits the phone.
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 702 999 999');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    final customers = await db.select(db.customers).get();
+    expect(customers, hasLength(2));
+    // Original row's data must not be clobbered.
+    final original = customers.firstWhere((c) => c.id == 'existing-cust-edited');
+    expect(original.name, 'Carol Original');
+    expect(original.phone, '+256 702 333 444');
+    expect(original.address, 'Original address');
+    // New row was created (id from customerIdGenerator) and the order
+    // points at it, not at the original.
+    final newCustomer =
+        customers.firstWhere((c) => c.id != 'existing-cust-edited');
+    expect(newCustomer.id, 'uuid-cust-1');
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.customerId, 'uuid-cust-1');
+  });
+
   testWidgets('Use my location chip fills address from stubbed reverseGeocode',
       (tester) async {
     NewPickupResult? popped;
