@@ -40,8 +40,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController(text: '+256 ');
   final _addressController = TextEditingController();
+  final _phoneFocus = FocusNode();
   ServiceType? _serviceType;
   bool _saving = false;
+  String? _matchedCustomerId;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneFocus.addListener(_onPhoneFocusChange);
+  }
 
   bool get _canSubmit =>
       _nameController.text.trim().isNotEmpty &&
@@ -50,12 +58,84 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       _serviceType != null &&
       !_saving;
 
+  String _normalizePhone(String s) =>
+      s.replaceAll(RegExp(r'\s+'), '').replaceAll('+', '');
+
+  Future<void> _onPhoneFocusChange() async {
+    if (_phoneFocus.hasFocus) return;
+    final typed = _normalizePhone(_phoneController.text);
+    if (typed.length < 9) return;
+    final all = await widget.customersRepo.getAll();
+    Customer? matched;
+    for (final c in all) {
+      if (_normalizePhone(c.phone) == typed) {
+        matched = c;
+        break;
+      }
+    }
+    if (matched == null || !mounted) return;
+    await _showCustomerMatchSheet(matched);
+  }
+
+  Future<void> _showCustomerMatchSheet(Customer match) async {
+    final useIt = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Existing customer found',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Text(match.name, style: const TextStyle(fontSize: 16)),
+              if (match.address != null) ...[
+                const SizedBox(height: 4),
+                Text(match.address!,
+                    style: const TextStyle(color: Colors.black54)),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Different customer'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Use this customer'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (useIt == true && mounted) {
+      setState(() {
+        _matchedCustomerId = match.id;
+        _nameController.text = match.name;
+        _addressController.text = match.address ?? '';
+      });
+    }
+  }
+
   Future<void> _onSubmit() async {
     if (!_canSubmit) return;
     setState(() => _saving = true);
     final now = widget.clock();
     final customer = Customer(
-      id: widget.customerIdGenerator(),
+      id: _matchedCustomerId ?? widget.customerIdGenerator(),
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
@@ -114,6 +194,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   @override
   void dispose() {
+    _phoneFocus.removeListener(_onPhoneFocusChange);
+    _phoneFocus.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -145,6 +227,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
             TextFormField(
               key: const Key('np_phone'),
               controller: _phoneController,
+              focusNode: _phoneFocus,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Phone'),
               onChanged: (_) => setState(() {}),

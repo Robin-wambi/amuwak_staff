@@ -33,6 +33,16 @@ class CustomersRepository {
         .watchSingleOrNull();
   }
 
+  /// One-shot fetch of all non-deleted customers. Used by callers that need
+  /// the current snapshot without subscribing (e.g. phone-on-blur dedup in
+  /// the New Pickup form).
+  Future<List<Customer>> getAll() {
+    return (_db.select(_db.customers)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+        .get();
+  }
+
   Future<void> upsertCustomer(Customer customer) async {
     final outbox = _requireOutbox();
     final now = _clock();

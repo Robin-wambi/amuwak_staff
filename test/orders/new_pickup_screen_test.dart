@@ -121,4 +121,71 @@ void main() {
     expect(customers, isEmpty);
     expect(orders, isEmpty);
   });
+
+  testWidgets('Phone-on-blur with a matching customer shows the bottom sheet; '
+      'tapping "Use this customer" pre-fills name + address', (tester) async {
+    await customersRepo.upsertCustomer(Customer(
+      id: 'existing-cust-1',
+      name: 'Jane Existing',
+      phone: '+256 700 111 222',
+      address: 'Old address, Kampala',
+      notes: null,
+      createdAt: DateTime(2026, 5, 20, 9),
+      updatedAt: DateTime(2026, 5, 20, 9),
+      deletedAt: null,
+    ));
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.tap(find.byKey(const Key('np_name')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Use this customer'), findsOneWidget);
+    expect(find.text('Jane Existing'), findsAtLeastNWidgets(1));
+
+    await tester.tap(find.text('Use this customer'));
+    await tester.pumpAndSettle();
+
+    expect(
+      (tester.widget<TextFormField>(find.byKey(const Key('np_name')))).controller!.text,
+      'Jane Existing',
+    );
+    expect(
+      (tester.widget<TextFormField>(find.byKey(const Key('np_address')))).controller!.text,
+      'Old address, Kampala',
+    );
+  });
+
+  testWidgets('Submit with a matched existing customer reuses customer id',
+      (tester) async {
+    await customersRepo.upsertCustomer(Customer(
+      id: 'existing-cust-2',
+      name: 'Bob Returning',
+      phone: '+256 701 222 333',
+      address: 'Wandegeya',
+      notes: null,
+      createdAt: DateTime(2026, 5, 20, 9),
+      updatedAt: DateTime(2026, 5, 20, 9),
+      deletedAt: null,
+    ));
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 701 222 333');
+    await tester.tap(find.byKey(const Key('np_name')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this customer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.dryCleaning.label).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    final customers = await db.select(db.customers).get();
+    expect(customers, hasLength(1));
+    expect(customers.single.id, 'existing-cust-2');
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.customerId, 'existing-cust-2');
+  });
 }
