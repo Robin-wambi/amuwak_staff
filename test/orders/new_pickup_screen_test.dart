@@ -235,4 +235,67 @@ void main() {
     );
     expect(popped, isNull);
   });
+
+  testWidgets('Schedule for later → Tomorrow morning sets scheduledFor to '
+      '9 AM next day and pops with startPickupNow=false', (tester) async {
+    NewPickupResult? popped;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  popped = await Navigator.of(context).push<NewPickupResult>(
+                    MaterialPageRoute(
+                      builder: (_) => NewPickupScreen(
+                        customersRepo: customersRepo,
+                        ordersRepo: ordersRepo,
+                        actorStaffId: 'staff-1',
+                        clock: () => DateTime(2026, 5, 25, 10),
+                        orderIdGenerator: () => 'uuid-order-1',
+                        customerIdGenerator: () => 'uuid-cust-1',
+                        geolocate: () async => null,
+                        reverseGeocode: (_) async => null,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Schedule for later'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Tomorrow morning'));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    expect(popped, isNotNull);
+    expect(popped!.startPickupNow, isFalse);
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.scheduledFor, DateTime(2026, 5, 26, 9));
+  });
 }

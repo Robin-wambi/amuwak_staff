@@ -10,6 +10,8 @@ import 'order.dart';
 import 'order_status.dart';
 import 'service_type.dart';
 
+enum _PickupTimeMode { now, scheduled }
+
 class NewPickupScreen extends StatefulWidget {
   const NewPickupScreen({
     super.key,
@@ -45,6 +47,35 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
+  _PickupTimeMode _pickupMode = _PickupTimeMode.now;
+  DateTime? _scheduledFor;
+
+  void _setQuickSchedule(DateTime when) {
+    setState(() => _scheduledFor = when);
+  }
+
+  Future<void> _pickCustomDateTime() async {
+    final now = widget.clock();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 14)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now),
+    );
+    if (time == null || !mounted) return;
+    setState(() => _scheduledFor = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        ));
+  }
 
   @override
   void initState() {
@@ -170,6 +201,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       return;
     }
     final orderId = widget.orderIdGenerator();
+    final scheduled = _scheduledFor;
     final order = LaundryOrder(
       orderId: orderId,
       orderCode: 'AMW-${now.millisecondsSinceEpoch}',
@@ -179,9 +211,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       address: customer.address ?? '',
       serviceType: _serviceType!,
       status: OrderStatus.pendingPickup,
-      timeLabel: 'Pickup: now',
+      timeLabel: scheduled == null ? 'Pickup: now' : 'Pickup: $scheduled',
       itemCount: 0,
       notes: '',
+      scheduledFor: scheduled,
     );
     try {
       await widget.ordersRepo
@@ -202,7 +235,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (!mounted) return;
     Navigator.pop<NewPickupResult>(
       context,
-      NewPickupResult(orderId: orderId, startPickupNow: true),
+      NewPickupResult(orderId: orderId, startPickupNow: scheduled == null),
     );
   }
 
@@ -272,6 +305,61 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   .toList(),
               onChanged: (v) => setState(() => _serviceType = v),
             ),
+            const SizedBox(height: 12),
+            SegmentedButton<_PickupTimeMode>(
+              segments: const [
+                ButtonSegment(
+                    value: _PickupTimeMode.now, label: Text('Pickup now')),
+                ButtonSegment(
+                    value: _PickupTimeMode.scheduled,
+                    label: Text('Schedule for later')),
+              ],
+              selected: <_PickupTimeMode>{_pickupMode},
+              onSelectionChanged: (sel) => setState(() {
+                _pickupMode = sel.first;
+                if (_pickupMode == _PickupTimeMode.now) _scheduledFor = null;
+              }),
+            ),
+            if (_pickupMode == _PickupTimeMode.scheduled) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('In 1 hour'),
+                    selected: false,
+                    onSelected: (_) => _setQuickSchedule(
+                        widget.clock().add(const Duration(hours: 1))),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Tomorrow morning'),
+                    selected: false,
+                    onSelected: (_) {
+                      final t = widget.clock().add(const Duration(days: 1));
+                      _setQuickSchedule(DateTime(t.year, t.month, t.day, 9));
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('Tomorrow afternoon'),
+                    selected: false,
+                    onSelected: (_) {
+                      final t = widget.clock().add(const Duration(days: 1));
+                      _setQuickSchedule(DateTime(t.year, t.month, t.day, 14));
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('Custom…'),
+                    selected: false,
+                    onSelected: (_) => _pickCustomDateTime(),
+                  ),
+                ],
+              ),
+              if (_scheduledFor != null) ...[
+                const SizedBox(height: 8),
+                Text('Scheduled for: $_scheduledFor',
+                    style: const TextStyle(color: Colors.black54)),
+              ],
+            ],
             const SizedBox(height: 24),
             Row(
               children: [
