@@ -49,6 +49,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   String? _matchedCustomerId;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
+  bool _optionalExpanded = false;
+  int _count = 0;
+  final _notesController = TextEditingController();
 
   void _setQuickSchedule(DateTime when) {
     setState(() => _scheduledFor = when);
@@ -212,8 +215,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       serviceType: _serviceType!,
       status: OrderStatus.pendingPickup,
       timeLabel: scheduled == null ? 'Pickup: now' : 'Pickup: $scheduled',
-      itemCount: 0,
-      notes: '',
+      itemCount: _count,
+      notes: _notesController.text.trim(),
       scheduledFor: scheduled,
     );
     try {
@@ -246,6 +249,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -359,6 +363,59 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 Text('Scheduled for: $_scheduledFor',
                     style: const TextStyle(color: Colors.black54)),
               ],
+            ],
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () =>
+                  setState(() => _optionalExpanded = !_optionalExpanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(_optionalExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Add optional details',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: amuwakDark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_optionalExpanded) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed:
+                        _count > 0 ? () => setState(() => _count--) : null,
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: Text('$_count',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    key: const Key('np_count_inc'),
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => setState(() => _count++),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const Key('np_notes'),
+                controller: _notesController,
+                decoration:
+                    const InputDecoration(labelText: 'Notes (optional)'),
+                maxLines: 3,
+              ),
             ],
             const SizedBox(height: 24),
             Row(

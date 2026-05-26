@@ -298,4 +298,43 @@ void main() {
     final orders = await db.select(db.orders).get();
     expect(orders.single.scheduledFor, DateTime(2026, 5, 26, 9));
   });
+
+  testWidgets('Optional details: expand → stepper increments count, notes '
+      'are persisted in the order row', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byKey(const Key('np_count_inc')));
+      await tester.pump();
+    }
+    await tester.enterText(
+        find.byKey(const Key('np_notes')), 'Gate locked after 6');
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.itemCount, 4);
+    expect(orders.single.notes, 'Gate locked after 6');
+  });
 }
