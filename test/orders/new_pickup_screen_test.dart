@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/orders/geo_services.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_result.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
@@ -187,5 +188,51 @@ void main() {
     expect(customers.single.id, 'existing-cust-2');
     final orders = await db.select(db.orders).get();
     expect(orders.single.customerId, 'existing-cust-2');
+  });
+
+  testWidgets('Use my location chip fills address from stubbed reverseGeocode',
+      (tester) async {
+    NewPickupResult? popped;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  popped = await Navigator.of(context).push<NewPickupResult>(
+                    MaterialPageRoute(
+                      builder: (_) => NewPickupScreen(
+                        customersRepo: customersRepo,
+                        ordersRepo: ordersRepo,
+                        actorStaffId: 'staff-1',
+                        clock: () => DateTime(2026, 5, 25, 10),
+                        orderIdGenerator: () => 'uuid-order-1',
+                        customerIdGenerator: () => 'uuid-cust-1',
+                        geolocate: () async => const GeoLocation(
+                            latitude: 0.3163, longitude: 32.5822),
+                        reverseGeocode: (loc) async => 'Detected address, Kampala',
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+    await tester.pumpAndSettle();
+
+    expect(
+      (tester.widget<TextFormField>(find.byKey(const Key('np_address')))).controller!.text,
+      'Detected address, Kampala',
+    );
+    expect(popped, isNull);
   });
 }

@@ -43,6 +43,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _phoneFocus = FocusNode();
   ServiceType? _serviceType;
   bool _saving = false;
+  bool _locating = false;
   String? _matchedCustomerId;
 
   @override
@@ -60,6 +61,19 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   String _normalizePhone(String s) =>
       s.replaceAll(RegExp(r'\s+'), '').replaceAll('+', '');
+
+  Future<void> _useMyLocation() async {
+    setState(() => _locating = true);
+    try {
+      final loc = await widget.geolocate();
+      if (loc == null) return;
+      final addr = await widget.reverseGeocode(loc);
+      if (addr == null || !mounted) return;
+      setState(() => _addressController.text = addr);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
 
   Future<void> _onPhoneFocusChange() async {
     if (_phoneFocus.hasFocus) return;
@@ -233,6 +247,15 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                avatar: const Icon(Icons.my_location, size: 18),
+                label: const Text('Use my location'),
+                onPressed: _locating ? null : _useMyLocation,
+              ),
+            ),
+            const SizedBox(height: 8),
             TextFormField(
               key: const Key('np_address'),
               controller: _addressController,
