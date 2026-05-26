@@ -6,6 +6,8 @@ import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
 import '../notifications/notifications_screen.dart';
+import '../orders/geo_services.dart';
+import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
@@ -15,6 +17,7 @@ import '../orders/order_status.dart';
 import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
+import '../shared/uuid.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
@@ -582,11 +585,28 @@ class _QuickActions extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _ActionButton(
-                label: 'New pickup',
-                icon: Icons.add_location_alt_outlined,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const NewPickupScreen()),
+              child: Consumer(
+                builder: (context, ref, _) => _ActionButton(
+                  label: 'New pickup',
+                  icon: Icons.add_location_alt_outlined,
+                  onTap: () {
+                    Navigator.of(context).push<NewPickupResult>(
+                      MaterialPageRoute(
+                        builder: (_) => NewPickupScreen(
+                          customersRepo:
+                              ref.read(customersRepositoryProvider),
+                          ordersRepo: ref.read(ordersRepositoryProvider),
+                          actorStaffId:
+                              ref.read(currentUserIdProvider) ?? '',
+                          clock: DateTime.now,
+                          orderIdGenerator: defaultUuidV4,
+                          customerIdGenerator: defaultUuidV4,
+                          geolocate: createDefaultGeolocate(),
+                          reverseGeocode: createDefaultReverseGeocode(),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
