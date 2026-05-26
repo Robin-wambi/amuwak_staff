@@ -26,7 +26,10 @@ final ordersRepositoryProvider = Provider<OrdersRepository>(
 );
 
 final customersRepositoryProvider = Provider<CustomersRepository>(
-  (ref) => CustomersRepository(ref.watch(appDatabaseProvider)),
+  (ref) => CustomersRepository(
+    ref.watch(appDatabaseProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+  ),
 );
 
 final staffRepositoryProvider = Provider<StaffRepository>(
