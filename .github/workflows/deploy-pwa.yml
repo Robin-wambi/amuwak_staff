@@ -29,11 +29,19 @@ jobs:
         run: flutter pub get
 
       - name: Build PWA release bundle
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
+          # Strip any trailing newlines/whitespace from secret values — pasting
+          # into the GitHub UI sometimes includes a trailing newline, which
+          # breaks bash line continuation and `--dart-define` parsing.
+          url="$(printf %s "$SUPABASE_URL" | tr -d '\r\n' | sed 's/[[:space:]]*$//')"
+          key="$(printf %s "$SUPABASE_ANON_KEY" | tr -d '\r\n' | sed 's/[[:space:]]*$//')"
           flutter build web --release \
             --base-href "/amuwak_staff/" \
-            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+            --dart-define=SUPABASE_URL="$url" \
+            --dart-define=SUPABASE_ANON_KEY="$key"
 
       - uses: actions/upload-pages-artifact@v3
         with:
