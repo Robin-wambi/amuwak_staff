@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
+import 'package:amuwak_staff/src/orders/proof/proof_photo_storage_io.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 
 void main() {
