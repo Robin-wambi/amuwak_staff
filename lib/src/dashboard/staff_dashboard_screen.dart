@@ -222,11 +222,11 @@ class _DashboardHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: amuwakPrimary,
+        color: amuwakSurfaceBrand,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: amuwakPrimary.withValues(alpha: 0.18),
+            color: amuwakSurfaceBrand.withValues(alpha: 0.18),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
