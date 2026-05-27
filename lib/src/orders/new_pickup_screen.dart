@@ -252,9 +252,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       address: customer.address ?? '',
       serviceType: _serviceType!,
       status: OrderStatus.pendingPickup,
-      timeLabel: scheduled == null
-          ? 'Pickup: now'
-          : 'Pickup: ${LaundryOrder.formatScheduled(scheduled, now: widget.clock)}',
+      timeLabel: LaundryOrder.computeTimeLabel(
+        scheduledFor: scheduled,
+        createdAt: now,
+        now: widget.clock,
+      ),
       itemCount: _count,
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,

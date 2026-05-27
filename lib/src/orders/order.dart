@@ -72,9 +72,10 @@ class LaundryOrder {
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
       status: _statusFromString(row.status),
-      timeLabel: row.scheduledFor != null
-          ? formatScheduled(row.scheduledFor!)
-          : _formatTime(row.createdAt),
+      timeLabel: computeTimeLabel(
+        scheduledFor: row.scheduledFor,
+        createdAt: row.createdAt,
+      ),
       itemCount: row.itemCount,
       phone: row.phone,
       address: row.address,
@@ -142,6 +143,25 @@ class LaundryOrder {
     final weekday = _weekdayShort[when.weekday - 1];
     final month = _monthShort[when.month - 1];
     return '$weekday ${when.day} $month, $time';
+  }
+
+  /// Single source of truth for the `timeLabel` shown on the dashboard order
+  /// card. Both [LaundryOrder.fromDriftRow] (when the stream re-emits an
+  /// order after sync) and the New Pickup form (when it builds the in-memory
+  /// `LaundryOrder` to pass to `upsertOrder`) call this so the displayed
+  /// label can't drift between the in-memory and post-roundtrip values.
+  ///
+  /// - Scheduled orders → `'Today, 2:15 PM'` etc. via [formatScheduled].
+  /// - Immediate orders → `'Pickup: now'` (a stable label that tells the
+  ///   rider this order doesn't have a future schedule, distinct from the
+  ///   creation timestamp which is shown elsewhere on the card).
+  static String computeTimeLabel({
+    required DateTime? scheduledFor,
+    required DateTime createdAt,
+    DateTime Function()? now,
+  }) {
+    if (scheduledFor != null) return formatScheduled(scheduledFor, now: now);
+    return 'Pickup: now';
   }
 
   LaundryOrder copyWith({

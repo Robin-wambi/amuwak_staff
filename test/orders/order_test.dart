@@ -249,6 +249,32 @@ void main() {
       });
     });
 
+    group('computeTimeLabel', () {
+      DateTime fixedNow() => DateTime(2026, 5, 26, 10);
+
+      test("returns 'Pickup: now' when scheduledFor is null", () {
+        expect(
+          LaundryOrder.computeTimeLabel(
+            scheduledFor: null,
+            createdAt: DateTime(2026, 5, 26, 8, 30),
+            now: fixedNow,
+          ),
+          'Pickup: now',
+        );
+      });
+
+      test('returns formatScheduled output when scheduledFor is set', () {
+        expect(
+          LaundryOrder.computeTimeLabel(
+            scheduledFor: DateTime(2026, 5, 27, 9, 0),
+            createdAt: DateTime(2026, 5, 26, 8, 30),
+            now: fixedNow,
+          ),
+          'Tomorrow, 9:00 AM',
+        );
+      });
+    });
+
     test('copyWith with clearCustomerId: true nulls out customerId', () {
       const o = LaundryOrder(
         orderId: 'X',

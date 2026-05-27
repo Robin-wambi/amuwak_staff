@@ -105,27 +105,13 @@ void main() {
       expect(mapped.timeLabel, contains('May'));
     });
 
-    test('falls back to time-only createdAt when scheduledFor is null', () {
+    test("uses 'Pickup: now' when scheduledFor is null", () {
       final row = _orderRow(
         scheduledFor: null,
         createdAt: DateTime(2026, 5, 19, 14, 15),
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
-      expect(mapped.timeLabel, '2:15 PM');
-    });
-
-    test('formats midnight as 12:00 AM and noon as 12:00 PM (createdAt path)',
-        () {
-      final midnight = LaundryOrder.fromDriftRow(
-        _orderRow(createdAt: DateTime(2026, 5, 19, 0, 0)),
-        const [],
-      );
-      expect(midnight.timeLabel, '12:00 AM');
-      final noon = LaundryOrder.fromDriftRow(
-        _orderRow(createdAt: DateTime(2026, 5, 19, 12, 0)),
-        const [],
-      );
-      expect(noon.timeLabel, '12:00 PM');
+      expect(mapped.timeLabel, 'Pickup: now');
     });
 
     test('maps two proof events of different types to domain ProofEvents '
