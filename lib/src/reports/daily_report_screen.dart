@@ -38,7 +38,7 @@ class DailyReportScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: amuwakPrimary,
+                color: amuwakSurfaceBrand,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Row(
