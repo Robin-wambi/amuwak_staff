@@ -45,6 +45,8 @@ dependencies:
   # Backend + offline sync
   supabase_flutter: ^2.5.0
   drift: ^2.18.0
+  drift_flutter: ^0.2.0
+  sqlite3: ^2.4.0
   sqlite3_flutter_libs: ^0.5.0
   path: ^1.9.0
   connectivity_plus: ^6.0.0
