@@ -366,7 +366,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -374,7 +374,7 @@ class _SummaryCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: amuwakSoftAccent,
+              color: amuwakPrimary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(icon, color: amuwakPrimary),
@@ -489,7 +489,7 @@ class _ActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: amuwakSoftAccent),
+            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
           ),
           child: Column(
             children: [
@@ -532,7 +532,7 @@ class _OrderCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: amuwakSoftAccent),
+            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,7 +543,7 @@ class _OrderCard extends StatelessWidget {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: amuwakSoftAccent,
+                      color: amuwakPrimary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(

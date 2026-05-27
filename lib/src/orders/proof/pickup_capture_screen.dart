@@ -230,7 +230,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: amuwakSoftAccent,
+                  color: amuwakPrimary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 clipBehavior: Clip.antiAlias,

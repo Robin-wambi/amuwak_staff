@@ -382,7 +382,7 @@ class _DetailsSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
