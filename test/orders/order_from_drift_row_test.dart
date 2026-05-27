@@ -94,16 +94,18 @@ void main() {
       );
     });
 
-    test('uses scheduledFor when present for the timeLabel', () {
+    test('uses formatScheduled (date + time) when scheduledFor is set', () {
       final row = _orderRow(
         scheduledFor: DateTime(2026, 5, 19, 10, 30),
         createdAt: DateTime(2026, 5, 19, 8, 0),
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
-      expect(mapped.timeLabel, '10:30 AM');
+      // Past date relative to test "now" → weekday/month form.
+      expect(mapped.timeLabel, contains('10:30 AM'));
+      expect(mapped.timeLabel, contains('May'));
     });
 
-    test('falls back to createdAt when scheduledFor is null', () {
+    test('falls back to time-only createdAt when scheduledFor is null', () {
       final row = _orderRow(
         scheduledFor: null,
         createdAt: DateTime(2026, 5, 19, 14, 15),
@@ -112,14 +114,15 @@ void main() {
       expect(mapped.timeLabel, '2:15 PM');
     });
 
-    test('formats midnight as 12:00 AM and noon as 12:00 PM', () {
+    test('formats midnight as 12:00 AM and noon as 12:00 PM (createdAt path)',
+        () {
       final midnight = LaundryOrder.fromDriftRow(
-        _orderRow(scheduledFor: DateTime(2026, 5, 19, 0, 0)),
+        _orderRow(createdAt: DateTime(2026, 5, 19, 0, 0)),
         const [],
       );
       expect(midnight.timeLabel, '12:00 AM');
       final noon = LaundryOrder.fromDriftRow(
-        _orderRow(scheduledFor: DateTime(2026, 5, 19, 12, 0)),
+        _orderRow(createdAt: DateTime(2026, 5, 19, 12, 0)),
         const [],
       );
       expect(noon.timeLabel, '12:00 PM');

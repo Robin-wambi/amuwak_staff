@@ -221,6 +221,34 @@ void main() {
       expect(cleared.scheduledFor, isNull);
     });
 
+    group('formatScheduled', () {
+      DateTime fixedNow() => DateTime(2026, 5, 26, 10);
+
+      test('uses "Today" when scheduled date matches now', () {
+        expect(
+          LaundryOrder.formatScheduled(DateTime(2026, 5, 26, 14, 15),
+              now: fixedNow),
+          'Today, 2:15 PM',
+        );
+      });
+
+      test('uses "Tomorrow" when scheduled is the next day', () {
+        expect(
+          LaundryOrder.formatScheduled(DateTime(2026, 5, 27, 9, 0),
+              now: fixedNow),
+          'Tomorrow, 9:00 AM',
+        );
+      });
+
+      test('uses weekday + month for dates further out', () {
+        expect(
+          LaundryOrder.formatScheduled(DateTime(2026, 6, 1, 9, 0),
+              now: fixedNow),
+          'Mon 1 Jun, 9:00 AM',
+        );
+      });
+    });
+
     test('copyWith with clearCustomerId: true nulls out customerId', () {
       const o = LaundryOrder(
         orderId: 'X',

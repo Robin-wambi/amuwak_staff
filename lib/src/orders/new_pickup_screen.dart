@@ -12,6 +12,8 @@ import 'service_type.dart';
 
 enum _PickupTimeMode { now, scheduled }
 
+enum _ScheduleChip { inOneHour, tomorrowMorning, tomorrowAfternoon, custom }
+
 class NewPickupScreen extends StatefulWidget {
   const NewPickupScreen({
     super.key,
@@ -53,12 +55,18 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   String? _pendingOrderId;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
+  // Which quick-chip preset is currently selected, if any. Cleared when
+  // _scheduledFor changes via a different path (e.g. Custom… picker).
+  _ScheduleChip? _selectedChip;
   bool _optionalExpanded = false;
   int _count = 0;
   final _notesController = TextEditingController();
 
-  void _setQuickSchedule(DateTime when) {
-    setState(() => _scheduledFor = when);
+  void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
+    setState(() {
+      _scheduledFor = when;
+      _selectedChip = chip;
+    });
   }
 
   Future<void> _pickCustomDateTime() async {
@@ -75,13 +83,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       initialTime: TimeOfDay.fromDateTime(now),
     );
     if (time == null || !mounted) return;
-    setState(() => _scheduledFor = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          time.hour,
-          time.minute,
-        ));
+    setState(() {
+      _scheduledFor = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+      _selectedChip = _ScheduleChip.custom;
+    });
   }
 
   @override
@@ -220,7 +231,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       address: customer.address ?? '',
       serviceType: _serviceType!,
       status: OrderStatus.pendingPickup,
-      timeLabel: scheduled == null ? 'Pickup: now' : 'Pickup: $scheduled',
+      timeLabel: scheduled == null
+          ? 'Pickup: now'
+          : 'Pickup: ${LaundryOrder.formatScheduled(scheduled, now: widget.clock)}',
       itemCount: _count,
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,
@@ -329,7 +342,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               selected: <_PickupTimeMode>{_pickupMode},
               onSelectionChanged: (sel) => setState(() {
                 _pickupMode = sel.first;
-                if (_pickupMode == _PickupTimeMode.now) _scheduledFor = null;
+                if (_pickupMode == _PickupTimeMode.now) {
+                  _scheduledFor = null;
+                  _selectedChip = null;
+                }
               }),
             ),
             if (_pickupMode == _PickupTimeMode.scheduled) ...[
@@ -339,37 +355,42 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 children: [
                   ChoiceChip(
                     label: const Text('In 1 hour'),
-                    selected: false,
+                    selected: _selectedChip == _ScheduleChip.inOneHour,
                     onSelected: (_) => _setQuickSchedule(
+                        _ScheduleChip.inOneHour,
                         widget.clock().add(const Duration(hours: 1))),
                   ),
                   ChoiceChip(
                     label: const Text('Tomorrow morning'),
-                    selected: false,
+                    selected: _selectedChip == _ScheduleChip.tomorrowMorning,
                     onSelected: (_) {
                       final t = widget.clock().add(const Duration(days: 1));
-                      _setQuickSchedule(DateTime(t.year, t.month, t.day, 9));
+                      _setQuickSchedule(_ScheduleChip.tomorrowMorning,
+                          DateTime(t.year, t.month, t.day, 9));
                     },
                   ),
                   ChoiceChip(
                     label: const Text('Tomorrow afternoon'),
-                    selected: false,
+                    selected: _selectedChip == _ScheduleChip.tomorrowAfternoon,
                     onSelected: (_) {
                       final t = widget.clock().add(const Duration(days: 1));
-                      _setQuickSchedule(DateTime(t.year, t.month, t.day, 14));
+                      _setQuickSchedule(_ScheduleChip.tomorrowAfternoon,
+                          DateTime(t.year, t.month, t.day, 14));
                     },
                   ),
                   ChoiceChip(
                     label: const Text('Custom…'),
-                    selected: false,
+                    selected: _selectedChip == _ScheduleChip.custom,
                     onSelected: (_) => _pickCustomDateTime(),
                   ),
                 ],
               ),
               if (_scheduledFor != null) ...[
                 const SizedBox(height: 8),
-                Text('Scheduled for: $_scheduledFor',
-                    style: const TextStyle(color: Colors.black54)),
+                Text(
+                  'Scheduled for: ${LaundryOrder.formatScheduled(_scheduledFor!, now: widget.clock)}',
+                  style: const TextStyle(color: Colors.black54),
+                ),
               ],
             ],
             const SizedBox(height: 12),

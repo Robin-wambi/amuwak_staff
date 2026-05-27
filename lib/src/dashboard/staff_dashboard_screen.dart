@@ -794,7 +794,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${order.orderId} - ${order.serviceType.label}',
+                          '${order.orderCode} - ${order.serviceType.label}',
                           style: const TextStyle(
                             color: Colors.black54,
                             fontSize: 13,

@@ -72,7 +72,9 @@ class LaundryOrder {
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
       status: _statusFromString(row.status),
-      timeLabel: _formatTime(row.scheduledFor ?? row.createdAt),
+      timeLabel: row.scheduledFor != null
+          ? formatScheduled(row.scheduledFor!)
+          : _formatTime(row.createdAt),
       itemCount: row.itemCount,
       phone: row.phone,
       address: row.address,
@@ -116,6 +118,30 @@ class LaundryOrder {
     final minute = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour < 12 ? 'AM' : 'PM';
     return '$hour12:$minute $ampm';
+  }
+
+  static const _weekdayShort = [
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+  ];
+  static const _monthShort = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// Human-readable label for a scheduled pickup/delivery time.
+  /// Examples: `'Today, 2:15 PM'`, `'Tomorrow, 9:00 AM'`, `'Mon 1 Jun, 9:00 AM'`.
+  /// The reference "now" is injectable for tests; defaults to [DateTime.now].
+  static String formatScheduled(DateTime when, {DateTime Function()? now}) {
+    final today = (now ?? DateTime.now)();
+    final scheduledDay = DateTime(when.year, when.month, when.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    final dayDelta = scheduledDay.difference(todayDay).inDays;
+    final time = _formatTime(when);
+    if (dayDelta == 0) return 'Today, $time';
+    if (dayDelta == 1) return 'Tomorrow, $time';
+    final weekday = _weekdayShort[when.weekday - 1];
+    final month = _monthShort[when.month - 1];
+    return '$weekday ${when.day} $month, $time';
   }
 
   LaundryOrder copyWith({

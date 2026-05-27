@@ -330,6 +330,16 @@ void main() {
     await tester.tap(find.widgetWithText(ChoiceChip, 'Tomorrow morning'));
     await tester.pumpAndSettle();
 
+    // The tapped chip is now visually selected; sibling chips are not.
+    final tomorrowMorningChip = tester.widget<ChoiceChip>(
+        find.widgetWithText(ChoiceChip, 'Tomorrow morning'));
+    expect(tomorrowMorningChip.selected, isTrue);
+    final inOneHourChip = tester
+        .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'In 1 hour'));
+    expect(inOneHourChip.selected, isFalse);
+    // The preview text uses the human-readable formatter, not raw toString.
+    expect(find.text('Scheduled for: Tomorrow, 9:00 AM'), findsOneWidget);
+
     await tester.dragUntilVisible(
       find.widgetWithText(ElevatedButton, 'Create pickup'),
       find.byType(ListView),
