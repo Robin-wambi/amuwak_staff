@@ -25,6 +25,7 @@ ThemeData buildAmuwakTheme() {
       backgroundColor: amuwakSurfaceBrand,
       foregroundColor: amuwakWhite,
       elevation: 0,
+      surfaceTintColor: Colors.transparent,
     ),
     textTheme: const TextTheme(
       headlineLarge: TextStyle(

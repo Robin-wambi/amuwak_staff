@@ -50,6 +50,7 @@ void main() {
     test('AppBar uses the deep terracotta with white foreground', () {
       expect(theme.appBarTheme.backgroundColor, amuwakSurfaceBrand);
       expect(theme.appBarTheme.foregroundColor, amuwakWhite);
+      expect(theme.appBarTheme.surfaceTintColor, Colors.transparent);
     });
 
     test('ElevatedButton uses dark text on bright orange (AA contrast)', () {
