@@ -4,6 +4,7 @@ import 'package:amuwak_staff/src/data/app_database.dart' as drift;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 
 drift.Order _orderRow({
   String id = 'AMW-1024',
@@ -93,35 +94,24 @@ void main() {
       );
     });
 
-    test('uses scheduledFor when present for the timeLabel', () {
+    test('uses formatScheduled (date + time) when scheduledFor is set', () {
       final row = _orderRow(
         scheduledFor: DateTime(2026, 5, 19, 10, 30),
         createdAt: DateTime(2026, 5, 19, 8, 0),
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
-      expect(mapped.timeLabel, '10:30 AM');
+      // Past date relative to test "now" → weekday/month form.
+      expect(mapped.timeLabel, contains('10:30 AM'));
+      expect(mapped.timeLabel, contains('May'));
     });
 
-    test('falls back to createdAt when scheduledFor is null', () {
+    test("uses 'Pickup: now' when scheduledFor is null", () {
       final row = _orderRow(
         scheduledFor: null,
         createdAt: DateTime(2026, 5, 19, 14, 15),
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
-      expect(mapped.timeLabel, '2:15 PM');
-    });
-
-    test('formats midnight as 12:00 AM and noon as 12:00 PM', () {
-      final midnight = LaundryOrder.fromDriftRow(
-        _orderRow(scheduledFor: DateTime(2026, 5, 19, 0, 0)),
-        const [],
-      );
-      expect(midnight.timeLabel, '12:00 AM');
-      final noon = LaundryOrder.fromDriftRow(
-        _orderRow(scheduledFor: DateTime(2026, 5, 19, 12, 0)),
-        const [],
-      );
-      expect(noon.timeLabel, '12:00 PM');
+      expect(mapped.timeLabel, 'Pickup: now');
     });
 
     test('maps two proof events of different types to domain ProofEvents '
@@ -195,11 +185,43 @@ void main() {
       final mapped = LaundryOrder.fromDriftRow(row, const []);
       expect(mapped.orderId, 'AMW-1027');
       expect(mapped.customerName, 'Daniel M.');
-      expect(mapped.serviceType, 'Wash only');
+      expect(mapped.serviceType, ServiceType.washOnly);
       expect(mapped.itemCount, 5);
       expect(mapped.phone, '+256 703 333 222');
       expect(mapped.address, 'Bwaise');
       expect(mapped.notes, 'Paid in cash at pickup.');
+    });
+
+    test('plumbs orderCode, customerId, intakeMethod, fulfillmentMethod, '
+        'scheduledFor from the Drift row onto the LaundryOrder', () {
+      final scheduled = DateTime(2026, 6, 1, 9);
+      final row = drift.Order(
+        id: 'uuid-order-1',
+        orderCode: 'AMW-9999',
+        customerId: 'cust-xyz',
+        customerName: 'Daniel M.',
+        phone: '+256 703 333 222',
+        address: 'Bwaise',
+        serviceType: 'Wash only',
+        status: 'pending_pickup',
+        intakeMethod: 'walk_in',
+        fulfillmentMethod: 'walk_out',
+        itemCount: 5,
+        notes: '',
+        scheduledFor: scheduled,
+        assignedDriver: null,
+        intakeRecordedBy: 's-1',
+        createdBy: 's-1',
+        createdAt: DateTime(2026, 5, 25, 10),
+        updatedAt: DateTime(2026, 5, 25, 10),
+        deletedAt: null,
+      );
+      final mapped = LaundryOrder.fromDriftRow(row, const []);
+      expect(mapped.orderCode, equals(row.orderCode));
+      expect(mapped.customerId, equals(row.customerId));
+      expect(mapped.intakeMethod, equals(row.intakeMethod));
+      expect(mapped.fulfillmentMethod, equals(row.fulfillmentMethod));
+      expect(mapped.scheduledFor, equals(row.scheduledFor));
     });
   });
 }

@@ -6,6 +6,8 @@ import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
 import '../notifications/notifications_screen.dart';
+import '../orders/geo_services.dart';
+import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
@@ -13,8 +15,10 @@ import '../orders/order_list_extensions.dart';
 import '../orders/order_search_screen.dart';
 import '../orders/order_status.dart';
 import '../orders/proof/barcode_reader.dart';
+import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
+import '../shared/uuid.dart';
 import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
@@ -156,6 +160,65 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
   }
 
+  Future<void> _handleNewPickup() async {
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session expired — please sign in again.'),
+        ),
+      );
+      return;
+    }
+    final result = await Navigator.of(context).push<NewPickupResult>(
+      MaterialPageRoute(
+        builder: (_) => NewPickupScreen(
+          customersRepo: ref.read(customersRepositoryProvider),
+          ordersRepo: ref.read(ordersRepositoryProvider),
+          actorStaffId: staffId,
+          clock: DateTime.now,
+          orderIdGenerator: defaultUuidV4,
+          customerIdGenerator: defaultUuidV4,
+          geolocate: createDefaultGeolocate(),
+          reverseGeocode: createDefaultReverseGeocode(),
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (!result.startPickupNow) return;
+    // The order was just written to Drift; the stream emits asynchronously
+    // after the transaction settles. Poll the snapshot a few times before
+    // giving up — without this the first pickup after app start lands on
+    // the dashboard instead of PickupCaptureScreen because the stream
+    // hadn't pre-emitted the order yet.
+    LaundryOrder? newOrder;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
+      for (final o in orders) {
+        if (o.orderId == result.orderId) {
+          newOrder = o;
+          break;
+        }
+      }
+      if (newOrder != null) break;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (!mounted) return;
+    }
+    if (newOrder == null || !mounted) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PickupCaptureScreen(
+          order: newOrder!,
+          photoStorage: _photoStorage,
+          pickPhoto: _pickPhoto,
+          ordersRepo: ref.read(ordersRepositoryProvider),
+          proofEventsRepo: ref.read(proofEventsRepositoryProvider),
+          actorStaffId: staffId,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openOrderDetails(LaundryOrder order) async {
     // Critical: actorStaffId must NEVER be empty downstream. Postgres has
     // intake_recorded_by/created_by as NOT NULL REFERENCES staff(id), so an
@@ -253,8 +316,11 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 data: (orders) => _DashboardBody(
                   orders: orders,
                   onOrderTap: _openOrderDetails,
+                  onNewPickup: _handleNewPickup,
                 ),
-                loading: () => const _DashboardLoadingBody(),
+                loading: () => _DashboardLoadingBody(
+                  onNewPickup: _handleNewPickup,
+                ),
                 error: (_, __) => _ErrorRetry(
                   onRetry: () => ref.invalidate(ordersStreamProvider),
                 ),
@@ -275,10 +341,12 @@ class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.orders,
     required this.onOrderTap,
+    required this.onNewPickup,
   });
 
   final List<LaundryOrder> orders;
   final void Function(LaundryOrder) onOrderTap;
+  final VoidCallback onNewPickup;
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +369,7 @@ class _DashboardBody extends StatelessWidget {
           completed: completed,
         ),
         const SizedBox(height: 24),
-        _QuickActions(orders: orders),
+        _QuickActions(orders: orders, onNewPickup: onNewPickup),
         const SizedBox(height: 24),
         const Text(
           'Assigned orders',
@@ -322,21 +390,23 @@ class _DashboardBody extends StatelessWidget {
 }
 
 class _DashboardLoadingBody extends StatelessWidget {
-  const _DashboardLoadingBody();
+  const _DashboardLoadingBody({required this.onNewPickup});
+
+  final VoidCallback onNewPickup;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      children: const [
-        _DashboardHeader(),
-        SizedBox(height: 20),
-        Padding(
+      children: [
+        const _DashboardHeader(),
+        const SizedBox(height: 20),
+        const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: LinearProgressIndicator(),
         ),
-        SizedBox(height: 24),
-        _QuickActions(orders: []),
+        const SizedBox(height: 24),
+        _QuickActions(orders: const [], onNewPickup: onNewPickup),
       ],
     );
   }
@@ -561,9 +631,10 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.orders});
+  const _QuickActions({required this.orders, required this.onNewPickup});
 
   final List<LaundryOrder> orders;
+  final VoidCallback onNewPickup;
 
   @override
   Widget build(BuildContext context) {
@@ -585,9 +656,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'New pickup',
                 icon: Icons.add_location_alt_outlined,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const NewPickupScreen()),
-                ),
+                onTap: onNewPickup,
               ),
             ),
             const SizedBox(width: 10),
@@ -725,7 +794,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${order.orderId} - ${order.serviceType}',
+                          '${order.orderCode} - ${order.serviceType.label}',
                           style: const TextStyle(
                             color: Colors.black54,
                             fontSize: 13,

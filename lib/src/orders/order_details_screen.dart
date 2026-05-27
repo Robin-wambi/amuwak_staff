@@ -267,7 +267,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           _DetailRow(
                             icon: Icons.checkroom_outlined,
                             label: 'Service',
-                            value: _order.serviceType,
+                            value: _order.serviceType.label,
                           ),
                           _DetailRow(
                             icon: Icons.inventory_2_outlined,
@@ -372,7 +372,7 @@ class _OrderHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  order.serviceType,
+                  order.serviceType.label,
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,

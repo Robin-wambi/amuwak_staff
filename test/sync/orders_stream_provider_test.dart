@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_status.dart';
 
@@ -51,7 +52,7 @@ void main() {
       const LaundryOrder(
         orderId: 'AMW-A',
         customerName: 'Sarah',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly,
         status: OrderStatus.pendingPickup,
         timeLabel: '10:00 AM',
         itemCount: 3,

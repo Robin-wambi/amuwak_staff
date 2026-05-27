@@ -11,6 +11,7 @@ import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
@@ -99,7 +100,9 @@ void main() {
   testWidgets(
     'Tapping "New pickup" opens NewPickupScreen',
     (tester) async {
-      await pumpDashboardWithDb(tester);
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
 
       await tester.ensureVisible(find.text('New pickup'));
       await tester.pumpAndSettle();
@@ -107,6 +110,25 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(NewPickupScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Tapping "New pickup" with a null staffId shows a session-expired '
+    'SnackBar instead of pushing NewPickupScreen',
+    (tester) async {
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.ensureVisible(find.text('New pickup'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New pickup'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NewPickupScreen), findsNothing);
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
     },
   );
 
@@ -187,7 +209,7 @@ void main() {
     const seeded = LaundryOrder(
       orderId: 'X',
       customerName: 'Test',
-      serviceType: 'wash',
+      serviceType: ServiceType.washOnly,
       status: OrderStatus.pendingPickup,
       timeLabel: '10:00 AM',
       itemCount: 1,
@@ -391,7 +413,7 @@ void main() {
     const seeded = LaundryOrder(
       orderId: 'AMW-NULL',
       customerName: 'No Session',
-      serviceType: 'wash',
+      serviceType: ServiceType.washOnly,
       status: OrderStatus.pendingPickup,
       timeLabel: '10:00 AM',
       itemCount: 1,

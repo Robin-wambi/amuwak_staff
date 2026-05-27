@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 
@@ -25,7 +26,7 @@ void main() {
       const order = LaundryOrder(
         orderId: 'AMW-A',
         customerName: 'Sarah',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly,
         status: OrderStatus.pendingPickup,
         timeLabel: '10:00 AM',
         itemCount: 3,
@@ -54,7 +55,7 @@ void main() {
       expect(payload['customer_name'], 'Sarah');
       expect(payload['phone'], '+256');
       expect(payload['address'], 'addr');
-      expect(payload['service_type'], 'wash');
+      expect(payload['service_type'], ServiceType.washOnly.toDbString());
       expect(payload['intake_method'], 'driver_pickup');
       expect(payload['fulfillment_method'], 'delivery');
       expect(payload['item_count'], 3);
@@ -68,6 +69,40 @@ void main() {
         'orders:insert:AMW-A:2026-05-21T12:00:00.000Z',
       );
     });
+
+    test('plumbs orderCode, customerId, intakeMethod, '
+        'fulfillmentMethod, and scheduledFor through to the orders row',
+        () async {
+      final scheduled = DateTime(2026, 6, 1, 9, 0);
+      final order = LaundryOrder(
+        orderId: 'uuid-test-1',
+        orderCode: 'AMW-9999',
+        customerId: 'cust-test-1',
+        customerName: 'X',
+        serviceType: ServiceType.dryCleaning,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 3,
+        phone: '+256 700 000 001',
+        address: 'Test address',
+        notes: 'gate locked',
+        intakeMethod: 'driver_pickup',
+        fulfillmentMethod: 'delivery',
+        scheduledFor: scheduled,
+      );
+
+      await repo.upsertOrder(order, actorStaffId: 'staff-1');
+
+      final row =
+          await (db.select(db.orders)..where((t) => t.id.equals('uuid-test-1')))
+              .getSingle();
+      expect(row.orderCode, 'AMW-9999');
+      expect(row.customerId, 'cust-test-1');
+      expect(row.serviceType, ServiceType.dryCleaning.toDbString());
+      expect(row.intakeMethod, 'driver_pickup');
+      expect(row.fulfillmentMethod, 'delivery');
+      expect(row.scheduledFor, scheduled);
+    });
   });
 
   group('updateStatus', () {
@@ -77,7 +112,7 @@ void main() {
         id: 'AMW-A',
         orderCode: 'AMW-A',
         customerName: 'Sarah',
-        phone: '+256', address: 'addr', serviceType: 'wash',
+        phone: '+256', address: 'addr', serviceType: ServiceType.washOnly.toDbString(),
         status: 'in_progress',
         intakeMethod: 'driver_pickup', fulfillmentMethod: 'delivery',
         itemCount: 3,
@@ -120,7 +155,7 @@ void main() {
             id: 'AMW-A',
             orderCode: 'AMW-A',
             customerName: 'Sarah',
-            phone: '+256', address: 'addr', serviceType: 'wash',
+            phone: '+256', address: 'addr', serviceType: ServiceType.washOnly.toDbString(),
             status: 'in_progress',
             intakeMethod: 'driver_pickup', fulfillmentMethod: 'delivery',
             itemCount: 3,
@@ -158,7 +193,7 @@ void main() {
       const order = LaundryOrder(
         orderId: 'AMW-A',
         customerName: 'Sarah',
-        serviceType: 'wash',
+        serviceType: ServiceType.washOnly,
         status: OrderStatus.pendingPickup,
         timeLabel: '10:00 AM',
         itemCount: 3,

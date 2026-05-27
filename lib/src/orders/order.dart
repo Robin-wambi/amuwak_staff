@@ -1,10 +1,13 @@
 import '../data/app_database.dart' as drift;
 import 'order_status.dart';
 import 'proof_event.dart';
+import 'service_type.dart';
 
 class LaundryOrder {
   const LaundryOrder({
     required this.orderId,
+    String? orderCode,
+    this.customerId,
     required this.customerName,
     required this.serviceType,
     required this.status,
@@ -13,18 +16,26 @@ class LaundryOrder {
     required this.phone,
     required this.address,
     required this.notes,
+    this.intakeMethod = 'driver_pickup',
+    this.fulfillmentMethod = 'delivery',
+    this.scheduledFor,
     this.proofEvents = const [],
-  });
+  }) : orderCode = orderCode ?? orderId;
 
   final String orderId;
+  final String orderCode;
+  final String? customerId;
   final String customerName;
-  final String serviceType;
+  final ServiceType serviceType;
   final OrderStatus status;
   final String timeLabel;
   final int itemCount;
   final String phone;
   final String address;
   final String notes;
+  final String intakeMethod;
+  final String fulfillmentMethod;
+  final DateTime? scheduledFor;
   final List<ProofEvent> proofEvents;
 
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
@@ -56,14 +67,22 @@ class LaundryOrder {
   ) {
     return LaundryOrder(
       orderId: row.id,
+      orderCode: row.orderCode,
+      customerId: row.customerId,
       customerName: row.customerName,
-      serviceType: row.serviceType,
+      serviceType: ServiceType.fromDbString(row.serviceType),
       status: _statusFromString(row.status),
-      timeLabel: _formatTime(row.scheduledFor ?? row.createdAt),
+      timeLabel: computeTimeLabel(
+        scheduledFor: row.scheduledFor,
+        createdAt: row.createdAt,
+      ),
       itemCount: row.itemCount,
       phone: row.phone,
       address: row.address,
       notes: row.notes,
+      intakeMethod: row.intakeMethod,
+      fulfillmentMethod: row.fulfillmentMethod,
+      scheduledFor: row.scheduledFor,
       proofEvents: events
           .map((e) => ProofEvent(
                 id: e.id,
@@ -102,20 +121,72 @@ class LaundryOrder {
     return '$hour12:$minute $ampm';
   }
 
+  static const _weekdayShort = [
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+  ];
+  static const _monthShort = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// Human-readable label for a scheduled pickup/delivery time.
+  /// Examples: `'Today, 2:15 PM'`, `'Tomorrow, 9:00 AM'`, `'Mon 1 Jun, 9:00 AM'`.
+  /// The reference "now" is injectable for tests; defaults to [DateTime.now].
+  static String formatScheduled(DateTime when, {DateTime Function()? now}) {
+    final today = (now ?? DateTime.now)();
+    final scheduledDay = DateTime(when.year, when.month, when.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    final dayDelta = scheduledDay.difference(todayDay).inDays;
+    final time = _formatTime(when);
+    if (dayDelta == 0) return 'Today, $time';
+    if (dayDelta == 1) return 'Tomorrow, $time';
+    final weekday = _weekdayShort[when.weekday - 1];
+    final month = _monthShort[when.month - 1];
+    return '$weekday ${when.day} $month, $time';
+  }
+
+  /// Single source of truth for the `timeLabel` shown on the dashboard order
+  /// card. Both [LaundryOrder.fromDriftRow] (when the stream re-emits an
+  /// order after sync) and the New Pickup form (when it builds the in-memory
+  /// `LaundryOrder` to pass to `upsertOrder`) call this so the displayed
+  /// label can't drift between the in-memory and post-roundtrip values.
+  ///
+  /// - Scheduled orders → `'Today, 2:15 PM'` etc. via [formatScheduled].
+  /// - Immediate orders → `'Pickup: now'` (a stable label that tells the
+  ///   rider this order doesn't have a future schedule, distinct from the
+  ///   creation timestamp which is shown elsewhere on the card).
+  static String computeTimeLabel({
+    required DateTime? scheduledFor,
+    required DateTime createdAt,
+    DateTime Function()? now,
+  }) {
+    if (scheduledFor != null) return formatScheduled(scheduledFor, now: now);
+    return 'Pickup: now';
+  }
+
   LaundryOrder copyWith({
     String? orderId,
+    String? orderCode,
+    String? customerId,
     String? customerName,
-    String? serviceType,
+    ServiceType? serviceType,
     OrderStatus? status,
     String? timeLabel,
     int? itemCount,
     String? phone,
     String? address,
     String? notes,
+    String? intakeMethod,
+    String? fulfillmentMethod,
+    DateTime? scheduledFor,
+    bool clearCustomerId = false,
+    bool clearScheduledFor = false,
     List<ProofEvent>? proofEvents,
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
+      orderCode: orderCode ?? this.orderCode,
+      customerId: clearCustomerId ? null : (customerId ?? this.customerId),
       customerName: customerName ?? this.customerName,
       serviceType: serviceType ?? this.serviceType,
       status: status ?? this.status,
@@ -124,6 +195,10 @@ class LaundryOrder {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       notes: notes ?? this.notes,
+      intakeMethod: intakeMethod ?? this.intakeMethod,
+      fulfillmentMethod: fulfillmentMethod ?? this.fulfillmentMethod,
+      scheduledFor:
+          clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
       proofEvents: proofEvents ?? this.proofEvents,
     );
   }
@@ -133,6 +208,8 @@ class LaundryOrder {
     if (identical(this, other)) return true;
     if (other is! LaundryOrder) return false;
     if (other.orderId != orderId ||
+        other.orderCode != orderCode ||
+        other.customerId != customerId ||
         other.customerName != customerName ||
         other.serviceType != serviceType ||
         other.status != status ||
@@ -140,7 +217,10 @@ class LaundryOrder {
         other.itemCount != itemCount ||
         other.phone != phone ||
         other.address != address ||
-        other.notes != notes) {
+        other.notes != notes ||
+        other.intakeMethod != intakeMethod ||
+        other.fulfillmentMethod != fulfillmentMethod ||
+        other.scheduledFor != scheduledFor) {
       return false;
     }
     if (proofEvents.length != other.proofEvents.length) return false;
@@ -153,6 +233,8 @@ class LaundryOrder {
   @override
   int get hashCode => Object.hash(
         orderId,
+        orderCode,
+        customerId,
         customerName,
         serviceType,
         status,
@@ -161,6 +243,9 @@ class LaundryOrder {
         phone,
         address,
         notes,
+        intakeMethod,
+        fulfillmentMethod,
+        scheduledFor,
         Object.hashAll(proofEvents),
       );
 }
