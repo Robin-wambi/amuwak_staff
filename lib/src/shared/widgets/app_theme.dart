@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-const Color amuwakPrimary = Color(0xFFA85A1F);
+const Color amuwakPrimary = Color(0xFFFF6E11);
+const Color amuwakSurfaceBrand = Color(0xFFC75A0E);
 const Color amuwakDark = Color(0xFF1F1F1F);
 const Color amuwakBackground = Color(0xFFFFF8F2);
-const Color amuwakSoftAccent = Color(0xFFF3E0D0);
 const Color amuwakWhite = Color(0xFFFFFFFF);
 
 ThemeData buildAmuwakTheme() {
