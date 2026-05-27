@@ -163,9 +163,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     return Scaffold(
       backgroundColor: amuwakBackground,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
-        elevation: 0,
         title: const Text(
           'Amuwak Staff',
           style: TextStyle(fontWeight: FontWeight.bold),
