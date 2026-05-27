@@ -13,8 +13,18 @@ ThemeData buildAmuwakTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: amuwakPrimary,
       primary: amuwakPrimary,
-      secondary: amuwakPrimary,
+      onPrimary: amuwakDark,
+      primaryContainer: amuwakSurfaceBrand,
+      onPrimaryContainer: amuwakWhite,
+      secondary: amuwakDark,
+      onSecondary: amuwakWhite,
       surface: amuwakWhite,
+      onSurface: amuwakDark,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: amuwakSurfaceBrand,
+      foregroundColor: amuwakWhite,
+      elevation: 0,
     ),
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
@@ -36,12 +46,16 @@ ThemeData buildAmuwakTheme() {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: amuwakPrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: amuwakDark,
         minimumSize: const Size(double.infinity, 54),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
       ),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: amuwakPrimary,
+      foregroundColor: amuwakDark,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

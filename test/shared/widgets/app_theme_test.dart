@@ -19,4 +19,48 @@ void main() {
       expect(amuwakWhite, const Color(0xFFFFFFFF));
     });
   });
+
+  group('buildAmuwakTheme ColorScheme', () {
+    final theme = buildAmuwakTheme();
+
+    test('primary is the logo orange', () {
+      expect(theme.colorScheme.primary, amuwakPrimary);
+    });
+
+    test('onPrimary is dark charcoal for AA contrast on bright orange', () {
+      expect(theme.colorScheme.onPrimary, amuwakDark);
+    });
+
+    test('primaryContainer is the deep terracotta', () {
+      expect(theme.colorScheme.primaryContainer, amuwakSurfaceBrand);
+    });
+
+    test('onPrimaryContainer is white for AA contrast on terracotta', () {
+      expect(theme.colorScheme.onPrimaryContainer, amuwakWhite);
+    });
+
+    test('surface is the white card surface', () {
+      expect(theme.colorScheme.surface, amuwakWhite);
+    });
+  });
+
+  group('component themes', () {
+    final theme = buildAmuwakTheme();
+
+    test('AppBar uses the deep terracotta with white foreground', () {
+      expect(theme.appBarTheme.backgroundColor, amuwakSurfaceBrand);
+      expect(theme.appBarTheme.foregroundColor, amuwakWhite);
+    });
+
+    test('ElevatedButton uses dark text on bright orange (AA contrast)', () {
+      final style = theme.elevatedButtonTheme.style;
+      expect(style?.backgroundColor?.resolve(<WidgetState>{}), amuwakPrimary);
+      expect(style?.foregroundColor?.resolve(<WidgetState>{}), amuwakDark);
+    });
+
+    test('FloatingActionButton uses dark icon on bright orange', () {
+      expect(theme.floatingActionButtonTheme.backgroundColor, amuwakPrimary);
+      expect(theme.floatingActionButtonTheme.foregroundColor, amuwakDark);
+    });
+  });
 }
