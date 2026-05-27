@@ -12,14 +12,6 @@ class DailyReportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrders = orders.length;
-    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
-    final inProgress = orders.countByStatus(OrderStatus.inProgress);
-    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = orders.countByStatus(OrderStatus.completed);
-    final totalItems = orders.totalItems;
-    final pendingWork = totalOrders - completed;
-
     return Scaffold(
       backgroundColor: amuwakBackground,
       appBar: AppBar(
@@ -31,126 +23,145 @@ class DailyReportScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: amuwakSurfaceBrand,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.bar_chart_rounded,
-                      color: amuwakPrimary,
-                      size: 30,
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Today's report",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 23,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Laundry operations summary',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+      body: DailyReportView(orders: orders),
+    );
+  }
+}
+
+class DailyReportView extends StatelessWidget {
+  const DailyReportView({super.key, required this.orders});
+
+  final List<LaundryOrder> orders;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalOrders = orders.length;
+    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
+    final inProgress = orders.countByStatus(OrderStatus.inProgress);
+    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
+    final completed = orders.countByStatus(OrderStatus.completed);
+    final totalItems = orders.totalItems;
+    final pendingWork = totalOrders - completed;
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: amuwakSurfaceBrand,
+              borderRadius: BorderRadius.circular(24),
             ),
-            const SizedBox(height: 20),
-            Row(
+            child: const Row(
               children: [
-                Expanded(
-                  child: _ReportMetricCard(
-                    title: 'Orders',
-                    value: '$totalOrders',
-                    icon: Icons.assignment_outlined,
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.bar_chart_rounded,
+                    color: amuwakPrimary,
+                    size: 30,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 14),
                 Expanded(
-                  child: _ReportMetricCard(
-                    title: 'Items',
-                    value: '$totalItems',
-                    icon: Icons.inventory_2_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Today's report",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 23,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Laundry operations summary',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _ReportMetricCard(
-                    title: OrderStatus.completed.label,
-                    value: '$completed',
-                    icon: Icons.check_circle_outline_rounded,
-                  ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _ReportMetricCard(
+                  title: 'Orders',
+                  value: '$totalOrders',
+                  icon: Icons.assignment_outlined,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ReportMetricCard(
-                    title: 'Pending work',
-                    value: '$pendingWork',
-                    icon: Icons.pending_actions_outlined,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ReportMetricCard(
+                  title: 'Items',
+                  value: '$totalItems',
+                  icon: Icons.inventory_2_outlined,
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Status breakdown',
-              style: TextStyle(
-                color: amuwakDark,
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
               ),
-            ),
-            const SizedBox(height: 12),
-            _StatusBreakdownCard(
-              pendingPickup: pendingPickup,
-              inProgress: inProgress,
-              readyForDelivery: readyForDelivery,
-              completed: completed,
-              totalOrders: totalOrders,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Work summary',
-              style: TextStyle(
-                color: amuwakDark,
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ReportMetricCard(
+                  title: OrderStatus.completed.label,
+                  value: '$completed',
+                  icon: Icons.check_circle_outline_rounded,
+                ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ReportMetricCard(
+                  title: 'Pending work',
+                  value: '$pendingWork',
+                  icon: Icons.pending_actions_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Status breakdown',
+            style: TextStyle(
+              color: amuwakDark,
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 12),
-            _WorkSummaryCard(
-              totalOrders: totalOrders,
-              completed: completed,
-              pendingWork: pendingWork,
-              totalItems: totalItems,
+          ),
+          const SizedBox(height: 12),
+          _StatusBreakdownCard(
+            pendingPickup: pendingPickup,
+            inProgress: inProgress,
+            readyForDelivery: readyForDelivery,
+            completed: completed,
+            totalOrders: totalOrders,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Work summary',
+            style: TextStyle(
+              color: amuwakDark,
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          _WorkSummaryCard(
+            totalOrders: totalOrders,
+            completed: completed,
+            pendingWork: pendingWork,
+            totalItems: totalItems,
+          ),
+        ],
       ),
     );
   }

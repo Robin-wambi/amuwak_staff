@@ -56,6 +56,8 @@ class StaffDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
+  int _selectedTabIndex = 0;
+
   // Backend deferred per SPEC-000: photos live in memory only. Swap for
   // `createDefaultProofPhotoStorage()` once the upload endpoint is available.
   final ProofPhotoStorage _photoStorage = InMemoryProofPhotoStorage();
@@ -251,15 +253,35 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // wire writes through the repositories).
   }
 
+  void _selectTab(int index) {
+    setState(() {
+      _selectedTabIndex = index;
+    });
+  }
+
+  String get _title {
+    switch (_selectedTabIndex) {
+      case 1:
+        return 'Orders';
+      case 2:
+        return 'Daily report';
+      case 3:
+        return 'Account';
+      case 0:
+      default:
+        return 'Amuwak Staff';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersStreamProvider);
     return Scaffold(
       backgroundColor: amuwakBackground,
       appBar: AppBar(
-        title: const Text(
-          'Amuwak Staff',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -304,27 +326,70 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SyncStatusBanner(),
-            Expanded(
-              child: ordersAsync.when(
-                data: (orders) => _DashboardBody(
-                  orders: orders,
-                  onOrderTap: _openOrderDetails,
-                  onNewPickup: _handleNewPickup,
-                ),
-                loading: () => _DashboardLoadingBody(
-                  onNewPickup: _handleNewPickup,
-                ),
-                error: (_, __) => _ErrorRetry(
-                  onRetry: () => ref.invalidate(ordersStreamProvider),
-                ),
+      body: _DashboardTabShell(
+        child: switch (_selectedTabIndex) {
+          1 => ordersAsync.when(
+              data: (orders) => _OrdersBody(
+                orders: orders,
+                onOrderTap: _openOrderDetails,
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => _ErrorRetry(
+                onRetry: () => ref.invalidate(ordersStreamProvider),
               ),
             ),
-          ],
-        ),
+          2 => ordersAsync.when(
+              data: (orders) => DailyReportView(orders: orders),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => _ErrorRetry(
+                onRetry: () => ref.invalidate(ordersStreamProvider),
+              ),
+            ),
+          3 => _AccountTab(onSignOut: _onSignOutPressed),
+          _ => ordersAsync.when(
+              data: (orders) => _DashboardBody(
+                orders: orders,
+                onOrderTap: _openOrderDetails,
+                onNewPickup: _handleNewPickup,
+                onShowReport: () => _selectTab(2),
+              ),
+              loading: () => _DashboardLoadingBody(
+                onNewPickup: _handleNewPickup,
+                onShowReport: () => _selectTab(2),
+              ),
+              error: (_, __) => _ErrorRetry(
+                onRetry: () => ref.invalidate(ordersStreamProvider),
+              ),
+            ),
+        },
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTabIndex,
+        onDestinationSelected: _selectTab,
+        backgroundColor: amuwakWhite,
+        indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment_rounded),
+            label: 'Orders',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart_rounded),
+            label: 'Report',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Account',
+          ),
+        ],
       ),
     );
   }
@@ -334,16 +399,36 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
 // Private body widgets
 // ---------------------------------------------------------------------------
 
+class _DashboardTabShell extends StatelessWidget {
+  const _DashboardTabShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          const SyncStatusBanner(),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.orders,
     required this.onOrderTap,
     required this.onNewPickup,
+    required this.onShowReport,
   });
 
   final List<LaundryOrder> orders;
   final void Function(LaundryOrder) onOrderTap;
   final VoidCallback onNewPickup;
+  final VoidCallback onShowReport;
 
   @override
   Widget build(BuildContext context) {
@@ -366,7 +451,10 @@ class _DashboardBody extends StatelessWidget {
           completed: completed,
         ),
         const SizedBox(height: 24),
-        _QuickActions(orders: orders, onNewPickup: onNewPickup),
+        _QuickActions(
+          onNewPickup: onNewPickup,
+          onShowReport: onShowReport,
+        ),
         const SizedBox(height: 24),
         const Text(
           'Assigned orders',
@@ -387,9 +475,13 @@ class _DashboardBody extends StatelessWidget {
 }
 
 class _DashboardLoadingBody extends StatelessWidget {
-  const _DashboardLoadingBody({required this.onNewPickup});
+  const _DashboardLoadingBody({
+    required this.onNewPickup,
+    required this.onShowReport,
+  });
 
   final VoidCallback onNewPickup;
+  final VoidCallback onShowReport;
 
   @override
   Widget build(BuildContext context) {
@@ -403,8 +495,164 @@ class _DashboardLoadingBody extends StatelessWidget {
           child: LinearProgressIndicator(),
         ),
         const SizedBox(height: 24),
-        _QuickActions(orders: const [], onNewPickup: onNewPickup),
+        _QuickActions(
+          onNewPickup: onNewPickup,
+          onShowReport: onShowReport,
+        ),
       ],
+    );
+  }
+}
+
+class _OrdersBody extends StatelessWidget {
+  const _OrdersBody({
+    required this.orders,
+    required this.onOrderTap,
+  });
+
+  final List<LaundryOrder> orders;
+  final void Function(LaundryOrder) onOrderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        const Text(
+          'Assigned orders',
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.bold,
+            color: amuwakDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final order in orders) ...[
+          _OrderCard(order: order, onTap: () => onOrderTap(order)),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+}
+
+class _AccountTab extends StatelessWidget {
+  const _AccountTab({required this.onSignOut});
+
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: amuwakWhite,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
+          ),
+          child: const Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: amuwakBackground,
+                child: Icon(
+                  Icons.person_rounded,
+                  color: amuwakPrimary,
+                  size: 30,
+                ),
+              ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Staff account',
+                      style: TextStyle(
+                        color: amuwakDark,
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Operations workspace',
+                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        const _AccountDetailRow(
+          icon: Icons.badge_outlined,
+          label: 'Role',
+          value: 'Laundry operations staff',
+        ),
+        const SizedBox(height: 10),
+        const _AccountDetailRow(
+          icon: Icons.schedule_outlined,
+          label: 'Shift',
+          value: 'Today',
+        ),
+        const SizedBox(height: 18),
+        OutlinedButton.icon(
+          onPressed: onSignOut,
+          icon: const Icon(Icons.logout_rounded),
+          label: const Text('Sign out'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountDetailRow extends StatelessWidget {
+  const _AccountDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: amuwakWhite,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: amuwakPrimary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: amuwakDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -628,10 +876,13 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.orders, required this.onNewPickup});
+  const _QuickActions({
+    required this.onNewPickup,
+    required this.onShowReport,
+  });
 
-  final List<LaundryOrder> orders;
   final VoidCallback onNewPickup;
+  final VoidCallback onShowReport;
 
   @override
   Widget build(BuildContext context) {
@@ -671,17 +922,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Report',
                 icon: Icons.bar_chart_rounded,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      // Pass a snapshot so the report reflects counts at the
-                      // moment it was opened, not later stream emissions.
-                      builder: (_) => DailyReportScreen(
-                        orders: List<LaundryOrder>.from(orders),
-                      ),
-                    ),
-                  );
-                },
+                onTap: onShowReport,
               ),
             ),
           ],
