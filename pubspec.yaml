@@ -74,6 +74,14 @@ dev_dependencies:
   shared_preferences: ^2.5.0   # transitive dep of supabase_flutter; declared
                                # here so test/end_to_end_sync_test.dart can
                                # call SharedPreferences.setMockInitialValues
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  web:
+    generate: true
+    image_path: "assets/branding/app_icon.png"
+    background_color: "#FFF8F2"
+    theme_color: "#A85A1F"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
