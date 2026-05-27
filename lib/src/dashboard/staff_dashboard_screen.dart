@@ -29,6 +29,8 @@ class StaffDashboardScreen extends StatefulWidget {
 }
 
 class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
+  int _selectedTabIndex = 0;
+
   final List<LaundryOrder> _orders = [
     const LaundryOrder(
       orderId: 'AMW-1024',
@@ -152,6 +154,26 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
   }
 
+  void _selectTab(int index) {
+    setState(() {
+      _selectedTabIndex = index;
+    });
+  }
+
+  String get _title {
+    switch (_selectedTabIndex) {
+      case 1:
+        return 'Orders';
+      case 2:
+        return 'Daily report';
+      case 3:
+        return 'Account';
+      case 0:
+      default:
+        return 'Amuwak Staff';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalOrders = _orders.length;
@@ -163,9 +185,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     return Scaffold(
       backgroundColor: amuwakBackground,
       appBar: AppBar(
-        title: const Text(
-          'Amuwak Staff',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -175,37 +197,260 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            const _DashboardHeader(),
-            const SizedBox(height: 20),
-            _SummaryGrid(
-              totalOrders: totalOrders,
-              pendingPickup: pendingPickup,
-              inProgress: inProgress,
-              readyForDelivery: readyForDelivery,
-              completed: completed,
+      body: switch (_selectedTabIndex) {
+        1 => _OrdersTab(
+            orders: _orders,
+            onOpenOrder: _openOrderDetails,
+          ),
+        2 => DailyReportView(orders: _orders),
+        3 => const _AccountTab(),
+        _ => _DashboardTab(
+            orders: _orders,
+            totalOrders: totalOrders,
+            pendingPickup: pendingPickup,
+            inProgress: inProgress,
+            readyForDelivery: readyForDelivery,
+            completed: completed,
+            onOpenOrder: _openOrderDetails,
+            onShowReport: () => _selectTab(2),
+          ),
+      },
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTabIndex,
+        onDestinationSelected: _selectTab,
+        backgroundColor: amuwakWhite,
+        indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment_rounded),
+            label: 'Orders',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart_rounded),
+            label: 'Report',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Account',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardTab extends StatelessWidget {
+  const _DashboardTab({
+    required this.orders,
+    required this.totalOrders,
+    required this.pendingPickup,
+    required this.inProgress,
+    required this.readyForDelivery,
+    required this.completed,
+    required this.onOpenOrder,
+    required this.onShowReport,
+  });
+
+  final List<LaundryOrder> orders;
+  final int totalOrders;
+  final int pendingPickup;
+  final int inProgress;
+  final int readyForDelivery;
+  final int completed;
+  final ValueChanged<LaundryOrder> onOpenOrder;
+  final VoidCallback onShowReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          const _DashboardHeader(),
+          const SizedBox(height: 20),
+          _SummaryGrid(
+            totalOrders: totalOrders,
+            pendingPickup: pendingPickup,
+            inProgress: inProgress,
+            readyForDelivery: readyForDelivery,
+            completed: completed,
+          ),
+          const SizedBox(height: 24),
+          _QuickActions(
+            onShowReport: onShowReport,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Assigned orders',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+              color: amuwakDark,
             ),
-            const SizedBox(height: 24),
-            _QuickActions(orders: _orders),
-            const SizedBox(height: 24),
-            const Text(
-              'Assigned orders',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                color: amuwakDark,
+          ),
+          const SizedBox(height: 12),
+          for (final order in orders) ...[
+            _OrderCard(order: order, onTap: () => onOpenOrder(order)),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OrdersTab extends StatelessWidget {
+  const _OrdersTab({
+    required this.orders,
+    required this.onOpenOrder,
+  });
+
+  final List<LaundryOrder> orders;
+  final ValueChanged<LaundryOrder> onOpenOrder;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          const Text(
+            'Assigned orders',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+              color: amuwakDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final order in orders) ...[
+            _OrderCard(order: order, onTap: () => onOpenOrder(order)),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountTab extends StatelessWidget {
+  const _AccountTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: amuwakWhite,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
+            ),
+            child: const Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: amuwakBackground,
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: amuwakPrimary,
+                    size: 30,
+                  ),
+                ),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Staff account',
+                        style: TextStyle(
+                          color: amuwakDark,
+                          fontSize: 21,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'staff@amuwak.com',
+                        style: TextStyle(color: Colors.black54, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const _AccountDetailRow(
+            icon: Icons.badge_outlined,
+            label: 'Role',
+            value: 'Laundry operations staff',
+          ),
+          const SizedBox(height: 10),
+          const _AccountDetailRow(
+            icon: Icons.schedule_outlined,
+            label: 'Shift',
+            value: 'Today',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountDetailRow extends StatelessWidget {
+  const _AccountDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: amuwakWhite,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: amuwakPrimary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 12),
-            for (final order in _orders) ...[
-              _OrderCard(order: order, onTap: () => _openOrderDetails(order)),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: amuwakDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -403,9 +648,11 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.orders});
+  const _QuickActions({
+    required this.onShowReport,
+  });
 
-  final List<LaundryOrder> orders;
+  final VoidCallback onShowReport;
 
   @override
   Widget build(BuildContext context) {
@@ -443,17 +690,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Report',
                 icon: Icons.bar_chart_rounded,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      // Pass a snapshot so the report reflects counts at the
-                      // moment it was opened, not later dashboard mutations.
-                      builder: (_) => DailyReportScreen(
-                        orders: List<LaundryOrder>.from(orders),
-                      ),
-                    ),
-                  );
-                },
+                onTap: onShowReport,
               ),
             ),
           ],

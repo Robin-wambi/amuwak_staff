@@ -41,4 +41,48 @@ void main() {
       );
     },
   );
+
+  testWidgets('Bottom navigation switches between staff sections', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StaffDashboardScreen(
+          retrieveLostPhoto: () async => false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Amuwak Staff'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Report').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Daily report'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Account').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Account'),
+      ),
+      findsOneWidget,
+    );
+  });
 }
