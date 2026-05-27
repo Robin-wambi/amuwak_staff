@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: const Icon(
                       Icons.local_laundry_service_rounded,
-                      color: Colors.white,
+                      color: amuwakDark,
                       size: 46,
                     ),
                   ),
