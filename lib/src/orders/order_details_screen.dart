@@ -330,7 +330,7 @@ class _OrderHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: amuwakPrimary,
+        color: amuwakSurfaceBrand,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
@@ -426,7 +426,7 @@ class _DetailsSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

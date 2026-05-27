@@ -226,7 +226,7 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
               decoration: BoxDecoration(
                 color: amuwakWhite,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: amuwakSoftAccent),
+                border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +272,7 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
                     width: 70,
                     height: 70,
                     decoration: BoxDecoration(
-                      color: amuwakSoftAccent,
+                      color: amuwakPrimary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     clipBehavior: Clip.antiAlias,

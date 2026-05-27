@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-const Color amuwakPrimary = Color(0xFFA85A1F);
+const Color amuwakPrimary = Color(0xFFFF6E11);
+const Color amuwakSurfaceBrand = Color(0xFFC75A0E);
 const Color amuwakDark = Color(0xFF1F1F1F);
 const Color amuwakBackground = Color(0xFFFFF8F2);
-const Color amuwakSoftAccent = Color(0xFFF3E0D0);
 const Color amuwakWhite = Color(0xFFFFFFFF);
 
 ThemeData buildAmuwakTheme() {
@@ -13,8 +13,19 @@ ThemeData buildAmuwakTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: amuwakPrimary,
       primary: amuwakPrimary,
-      secondary: amuwakPrimary,
+      onPrimary: amuwakDark,
+      primaryContainer: amuwakSurfaceBrand,
+      onPrimaryContainer: amuwakWhite,
+      secondary: amuwakDark,
+      onSecondary: amuwakWhite,
       surface: amuwakWhite,
+      onSurface: amuwakDark,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: amuwakSurfaceBrand,
+      foregroundColor: amuwakWhite,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
     ),
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
@@ -36,12 +47,16 @@ ThemeData buildAmuwakTheme() {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: amuwakPrimary,
-        foregroundColor: Colors.white,
+        foregroundColor: amuwakDark,
         minimumSize: const Size(double.infinity, 54),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
       ),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: amuwakPrimary,
+      foregroundColor: amuwakDark,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

@@ -38,7 +38,7 @@ class DailyReportScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: amuwakPrimary,
+                color: amuwakSurfaceBrand,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Row(
@@ -174,7 +174,7 @@ class _ReportMetricCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,7 +183,7 @@ class _ReportMetricCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: amuwakSoftAccent,
+              color: amuwakPrimary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(icon, color: amuwakPrimary),
@@ -234,7 +234,7 @@ class _StatusBreakdownCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Column(
         children: [
@@ -350,7 +350,7 @@ class _WorkSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: amuwakWhite,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakSoftAccent),
+        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
