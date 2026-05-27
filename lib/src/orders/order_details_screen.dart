@@ -286,7 +286,7 @@ class _OrderHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: amuwakPrimary,
+        color: amuwakSurfaceBrand,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
