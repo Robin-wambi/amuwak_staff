@@ -244,7 +244,10 @@ void main() {
       (tester) async {
     // Override ordersStreamProvider with a stream that never emits — keeps
     // Riverpod's AsyncValue in the loading state.  SyncStatusBanner providers
-    // are also stubbed so no real Drift stream is opened.
+    // and the dead-letter providers (read transitively via
+    // syncErrorCountProvider) are also stubbed so no real Drift stream is
+    // opened — drift_flutter's driftDatabase() schedules a Future at
+    // connection time, which would leave a pending Timer at test teardown.
     await tester.pumpWidget(ProviderScope(
       overrides: [
         ordersStreamProvider.overrideWith((ref) => const Stream.empty()),
@@ -252,6 +255,10 @@ void main() {
             .overrideWith((ref) => const Stream<int>.empty()),
         lastSyncedAtProvider
             .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        outboxDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<OutboxData>>.value(const [])),
+        pullDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
       ],
       child: MaterialApp(
           home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
@@ -275,8 +282,11 @@ void main() {
 
   testWidgets('shows the retry button when the stream emits an error',
       (tester) async {
-    // Also override the SyncStatusBanner providers to avoid hitting the real
-    // file-system database.
+    // Also override the SyncStatusBanner providers + dead-letter providers
+    // (read transitively via syncErrorCountProvider) to avoid hitting the
+    // real file-system database — drift_flutter's driftDatabase() schedules
+    // a Future at connection time, which would leave a pending Timer at
+    // test teardown.
     await tester.pumpWidget(ProviderScope(
       overrides: [
         ordersStreamProvider
@@ -285,6 +295,10 @@ void main() {
             .overrideWith((ref) => const Stream<int>.empty()),
         lastSyncedAtProvider
             .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        outboxDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<OutboxData>>.value(const [])),
+        pullDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
       ],
       child: MaterialApp(
           home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),

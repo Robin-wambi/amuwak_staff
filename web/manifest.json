@@ -1,12 +1,13 @@
 {
-    "name": "amuwak_staff",
-    "short_name": "amuwak_staff",
+    "name": "Amuwak Staff",
+    "short_name": "Amuwak",
+    "description": "On-the-road tool for Amuwak laundry pickup and delivery riders.",
     "start_url": ".",
+    "scope": "./",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
+    "background_color": "#FFF8F2",
+    "theme_color": "#A85A1F",
     "prefer_related_applications": false,
     "icons": [
         {
