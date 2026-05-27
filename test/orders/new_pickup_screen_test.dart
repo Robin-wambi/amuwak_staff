@@ -28,8 +28,8 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<NewPickupResult?> pumpFormAndOpen(WidgetTester tester) async {
-    NewPickupResult? popped;
+  Future<_FormHandle> pumpFormAndOpen(WidgetTester tester) async {
+    final handle = _FormHandle();
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -37,7 +37,8 @@ void main() {
             body: Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  popped = await Navigator.of(context).push<NewPickupResult>(
+                  handle.popped =
+                      await Navigator.of(context).push<NewPickupResult>(
                     MaterialPageRoute(
                       builder: (_) => NewPickupScreen(
                         customersRepo: customersRepo,
@@ -61,7 +62,7 @@ void main() {
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    return popped;
+    return handle;
   }
 
   testWidgets('Create button is disabled until required fields are valid',
@@ -83,7 +84,7 @@ void main() {
 
   testWidgets('Submit happy path writes customer + order, pops with '
       'startPickupNow=true (default schedule)', (tester) async {
-    await pumpFormAndOpen(tester);
+    final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
     await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
@@ -95,6 +96,10 @@ void main() {
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
+
+    expect(handle.popped, isNotNull);
+    expect(handle.popped!.orderId, 'uuid-order-1');
+    expect(handle.popped!.startPickupNow, isTrue);
 
     final customers = await db.select(db.customers).get();
     expect(customers, hasLength(1));
@@ -113,10 +118,10 @@ void main() {
   });
 
   testWidgets('Cancel returns null and writes nothing', (tester) async {
-    final popped = await pumpFormAndOpen(tester);
+    final handle = await pumpFormAndOpen(tester);
     await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
     await tester.pumpAndSettle();
-    expect(popped, isNull);
+    expect(handle.popped, isNull);
     final customers = await db.select(db.customers).get();
     final orders = await db.select(db.orders).get();
     expect(customers, isEmpty);
@@ -282,6 +287,56 @@ void main() {
     expect(popped, isNull);
   });
 
+  testWidgets(
+      'Use my location chip shows a SnackBar when reverseGeocode returns '
+      'null after a successful geolocate, and leaves the address blank',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).push<NewPickupResult>(
+                  MaterialPageRoute(
+                    builder: (_) => NewPickupScreen(
+                      customersRepo: customersRepo,
+                      ordersRepo: ordersRepo,
+                      actorStaffId: 'staff-1',
+                      clock: () => DateTime(2026, 5, 25, 10),
+                      orderIdGenerator: () => 'uuid-order-1',
+                      customerIdGenerator: () => 'uuid-cust-1',
+                      geolocate: () async => const GeoLocation(
+                          latitude: 0.3163, longitude: 32.5822),
+                      reverseGeocode: (_) async => null,
+                    ),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Could not determine address — please type it manually.'),
+      findsOneWidget,
+    );
+    expect(
+      (tester.widget<TextFormField>(find.byKey(const Key('np_address'))))
+          .controller!
+          .text,
+      isEmpty,
+    );
+  });
+
   testWidgets('Schedule for later → Tomorrow morning sets scheduledFor to '
       '9 AM next day and pops with startPickupNow=false', (tester) async {
     NewPickupResult? popped;
@@ -393,4 +448,10 @@ void main() {
     expect(orders.single.itemCount, 4);
     expect(orders.single.notes, 'Gate locked after 6');
   });
+}
+
+/// Mutable holder so tests can read the value the form pops with AFTER the
+/// pop has actually happened (i.e. after Cancel or Create pickup).
+class _FormHandle {
+  NewPickupResult? popped;
 }

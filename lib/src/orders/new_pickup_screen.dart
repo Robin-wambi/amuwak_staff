@@ -117,7 +117,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       final loc = await widget.geolocate();
       if (loc == null) return;
       final addr = await widget.reverseGeocode(loc);
-      if (addr == null || !mounted) return;
+      if (!mounted) return;
+      if (addr == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Could not determine address — please type it manually.'),
+          ),
+        );
+        return;
+      }
       setState(() => _addressController.text = addr);
     } finally {
       if (mounted) setState(() => _locating = false);
@@ -128,16 +137,28 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (_phoneFocus.hasFocus) return;
     final typed = _normalizePhone(_phoneController.text);
     if (typed.length < 9) return;
-    final all = await widget.customersRepo.getAll();
-    Customer? matched;
-    for (final c in all) {
-      if (_normalizePhone(c.phone) == typed) {
-        matched = c;
-        break;
+    // FocusNode.addListener takes a VoidCallback and discards the Future
+    // this async listener returns, so a thrown error becomes an unhandled
+    // zone error. Catch and surface via SnackBar instead.
+    try {
+      final all = await widget.customersRepo.getAll();
+      Customer? matched;
+      for (final c in all) {
+        if (_normalizePhone(c.phone) == typed) {
+          matched = c;
+          break;
+        }
       }
+      if (matched == null || !mounted) return;
+      await _showCustomerMatchSheet(matched);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not check for existing customers.'),
+        ),
+      );
     }
-    if (matched == null || !mounted) return;
-    await _showCustomerMatchSheet(matched);
   }
 
   Future<void> _showCustomerMatchSheet(Customer match) async {
