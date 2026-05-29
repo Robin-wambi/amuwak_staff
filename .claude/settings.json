@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter test *)",
+      "Read(//c/Users/RAYMOND/AppData/Local/Pub/Cache/hosted/pub.dev/drift_flutter-0.2.8/lib/**)"
+    ]
+  }
+}

@@ -55,6 +55,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(NavigationBar), findsOneWidget);
+    final navigationBar = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+    expect(
+      navigationBar.labelBehavior,
+      NavigationDestinationLabelBehavior.alwaysShow,
+    );
+    expect(find.byIcon(Icons.home), findsOneWidget);
+    expect(find.byIcon(Icons.list_alt_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.insert_chart_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(AppBar),
