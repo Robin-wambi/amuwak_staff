@@ -14,10 +14,7 @@ import '../shared/widgets/coming_soon_snackbar.dart';
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
 class StaffDashboardScreen extends StatefulWidget {
-  const StaffDashboardScreen({
-    super.key,
-    this.retrieveLostPhoto,
-  });
+  const StaffDashboardScreen({super.key, this.retrieveLostPhoto});
 
   // On Android the OS may kill MainActivity while the camera is open, dropping
   // the photo bytes silently. We check on startup so the rider knows to retry
@@ -179,7 +176,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final totalOrders = _orders.length;
     final pendingPickup = _orders.countByStatus(OrderStatus.pendingPickup);
     final inProgress = _orders.countByStatus(OrderStatus.inProgress);
-    final readyForDelivery = _orders.countByStatus(OrderStatus.readyForDelivery);
+    final readyForDelivery = _orders.countByStatus(
+      OrderStatus.readyForDelivery,
+    );
     final completed = _orders.countByStatus(OrderStatus.completed);
 
     return Scaffold(
@@ -198,47 +197,43 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         ],
       ),
       body: switch (_selectedTabIndex) {
-        1 => _OrdersTab(
-            orders: _orders,
-            onOpenOrder: _openOrderDetails,
-          ),
+        1 => _OrdersTab(orders: _orders, onOpenOrder: _openOrderDetails),
         2 => DailyReportView(orders: _orders),
         3 => const _AccountTab(),
         _ => _DashboardTab(
-            orders: _orders,
-            totalOrders: totalOrders,
-            pendingPickup: pendingPickup,
-            inProgress: inProgress,
-            readyForDelivery: readyForDelivery,
-            completed: completed,
-            onOpenOrder: _openOrderDetails,
-            onShowReport: () => _selectTab(2),
-          ),
+          orders: _orders,
+          totalOrders: totalOrders,
+          pendingPickup: pendingPickup,
+          inProgress: inProgress,
+          readyForDelivery: readyForDelivery,
+          completed: completed,
+          onOpenOrder: _openOrderDetails,
+          onShowReport: () => _selectTab(2),
+        ),
       },
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTabIndex,
         onDestinationSelected: _selectTab,
-        backgroundColor: amuwakWhite,
-        indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard_rounded),
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment_rounded),
+            icon: Icon(Icons.list_alt_outlined),
+            selectedIcon: Icon(Icons.list_alt),
             label: 'Orders',
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart_rounded),
+            icon: Icon(Icons.insert_chart_outlined),
+            selectedIcon: Icon(Icons.insert_chart),
             label: 'Report',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
+            icon: Icon(Icons.account_circle_outlined),
+            selectedIcon: Icon(Icons.account_circle),
             label: 'Account',
           ),
         ],
@@ -284,9 +279,7 @@ class _DashboardTab extends StatelessWidget {
             completed: completed,
           ),
           const SizedBox(height: 24),
-          _QuickActions(
-            onShowReport: onShowReport,
-          ),
+          _QuickActions(onShowReport: onShowReport),
           const SizedBox(height: 24),
           const Text(
             'Assigned orders',
@@ -308,10 +301,7 @@ class _DashboardTab extends StatelessWidget {
 }
 
 class _OrdersTab extends StatelessWidget {
-  const _OrdersTab({
-    required this.orders,
-    required this.onOpenOrder,
-  });
+  const _OrdersTab({required this.orders, required this.onOpenOrder});
 
   final List<LaundryOrder> orders;
   final ValueChanged<LaundryOrder> onOpenOrder;
@@ -555,7 +545,7 @@ class _SummaryGrid extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(width: 12),
         Row(
           children: [
             Expanded(
@@ -565,7 +555,7 @@ class _SummaryGrid extends StatelessWidget {
                 icon: Icons.timelapse_rounded,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(height: 12),
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.readyForDelivery.label,
@@ -648,9 +638,7 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({
-    required this.onShowReport,
-  });
+  const _QuickActions({required this.onShowReport});
 
   final VoidCallback onShowReport;
 
