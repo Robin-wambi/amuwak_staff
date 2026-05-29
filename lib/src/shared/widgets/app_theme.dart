@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
-const Color amuwakPrimary = Color(0xFFFF6E11);
-const Color amuwakSurfaceBrand = Color(0xFFC75A0E);
-const Color amuwakDark = Color(0xFF1F1F1F);
-const Color amuwakBackground = Color(0xFFFFF8F2);
+const Color amuwakPrimary = Color(0xFFF97316); //Crisp, signature brand orange
+const Color amuwakDark = Color(
+  0xFF1E293B,
+); // Deep charcoal (instead of harsh black 0xFF1F1F1F)
+const Color amuwakBackground = Color(
+  0xFFF4F4F5,
+); // Premium soft off-white background
+const Color amuwakSurfaceBrand = Color(
+  0xFFFFEDD5,
+); // Keep so that other pages don't break!
 const Color amuwakWhite = Color(0xFFFFFFFF);
 
 ThemeData buildAmuwakTheme() {
@@ -15,8 +21,8 @@ ThemeData buildAmuwakTheme() {
       primary: amuwakPrimary,
       onPrimary: amuwakDark,
       primaryContainer: amuwakSurfaceBrand,
-      onPrimaryContainer: amuwakWhite,
-      secondary: amuwakDark,
+      onPrimaryContainer: amuwakDark,
+      secondary: amuwakPrimary,
       onSecondary: amuwakWhite,
       surface: amuwakWhite,
       onSurface: amuwakDark,
@@ -27,31 +33,37 @@ ThemeData buildAmuwakTheme() {
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: amuwakWhite,
+      indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        final isSelected = states.contains(WidgetState.selected);
+        return IconThemeData(
+          color: isSelected ? amuwakPrimary : Colors.black54,
+          size: 24,
+        );
+      }),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        final isSelected = states.contains(WidgetState.selected);
+        return TextStyle(
+          color: isSelected ? amuwakDark : Colors.black54,
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+        );
+      }),
+    ),
     textTheme: const TextTheme(
-      headlineLarge: TextStyle(
-        color: amuwakDark,
-        fontWeight: FontWeight.bold,
-      ),
-      headlineMedium: TextStyle(
-        color: amuwakDark,
-        fontWeight: FontWeight.bold,
-      ),
-      titleLarge: TextStyle(
-        color: amuwakDark,
-        fontWeight: FontWeight.bold,
-      ),
-      bodyMedium: TextStyle(
-        color: amuwakDark,
-      ),
+      headlineLarge: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
+      headlineMedium: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
+      bodyMedium: TextStyle(color: amuwakDark),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: amuwakPrimary,
         foregroundColor: amuwakDark,
         minimumSize: const Size(double.infinity, 54),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -68,10 +80,7 @@ ThemeData buildAmuwakTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(
-          color: amuwakPrimary,
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: amuwakPrimary, width: 1.5),
       ),
     ),
   );
