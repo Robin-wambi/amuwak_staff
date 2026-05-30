@@ -17,11 +17,18 @@ bool isTransientSyncError(Object error) {
       type == 'HandshakeException') {
     return true;
   }
+  // runtimeType names above are mangled in --obfuscate / release-web builds,
+  // so the string fallback below is the real safety net there. Keep the
+  // class-name substrings (handshakeexception, timeoutexception) in sync with
+  // the type list above for that reason.
   final msg = error.toString().toLowerCase();
   return msg.contains('socketexception') ||
       msg.contains('clientexception') ||
+      msg.contains('httpexception') ||
+      msg.contains('handshakeexception') ||
+      msg.contains('timeoutexception') ||
       msg.contains('failed host lookup') ||
-      msg.contains('connection closed') ||
+      msg.contains('connection closed before') ||
       msg.contains('connection refused') ||
       msg.contains('connection reset') ||
       msg.contains('connection attempt failed') ||
@@ -36,7 +43,7 @@ bool isTransientSyncError(Object error) {
 String friendlySyncError(String? raw) {
   if (raw == null || raw.trim().isEmpty) return 'Could not be saved.';
   final t = raw.toLowerCase();
-  if (t.contains('23505') || t.contains('duplicate')) {
+  if (t.contains('23505') || t.contains('duplicate key')) {
     return 'Already saved on the server.';
   }
   if (t.contains('23503') || t.contains('foreign key')) {
@@ -44,7 +51,7 @@ String friendlySyncError(String? raw) {
   }
   if (t.contains('row-level security') ||
       t.contains('42501') ||
-      t.contains('permission') ||
+      t.contains('permission denied') ||
       t.contains('403')) {
     return 'Not allowed on the server (permissions).';
   }

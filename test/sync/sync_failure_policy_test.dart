@@ -31,6 +31,30 @@ void main() {
       expect(isTransientSyncError(StateError('unknown op "frobnicate"')),
           isFalse);
     });
+
+    test('detects handshake/timeout via class-name string (obfuscated builds)',
+        () {
+      // In --obfuscate / release-web builds runtimeType names are mangled, so
+      // detection must also work off the toString() class-name substring.
+      expect(
+          isTransientSyncError('HandshakeException: Handshake error in client'),
+          isTrue);
+      expect(isTransientSyncError('TimeoutException after 0:00:30.000000'),
+          isTrue);
+    });
+
+    test('does not treat a bare "connection closed" server message as transient',
+        () {
+      // Narrowed to "connection closed before" (what dart:http actually emits
+      // for a true transport drop) so a server/proxy message mentioning a
+      // closed connection is not misclassified as retryable.
+      expect(isTransientSyncError('relation "x" connection closed by policy'),
+          isFalse);
+      expect(
+          isTransientSyncError('ClientException: Connection closed before '
+              'full header was received'),
+          isTrue);
+    });
   });
 
   group('friendlySyncError', () {
@@ -57,6 +81,15 @@ void main() {
 
     test('falls back to a server-rejected line', () {
       expect(friendlySyncError('42P01: relation does not exist'),
+          'Could not be saved (server rejected it).');
+    });
+
+    test('over-broad words alone do not trigger specific messages', () {
+      // "duplicate" without "key" and "permission" without "denied" must NOT
+      // be mistaken for the server unique-violation / RLS messages.
+      expect(friendlySyncError('Duplicate scan ignored locally'),
+          'Could not be saved (server rejected it).');
+      expect(friendlySyncError('Camera permission is required'),
           'Could not be saved (server rejected it).');
     });
   });
