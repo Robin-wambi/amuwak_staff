@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -150,5 +151,48 @@ void main() {
     );
     expect(await worker.drainOnce(), 1);
     expect(recorder.calls, hasLength(2));
+  });
+
+  test(
+      'transient (offline) errors do NOT dead-letter: row stays pending with '
+      'retryCount 0 no matter how many drains run', () async {
+    recorder.throwThis = SocketException('failed host lookup');
+
+    await repo.enqueue(
+      id: 'm1', forTable: 'orders', op: 'insert',
+      rowId: 'r1', payload: const {},
+    );
+
+    // Far more drains than deadLetterAfter (5) — a real offline spell.
+    for (var i = 0; i < 10; i++) {
+      expect(await worker.drainOnce(), 0);
+    }
+
+    final pending = await repo.peekPending(limit: 10);
+    expect(pending, hasLength(1),
+        reason: 'the row must remain queued, not dead-lettered');
+    expect(pending.first.status, 'pending',
+        reason: 'offline blips must not flip status to failed/dead_letter');
+    expect(pending.first.retryCount, 0,
+        reason: 'transient errors must not burn the retry budget');
+    expect(await repo.watchDeadLettered().first, isEmpty);
+  });
+
+  test('permanent (non-Postgrest) errors still dead-letter after the budget',
+      () async {
+    recorder.throwThis = StateError('OutboxWorker: unknown op "frobnicate"');
+
+    await repo.enqueue(
+      id: 'm1', forTable: 'orders', op: 'insert',
+      rowId: 'r1', payload: const {},
+    );
+
+    for (var i = 0; i < 6; i++) {
+      await worker.drainOnce();
+    }
+
+    expect(await repo.peekPending(limit: 10), isEmpty,
+        reason: 'dead-lettered rows are excluded from peekPending');
+    expect(await repo.watchDeadLettered().first, hasLength(1));
   });
 }

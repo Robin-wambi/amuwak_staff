@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'outbox_repository.dart';
+import 'sync_failure_policy.dart';
 
 /// Function called for each row drained from the outbox. Implementations
 /// throw to signal failure; the worker will catch and call repo.markFailed.
@@ -85,6 +86,13 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
+        if (isTransientSyncError(e)) {
+          // Connectivity/transport blip — not the row's fault. Leave it
+          // pending and stop this drain; the next cycle retries WITHOUT
+          // burning the dead-letter budget. Prevents a flaky-signal rider
+          // from accumulating false sync errors.
+          return sent;
+        }
         await repo.markFailed(row.id, e.toString(),
             deadLetterAfter: deadLetterAfter);
         return sent;
