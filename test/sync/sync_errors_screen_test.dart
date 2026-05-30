@@ -100,7 +100,7 @@ void main() {
             forTable: 'orders',
             op: 'update',
             rowId: 'AMW-A',
-            lastError: 'network down',
+            lastError: '23505: duplicate key value',
           ),
         ]),
       );
@@ -114,7 +114,7 @@ void main() {
             forTable: 'orders',
             op: 'update',
             rowId: 'AMW-A',
-            lastError: 'network down',
+            lastError: '23505: duplicate key value',
           ),
         ],
         pullRows: const [],
@@ -123,7 +123,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('AMW-A'), findsOneWidget);
-      expect(find.textContaining('network down'), findsOneWidget);
+      expect(find.text('Already saved on the server.'), findsOneWidget);
+      expect(find.textContaining('23505'), findsNothing);
       expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(TextButton, 'Retry'));
@@ -132,6 +133,38 @@ void main() {
       verify(() => mockOutbox.requeue('k-1')).called(1);
     },
   );
+
+  testWidgets(
+      'outbox tile Discard confirms then calls discard', (tester) async {
+    final mockOutbox = _MockOutboxRepo();
+    when(() => mockOutbox.discard(any())).thenAnswer((_) async {});
+
+    await _pumpScreen(
+      tester,
+      outboxRows: [
+        _stubOutboxRow(
+          id: 'k-1', forTable: 'orders', op: 'update', rowId: 'AMW-A',
+          lastError: '23505: duplicate key value',
+        ),
+      ],
+      pullRows: const [],
+      outboxRepoOverride: mockOutbox,
+    );
+    await tester.pumpAndSettle();
+
+    // Friendly text replaces the raw "23505: ..." string.
+    expect(find.text('Already saved on the server.'), findsOneWidget);
+    expect(find.textContaining('23505'), findsNothing);
+
+    // The tile's 'Discard' opens a confirm dialog; the dialog's
+    // 'Discard upload' action is what calls repo.discard.
+    await tester.tap(find.widgetWithText(TextButton, 'Discard'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Discard upload'));
+    await tester.pumpAndSettle();
+
+    verify(() => mockOutbox.discard('k-1')).called(1);
+  });
 
   testWidgets(
     'a failing requeue surfaces a SnackBar instead of being swallowed',

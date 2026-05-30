@@ -5,6 +5,7 @@ import '../data/app_database.dart';
 import '../shared/widgets/app_theme.dart';
 import 'repository_providers.dart';
 import 'sync_errors_provider.dart';
+import 'sync_failure_policy.dart';
 
 class SyncErrorsScreen extends ConsumerWidget {
   const SyncErrorsScreen({super.key});
@@ -64,6 +65,41 @@ class SyncErrorsScreen extends ConsumerWidget {
                             );
                           }
                         },
+                        onDiscard: () async {
+                          final ok = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogCtx) => AlertDialog(
+                              title: const Text('Discard upload?'),
+                              content: const Text(
+                                'This change could not be saved and will be '
+                                'permanently discarded from this device.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(true),
+                                  child: const Text('Discard upload'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok != true) return;
+                          try {
+                            await ref
+                                .read(outboxRepositoryProvider)
+                                .discard(row.id);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Discard failed: $e')),
+                            );
+                          }
+                        },
                       ),
                   ],
                   if (pullRows.isNotEmpty) ...[
@@ -117,9 +153,14 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _OutboxErrorTile extends StatelessWidget {
-  const _OutboxErrorTile({required this.row, required this.onRetry});
+  const _OutboxErrorTile({
+    required this.row,
+    required this.onRetry,
+    required this.onDiscard,
+  });
   final OutboxData row;
   final VoidCallback onRetry;
+  final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
@@ -128,13 +169,16 @@ class _OutboxErrorTile extends StatelessWidget {
       child: ListTile(
         title: Text('${row.forTable} · ${row.op} · ${row.rowId}'),
         subtitle: Text(
-          row.lastError ?? 'No error message recorded',
-          maxLines: 3,
+          friendlySyncError(row.lastError),
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: TextButton(
-          onPressed: onRetry,
-          child: const Text('Retry'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+            TextButton(onPressed: onDiscard, child: const Text('Discard')),
+          ],
         ),
       ),
     );
