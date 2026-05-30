@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../shared/uuid.dart';
 import '../../shared/widgets/app_theme.dart';
+import '../../sync/orders_repository.dart';
+import '../../sync/proof_events_repository.dart';
 import '../order.dart';
 import '../order_status.dart';
 import '../proof_event.dart';
@@ -18,13 +21,21 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.order,
     required this.photoStorage,
     required this.pickPhoto,
+    required this.ordersRepo,
+    required this.proofEventsRepo,
+    required this.actorStaffId,
     this.clock = _defaultClock,
+    this.proofEventIdGenerator = defaultUuidV4,
   });
 
   final LaundryOrder order;
   final ProofPhotoStorage photoStorage;
   final PickPhotoFn pickPhoto;
   final DateTime Function() clock;
+  final OrdersRepository ordersRepo;
+  final ProofEventsRepository proofEventsRepo;
+  final String actorStaffId;
+  final String Function() proofEventIdGenerator;
 
   @override
   State<PickupCaptureScreen> createState() => _PickupCaptureScreenState();
@@ -37,6 +48,21 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   final TextEditingController _notesController = TextEditingController();
   bool _saving = false;
   bool _pickingPhoto = false;
+
+  // Cached across retries so re-tapping "Done" after a downstream failure
+  // produces a byte-identical ProofEvent + outbox payload. With the outbox's
+  // deterministic dedup key (Plan 4 Task 2) AND the proof_events row's
+  // insertOrIgnore on event id, both layers absorb the retry as no-ops —
+  // no UI-side `_proofPersisted` flag needed.
+  //
+  // [_pendingUpdatedAt] is the stable timestamp passed to
+  // `ordersRepo.updateStatus(updatedAt:)`. Used in the outbox dedup key for
+  // `orders:update:<id>:<updatedAt>`; without it, two retries would mint
+  // distinct keys and double-enqueue.
+  String? _pendingEventId;
+  List<String>? _pendingPhotoPaths;
+  DateTime? _pendingCapturedAt;
+  DateTime? _pendingUpdatedAt;
 
   static const int _maxPhotos = 3;
 
@@ -91,32 +117,26 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   Future<void> _onDone() async {
     if (_saving) return;
     setState(() => _saving = true);
+
+    // Capture the moment Done was tapped — BEFORE the photo-save loop, which
+    // can take seconds on slow flash. `??=` so a retry preserves the first
+    // attempt's timestamp.
+    _pendingCapturedAt ??= widget.clock();
+
+    // Photo save — cache the paths so retries don't re-save bytes (and don't
+    // surface fresh storage errors mid-retry for already-persisted photos).
+    final List<String> paths;
     try {
-      final paths = <String>[];
-      for (var i = 0; i < _photoBytes.length; i++) {
-        final path = await widget.photoStorage.save(
-          orderId: widget.order.orderId,
-          type: ProofEventType.pickup,
-          index: i,
-          bytes: _photoBytes[i],
-        );
-        paths.add(path);
-      }
-      final event = ProofEvent(
-        type: ProofEventType.pickup,
-        capturedAt: widget.clock(),
-        count: _count,
-        photoPaths: paths,
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
-      );
-      final updated = widget.order.copyWith(
-        status: OrderStatus.inProgress,
-        proofEvents: [...widget.order.proofEvents, event],
-      );
-      if (!mounted) return;
-      Navigator.pop<LaundryOrder>(context, updated);
+      paths = _pendingPhotoPaths ?? <String>[
+        for (var i = 0; i < _photoBytes.length; i++)
+          await widget.photoStorage.save(
+            orderId: widget.order.orderId,
+            type: ProofEventType.pickup,
+            index: i,
+            bytes: _photoBytes[i],
+          ),
+      ];
+      _pendingPhotoPaths = paths;
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -125,7 +145,66 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
           content: Text('Could not save pickup proof. Please try again.'),
         ),
       );
+      return;
     }
+
+    // Generate / reuse the event id ONCE so the proof_events row (and its
+    // outbox payload) is byte-identical across retries. `_pendingCapturedAt`
+    // is already cached at the top of this method.
+    _pendingEventId ??= widget.proofEventIdGenerator();
+    final trimmedNotes = _notesController.text.trim();
+    final event = ProofEvent(
+      id: _pendingEventId!,
+      type: ProofEventType.pickup,
+      capturedAt: _pendingCapturedAt!,
+      count: _count,
+      photoPaths: paths,
+      notes: trimmedNotes.isEmpty ? null : trimmedNotes,
+    );
+
+    try {
+      await widget.proofEventsRepo.insertEvent(
+        event,
+        orderId: widget.order.orderId,
+        actorStaffId: widget.actorStaffId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save pickup proof. Please try again.'),
+        ),
+      );
+      return;
+    }
+
+    // Cache the stable updatedAt for the orders-update outbox key so retries
+    // dedup at the SQL layer (Plan 4 Task 2).
+    _pendingUpdatedAt ??= widget.clock();
+    try {
+      await widget.ordersRepo.updateStatus(
+        widget.order.orderId,
+        OrderStatus.inProgress,
+        actorStaffId: widget.actorStaffId,
+        updatedAt: _pendingUpdatedAt,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pickup proof saved, but status update failed. Tap Done again to '
+            'retry.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pop<bool>(context, true);
   }
 
   @override

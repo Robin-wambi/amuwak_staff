@@ -1,0 +1,51 @@
+import 'package:drift/drift.dart';
+import 'package:drift_flutter/drift_flutter.dart';
+
+import 'tables/staff_table.dart';
+import 'tables/customers_table.dart';
+import 'tables/orders_table.dart';
+import 'tables/order_status_events_table.dart';
+import 'tables/proof_events_table.dart';
+import 'tables/proof_photos_table.dart';
+import 'tables/issues_table.dart';
+import 'tables/shifts_table.dart';
+import 'tables/valid_transitions_table.dart';
+import 'tables/outbox_table.dart';
+import 'tables/sync_watermarks_table.dart';
+import 'tables/pull_dead_letter_table.dart';
+
+part 'app_database.g.dart';
+
+@DriftDatabase(tables: [
+  Staff, Customers, Orders, OrderStatusEvents,
+  ProofEvents, ProofPhotos, Issues, Shifts,
+  ValidTransitions, Outbox, SyncWatermarks,
+  PullDeadLetter,
+])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(super.e);
+
+  @override
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(pullDeadLetter);
+          }
+        },
+      );
+}
+
+QueryExecutor _openConnection() => LazyDatabase(
+      () async => driftDatabase(
+        name: 'amuwak_staff',
+        web: DriftWebOptions(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          driftWorker: Uri.parse('drift_worker.js'),
+        ),
+      ),
+    );

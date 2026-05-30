@@ -23,6 +23,13 @@ enum OrderStatus {
   final String label;
   final Color color;
 
+  String toDbString() => switch (this) {
+    OrderStatus.pendingPickup    => 'pending_pickup',
+    OrderStatus.inProgress       => 'in_progress',
+    OrderStatus.readyForDelivery => 'ready',
+    OrderStatus.completed        => 'completed',
+  };
+
   OrderStatus? get nextStatus => switch (this) {
     OrderStatus.pendingPickup => OrderStatus.inProgress,
     OrderStatus.inProgress => OrderStatus.readyForDelivery,

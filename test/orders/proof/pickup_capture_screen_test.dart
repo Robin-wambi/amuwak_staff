@@ -1,15 +1,22 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// Hide Drift's row class `ProofEvent` so the tests can keep referring to the
+// domain `ProofEvent` from `orders/proof_event.dart` without ambiguity.
+import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/sync/orders_repository.dart';
+import 'package:amuwak_staff/src/sync/outbox_repository.dart';
+import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 
 class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   @override
@@ -23,10 +30,39 @@ class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   }
 }
 
+/// Wraps a real [OrdersRepository] but rigs `updateStatus` to throw on the
+/// first call and delegate to the real repo on subsequent calls. Used to
+/// exercise the capture-screen retry path: insert proof succeeds, status
+/// update fails, user retries, status update succeeds.
+class _FlakyUpdateOrdersRepo extends OrdersRepository {
+  _FlakyUpdateOrdersRepo(super.db, {required super.outbox});
+
+  int _calls = 0;
+
+  @override
+  Future<void> updateStatus(
+    String orderId,
+    OrderStatus newStatus, {
+    required String actorStaffId,
+    DateTime? updatedAt,
+  }) async {
+    _calls += 1;
+    if (_calls == 1) {
+      throw Exception('transient flake');
+    }
+    return super.updateStatus(
+      orderId,
+      newStatus,
+      actorStaffId: actorStaffId,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
 const _baseOrder = LaundryOrder(
   orderId: 'AMW-0421',
   customerName: 'Jane Doe',
-  serviceType: 'Wash & iron',
+  serviceType: ServiceType.washAndIron,
   status: OrderStatus.pendingPickup,
   timeLabel: 'Today, 09:00',
   itemCount: 12,
@@ -35,13 +71,93 @@ const _baseOrder = LaundryOrder(
   notes: 'Gate locked',
 );
 
+/// Bundles an in-memory Drift DB + outbox + wired repos for tests that need
+/// to assert the write path lands the right rows.
+class _PickupFixture {
+  _PickupFixture._(this.db, this.outbox, this.ordersRepo, this.proofEventsRepo);
+
+  final AppDatabase db;
+  final OutboxRepository outbox;
+  final OrdersRepository ordersRepo;
+  final ProofEventsRepository proofEventsRepo;
+
+  static _PickupFixture create() {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final outbox = OutboxRepository(db);
+    final ordersRepo = OrdersRepository(
+      db,
+      outbox: outbox,
+      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
+    );
+    final proofEventsRepo = ProofEventsRepository(
+      db,
+      outbox: outbox,
+      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
+    );
+    return _PickupFixture._(db, outbox, ordersRepo, proofEventsRepo);
+  }
+}
+
+/// Seeds an `orders` row matching [order] directly into the Drift DB.
+Future<void> _seedOrder(AppDatabase db, LaundryOrder order) {
+  return db.into(db.orders).insert(OrdersCompanion.insert(
+        id: order.orderId,
+        orderCode: order.orderId,
+        customerName: order.customerName,
+        phone: order.phone,
+        address: order.address,
+        serviceType: order.serviceType.toDbString(),
+        status: order.status.toDbString(),
+        intakeMethod: 'driver_pickup',
+        fulfillmentMethod: 'delivery',
+        itemCount: order.itemCount,
+        intakeRecordedBy: 's-test',
+        createdBy: 's-test',
+      ));
+}
+
+/// Lazily-constructed placeholder DB shared by `_pumpAndPushPickup` calls that
+/// don't supply repos. Read-only by construction (no outbox wired), so any
+/// accidental write surfaces as a `StateError` rather than silently succeeding.
+AppDatabase? _placeholderDb;
+AppDatabase _ensurePlaceholderDb() =>
+    _placeholderDb ??= AppDatabase.forTesting(NativeDatabase.memory());
+
+/// Builds a `PickupCaptureScreen` with the placeholder repos for tests that
+/// only exercise UI (count buttons, photo picker, etc.) and never tap "Done".
+PickupCaptureScreen _buildScreen({
+  required LaundryOrder order,
+  required ProofPhotoStorage storage,
+  required Future<List<int>?> Function() pickPhoto,
+  required DateTime Function() clock,
+}) {
+  return PickupCaptureScreen(
+    order: order,
+    photoStorage: storage,
+    pickPhoto: pickPhoto,
+    clock: clock,
+    ordersRepo: OrdersRepository(_ensurePlaceholderDb()),
+    proofEventsRepo: ProofEventsRepository(_ensurePlaceholderDb()),
+    actorStaffId: 's-test',
+    proofEventIdGenerator: () => 'pe-test',
+  );
+}
+
 Future<void> _pumpAndPushPickup(
   WidgetTester tester, {
-  required InMemoryProofPhotoStorage storage,
+  required ProofPhotoStorage storage,
   required LaundryOrder order,
   Future<List<int>?> Function()? pickPhoto,
   DateTime Function()? clock,
+  OrdersRepository? ordersRepo,
+  ProofEventsRepository? proofEventsRepo,
+  String actorStaffId = 's-test',
+  String Function()? proofEventIdGenerator,
 }) async {
+  final effectiveOrdersRepo =
+      ordersRepo ?? OrdersRepository(_ensurePlaceholderDb());
+  final effectiveProofEventsRepo =
+      proofEventsRepo ?? ProofEventsRepository(_ensurePlaceholderDb());
   await tester.pumpWidget(
     MaterialApp(
       home: Builder(
@@ -50,7 +166,7 @@ Future<void> _pumpAndPushPickup(
             body: Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  await Navigator.of(context).push<LaundryOrder>(
+                  await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => PickupCaptureScreen(
                         order: order,
@@ -58,6 +174,11 @@ Future<void> _pumpAndPushPickup(
                         pickPhoto:
                             pickPhoto ?? () async => const [1, 2, 3, 4],
                         clock: clock ?? () => DateTime(2026, 5, 12, 9, 42),
+                        ordersRepo: effectiveOrdersRepo,
+                        proofEventsRepo: effectiveProofEventsRepo,
+                        actorStaffId: actorStaffId,
+                        proofEventIdGenerator:
+                            proofEventIdGenerator ?? () => 'pe-test',
                       ),
                     ),
                   );
@@ -103,10 +224,15 @@ void main() {
   });
 
   testWidgets(
-      'Tapping Done writes a pickup ProofEvent and pops with status inProgress',
+      'Tapping Done flips the order to in_progress, inserts a pickup '
+      'proof_events row, and enqueues both outbox writes',
       (tester) async {
+    final fixture = _PickupFixture.create();
+    addTearDown(() async => fixture.db.close());
+    await _seedOrder(fixture.db, _baseOrder);
+
     final storage = InMemoryProofPhotoStorage();
-    LaundryOrder? captured;
+    bool? popResult;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -116,14 +242,17 @@ void main() {
               body: Center(
                 child: ElevatedButton(
                   onPressed: () async {
-                    captured =
-                        await Navigator.of(context).push<LaundryOrder>(
+                    popResult = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
                         builder: (_) => PickupCaptureScreen(
                           order: _baseOrder,
                           photoStorage: storage,
                           pickPhoto: () async => const [10, 20, 30],
                           clock: () => DateTime(2026, 5, 12, 9, 42),
+                          ordersRepo: fixture.ordersRepo,
+                          proofEventsRepo: fixture.proofEventsRepo,
+                          actorStaffId: 's-test',
+                          proofEventIdGenerator: () => 'pe-task-11',
                         ),
                       ),
                     );
@@ -156,25 +285,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tie tag to the bag'), findsOneWidget);
 
-    // Tap Done → pops back with updated order.
+    // Tap Done → screen pops once both writes resolve.
     await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
     await tester.pumpAndSettle();
 
-    expect(captured, isNotNull);
-    expect(captured!.status, equals(OrderStatus.inProgress));
-    expect(captured!.proofEvents, hasLength(1));
-    final event = captured!.proofEvents.single;
-    expect(event.type, equals(ProofEventType.pickup));
-    expect(event.count, equals(12));
-    expect(event.photoPaths, hasLength(1));
+    expect(popResult, isTrue);
+
+    // Orders row was flipped to in_progress.
+    final orderRow = await (fixture.db.select(fixture.db.orders)
+          ..where((t) => t.id.equals('AMW-0421')))
+        .getSingle();
+    expect(orderRow.status, 'in_progress');
+
+    // proof_events row landed with the right type + count + actor.
+    final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
+    expect(proofRows, hasLength(1));
+    expect(proofRows.single.id, 'pe-task-11');
+    expect(proofRows.single.orderId, 'AMW-0421');
+    expect(proofRows.single.type, 'pickup');
+    expect(proofRows.single.itemCount, 12);
+    expect(proofRows.single.capturedBy, 's-test');
+
+    // Outbox has the proof_events insert AND the orders update.
+    final outboxRows = await fixture.db.select(fixture.db.outbox).get();
+    expect(outboxRows, hasLength(2));
+    final tableOps = outboxRows
+        .map((r) => '${r.forTable}:${r.op}')
+        .toSet();
+    expect(
+      tableOps,
+      containsAll(<String>['proof_events:insert', 'orders:update']),
+    );
+
+    // Photo bytes were actually persisted to storage.
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [10, 20, 30]));
   });
 
   testWidgets(
-    'Done re-enables itself and surfaces an error when photo save fails',
+    'Done re-enables itself, surfaces an error, and lands no DB rows '
+    'when photo save fails',
     (tester) async {
-      LaundryOrder? captured;
+      final fixture = _PickupFixture.create();
+      addTearDown(() async => fixture.db.close());
+      await _seedOrder(fixture.db, _baseOrder);
+
+      bool? popResult;
+      var popResolved = false;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -184,16 +341,21 @@ void main() {
                 body: Center(
                   child: ElevatedButton(
                     onPressed: () async {
-                      captured = await Navigator.of(context).push<LaundryOrder>(
+                      popResult = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (_) => PickupCaptureScreen(
                             order: _baseOrder,
                             photoStorage: _ThrowingProofPhotoStorage(),
                             pickPhoto: () async => const [10, 20, 30],
                             clock: () => DateTime(2026, 5, 12, 9, 42),
+                            ordersRepo: fixture.ordersRepo,
+                            proofEventsRepo: fixture.proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-task-11',
                           ),
                         ),
                       );
+                      popResolved = true;
                     },
                     child: const Text('Open'),
                   ),
@@ -218,7 +380,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Push has not resolved — the screen did not pop.
-      expect(captured, isNull);
+      expect(popResolved, isFalse);
+      expect(popResult, isNull);
       expect(find.text('Tie tag to the bag'), findsOneWidget);
       // Done button is re-enabled so the user can retry.
       final done = find.widgetWithText(ElevatedButton, 'Done');
@@ -230,6 +393,17 @@ void main() {
       );
       // The exception was handled, not left dangling.
       expect(tester.takeException(), isNull);
+
+      // Photo-save failure short-circuited before any repo write:
+      // orders row still pending_pickup, no proof_events row, no outbox rows.
+      final orderRow = await (fixture.db.select(fixture.db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'pending_pickup');
+      final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
+      expect(proofRows, isEmpty);
+      final outboxRows = await fixture.db.select(fixture.db.outbox).get();
+      expect(outboxRows, isEmpty);
     },
   );
 
@@ -240,9 +414,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: PickupCaptureScreen(
+          home: _buildScreen(
             order: _baseOrder,
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () {
               final c = Completer<List<int>?>();
               completers.add(c);
@@ -278,9 +452,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: PickupCaptureScreen(
+          home: _buildScreen(
             order: _baseOrder,
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async => const [9, 8, 7, 6, 5],
             clock: () => DateTime(2026, 5, 12, 9, 42),
           ),
@@ -307,9 +481,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: PickupCaptureScreen(
+          home: _buildScreen(
             order: _baseOrder,
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw Exception('camera permission revoked');
             },
@@ -338,9 +512,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: PickupCaptureScreen(
+          home: _buildScreen(
             order: _baseOrder,
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw PlatformException(code: 'camera_access_denied');
             },
@@ -364,9 +538,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: PickupCaptureScreen(
+          home: _buildScreen(
             order: _baseOrder,
-            photoStorage: InMemoryProofPhotoStorage(),
+            storage: InMemoryProofPhotoStorage(),
             pickPhoto: () async {
               throw PlatformException(code: 'no_available_camera');
             },
@@ -385,10 +559,129 @@ void main() {
   );
 
   testWidgets(
+    'Retrying Done after a transient status-update failure lands exactly ONE '
+    'proof_events row and ONE proof_events outbox row (cached event id)',
+    (tester) async {
+      // Critical #2: a fresh UUID per Done-tap would otherwise land a second
+      // proof_events row and outbox enqueue on every retry. With caching, the
+      // proof_events insertOrIgnore is a no-op on the second tap and only the
+      // orders update runs.
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(() async => db.close());
+      final outbox = OutboxRepository(db);
+      final flakyOrdersRepo = _FlakyUpdateOrdersRepo(
+        db,
+        outbox: outbox,
+      );
+      final proofEventsRepo = ProofEventsRepository(db, outbox: outbox);
+      await _seedOrder(db, _baseOrder);
+
+      bool? popResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      popResult = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => PickupCaptureScreen(
+                            order: _baseOrder,
+                            photoStorage: InMemoryProofPhotoStorage(),
+                            pickPhoto: () async => const [10, 20, 30],
+                            clock: () => DateTime(2026, 5, 12, 9, 42),
+                            ordersRepo: flakyOrdersRepo,
+                            proofEventsRepo: proofEventsRepo,
+                            actorStaffId: 's-test',
+                            proofEventIdGenerator: () => 'pe-retry-once',
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Set count + photo and confirm to reach the QR stage.
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+
+      // First Done — proof insert succeeds, status update throws. Screen does
+      // NOT pop, error SnackBar surfaces.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+      expect(popResult, isNull);
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+      expect(
+        find.textContaining('status update failed'),
+        findsOneWidget,
+      );
+
+      // After the first tap, exactly one proof_events row and one outbox row.
+      var proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1));
+      expect(proofRows.single.id, 'pe-retry-once');
+      var outboxRows = await db.select(db.outbox).get();
+      expect(outboxRows.where((r) => r.forTable == 'proof_events'), hasLength(1));
+      // No successful orders update yet.
+      expect(outboxRows.where((r) => r.forTable == 'orders'), isEmpty);
+      var orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'pending_pickup');
+
+      // Flush the in-flight SnackBar so it doesn't overlap the Done button
+      // on the next tap. SnackBars auto-dismiss after ~4s by default;
+      // pumping forward past that and settling clears the bottom of the
+      // screen.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Second Done — status update succeeds. proof_events stays at 1 (cached
+      // event id + insertOrIgnore). Orders status flips, orders outbox row
+      // lands. Screen pops.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+      expect(popResult, isTrue);
+
+      proofRows = await db.select(db.proofEvents).get();
+      expect(proofRows, hasLength(1),
+          reason: 'cached event id must keep proof_events at exactly one row');
+      expect(proofRows.single.id, 'pe-retry-once');
+
+      outboxRows = await db.select(db.outbox).get();
+      expect(outboxRows.where((r) => r.forTable == 'proof_events'), hasLength(1),
+          reason: 'cached event id must keep proof_events outbox at one row');
+      expect(outboxRows.where((r) => r.forTable == 'orders'), hasLength(1));
+
+      orderRow = await (db.select(db.orders)
+            ..where((t) => t.id.equals('AMW-0421')))
+          .getSingle();
+      expect(orderRow.status, 'in_progress');
+    },
+  );
+
+  testWidgets(
     'Back from QR stage returns to collecting without losing count/photos/notes',
     (tester) async {
       final storage = InMemoryProofPhotoStorage();
-      LaundryOrder? captured;
+      bool? captured;
       var poppedFromPush = false;
 
       await tester.pumpWidget(
@@ -399,11 +692,11 @@ void main() {
                 body: Center(
                   child: ElevatedButton(
                     onPressed: () async {
-                      captured = await Navigator.of(context).push<LaundryOrder>(
+                      captured = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (_) => PickupCaptureScreen(
+                          builder: (_) => _buildScreen(
                             order: _baseOrder,
-                            photoStorage: storage,
+                            storage: storage,
                             pickPhoto: () async => const [10, 20, 30],
                             clock: () => DateTime(2026, 5, 12, 9, 42),
                           ),

@@ -47,5 +47,7 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Amuwak Staff uses the camera to scan order QR tags and capture pickup and delivery proof photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Used to pre-fill the customer address when you create a new pickup.</string>
 </dict>
 </plist>

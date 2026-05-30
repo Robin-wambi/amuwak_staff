@@ -1,50 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../dashboard/staff_dashboard_screen.dart';
 import '../shared/widgets/app_theme.dart';
+import 'auth_service.dart';
+import 'session.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _pinController = TextEditingController();
 
   String? _errorMessage;
+  bool _busy = false;
 
-  void _login() {
+  Future<void> _login() async {
     setState(() {
       _errorMessage = null;
     });
+    if (!_formKey.currentState!.validate()) return;
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (email == 'staff@amuwak.com' && password == 'password123') {
+    setState(() => _busy = true);
+    try {
+      await ref.read(authServiceProvider).signInWithUsernamePin(
+            username: _usernameController.text.trim(),
+            pin: _pinController.text.trim(),
+          );
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const StaffDashboardScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const StaffDashboardScreen()),
       );
-    } else {
-      setState(() {
-        _errorMessage = 'Invalid staff login details.';
-      });
+    } on AuthFailure catch (e) {
+      setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _usernameController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -85,39 +87,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'Login to manage laundry orders',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
-                    controller: _emailController,
+                    controller: _usernameController,
                     decoration: const InputDecoration(
-                      labelText: 'Email or phone',
+                      labelText: 'Username',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Enter your email or phone';
-                      }
-                      return null;
-                    },
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Enter your username' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _passwordController,
+                    controller: _pinController,
                     obscureText: true,
+                    keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Password',
+                      labelText: 'PIN',
                       prefixIcon: Icon(Icons.lock_outline),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Enter your password';
-                      }
-                      return null;
-                    },
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Enter your PIN' : null,
                   ),
                   const SizedBox(height: 16),
                   if (_errorMessage != null)
@@ -135,19 +129,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: _login,
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Demo login: staff@amuwak.com / password123',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black45,
-                    ),
+                    onPressed: _busy ? null : _login,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Login', style: TextStyle(fontSize: 16)),
                   ),
                 ],
               ),

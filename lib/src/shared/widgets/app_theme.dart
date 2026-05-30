@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 
-const Color amuwakPrimary = Color(0xFFF97316); //Crisp, signature brand orange
-const Color amuwakDark = Color(
-  0xFF1E293B,
-); // Deep charcoal (instead of harsh black 0xFF1F1F1F)
-const Color amuwakBackground = Color(
-  0xFFF4F4F5,
-); // Premium soft off-white background
-const Color amuwakSurfaceBrand = Color(
-  0xFFFFEDD5,
-); // Keep so that other pages don't break!
+const Color amuwakPrimary = Color(0xFFFF6E11); // Sampled logo orange (60% role)
+const Color amuwakSurfaceBrand = Color(0xFFC75A0E); // Deep terracotta (30% role)
+const Color amuwakDark = Color(0xFF1F1F1F);
+const Color amuwakBackground = Color(0xFFFFF8F2);
 const Color amuwakWhite = Color(0xFFFFFFFF);
 
 ThemeData buildAmuwakTheme() {
@@ -21,7 +15,7 @@ ThemeData buildAmuwakTheme() {
       primary: amuwakPrimary,
       onPrimary: amuwakDark,
       primaryContainer: amuwakSurfaceBrand,
-      onPrimaryContainer: amuwakDark,
+      onPrimaryContainer: amuwakWhite,
       secondary: amuwakPrimary,
       onSecondary: amuwakWhite,
       surface: amuwakWhite,
