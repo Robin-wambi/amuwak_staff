@@ -259,6 +259,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     });
   }
 
+  void _openSyncErrors() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
+    );
+  }
+
   String get _title {
     switch (_selectedTabIndex) {
       case 1:
