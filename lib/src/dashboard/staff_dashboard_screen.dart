@@ -309,6 +309,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         ],
       ),
       body: _DashboardTabShell(
+        onShowErrors: _openSyncErrors,
         child: switch (_selectedTabIndex) {
           1 => ordersAsync.when(
               data: (orders) => _OrdersBody(
@@ -382,16 +383,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
 // ---------------------------------------------------------------------------
 
 class _DashboardTabShell extends StatelessWidget {
-  const _DashboardTabShell({required this.child});
+  const _DashboardTabShell({required this.child, this.onShowErrors});
 
   final Widget child;
+  final VoidCallback? onShowErrors;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         children: [
-          const SyncStatusBanner(),
+          SyncStatusBanner(onShowErrors: onShowErrors),
           Expanded(child: child),
         ],
       ),

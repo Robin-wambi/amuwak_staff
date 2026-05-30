@@ -1,16 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../sync/sync_errors_provider.dart';
 import '../../sync/sync_status.dart';
 
-/// A thin banner shown above the staff dashboard whenever the device is
-/// offline or the outbox has pending rows. Hides itself when everything is
-/// clean.
+/// A thin banner shown above the staff dashboard. Priority order:
+///   1. Sync errors (red, tappable → opens the sync-errors screen)
+///   2. Offline (orange)
+///   3. Pending uploads (blue)
+/// Hides itself when online, nothing pending, and no errors.
 class SyncStatusBanner extends ConsumerWidget {
-  const SyncStatusBanner({super.key});
+  const SyncStatusBanner({super.key, this.onShowErrors});
+
+  /// Invoked when the rider taps the error state. The dashboard wires this to
+  /// push the SyncErrorsScreen; left null in contexts that can't navigate.
+  final VoidCallback? onShowErrors;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(syncStatusProvider);
+    final errorCount = ref.watch(syncErrorCountProvider);
+
+    if (errorCount > 0) {
+      final label =
+          '$errorCount sync error${errorCount == 1 ? "" : "s"} — tap to review';
+      return Material(
+        color: Colors.red.shade100,
+        child: InkWell(
+          onTap: onShowErrors,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline,
+                    size: 16, color: Colors.red.shade900),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(label,
+                      style:
+                          TextStyle(color: Colors.red.shade900, fontSize: 13)),
+                ),
+                Icon(Icons.chevron_right,
+                    size: 18, color: Colors.red.shade900),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (s.online && s.pendingCount == 0) {
       return const SizedBox.shrink();
     }
