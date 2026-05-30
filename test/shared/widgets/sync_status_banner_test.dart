@@ -48,6 +48,52 @@ void main() {
     expect(tapped, 1);
   });
 
+  testWidgets(
+      'error banner still surfaces offline + pending context (Bug 2)',
+      (t) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final container = ProviderContainer(overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+    ]);
+    addTearDown(container.dispose);
+
+    final outbox = container.read(outboxRepositoryProvider);
+    // 2 dead-letters → errorCount == 2.
+    for (final id in ['e1', 'e2']) {
+      await outbox.enqueue(
+        id: id, forTable: 'orders', op: 'update', rowId: id, payload: const {},
+      );
+      for (var i = 0; i < 6; i++) {
+        await outbox.markFailed(id, 'boom');
+      }
+    }
+    // 3 still-pending rows → pendingCount == 3.
+    for (final id in ['p1', 'p2', 'p3']) {
+      await outbox.enqueue(
+        id: id, forTable: 'orders', op: 'update', rowId: id, payload: const {},
+      );
+    }
+    // Device is offline.
+    container.read(onlineProvider.notifier).state = false;
+
+    await container.read(outboxDeadLetteredProvider.future);
+    await container.read(pullDeadLetteredProvider.future);
+    await container.read(pendingOutboxCountProvider.future);
+
+    await t.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(body: SyncStatusBanner(onShowErrors: () {})),
+      ),
+    ));
+    await t.pump();
+
+    // The error state must NOT swallow the offline + pending context.
+    expect(find.text('Offline · 3 pending · 2 sync errors — tap to review'),
+        findsOneWidget);
+  });
+
   testWidgets('hides entirely when online, no pending, no errors', (t) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(() async => db.close());

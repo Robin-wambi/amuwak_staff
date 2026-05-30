@@ -17,12 +17,22 @@ class OutboxWorker {
   OutboxWorker({
     required this.repo,
     required this.dispatch,
+    this.isOnline,
     this.batchSize = 25,
     this.deadLetterAfter = 5,
   });
 
   final OutboxRepository repo;
   final OutboxDispatch dispatch;
+
+  /// Reports whether the device currently has connectivity. Used to tell an
+  /// offline blip (skip without penalty) apart from an online, row-specific
+  /// transient failure (must count toward the dead-letter budget so a poison
+  /// head row can't block the queue forever). When null, the worker assumes
+  /// offline — the conservative choice that never dead-letters a transient
+  /// error, at the cost of head-of-line blocking until connectivity is wired.
+  final bool Function()? isOnline;
+
   final int batchSize;
 
   /// After this many failed attempts the row is parked in `dead_letter`
@@ -86,13 +96,17 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        if (isTransientSyncError(e)) {
-          // Connectivity/transport blip — not the row's fault. Leave it
-          // pending and stop this drain; the next cycle retries WITHOUT
-          // burning the dead-letter budget. Prevents a flaky-signal rider
-          // from accumulating false sync errors.
+        if (isTransientSyncError(e) && !(isOnline?.call() ?? false)) {
+          // Offline (or connectivity unknown): a whole-device transport blip,
+          // not this row's fault. Leave it pending and stop this drain; the
+          // next cycle retries WITHOUT burning the dead-letter budget. Keeps a
+          // flaky-signal rider from accumulating false sync errors.
           return sent;
         }
+        // Either a permanent error, or a transient-looking error while the
+        // device IS online — which makes it row-specific. Count it toward the
+        // dead-letter budget so one persistently-failing head row can't
+        // head-of-line block the rest of the queue indefinitely.
         await repo.markFailed(row.id, e.toString(),
             deadLetterAfter: deadLetterAfter);
         return sent;

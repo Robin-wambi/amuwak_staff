@@ -22,8 +22,16 @@ class SyncStatusBanner extends ConsumerWidget {
     final errorCount = ref.watch(syncErrorCountProvider);
 
     if (errorCount > 0) {
-      final label =
-          '$errorCount sync error${errorCount == 1 ? "" : "s"} — tap to review';
+      // Compose context segments so the error state does NOT swallow the
+      // offline / pending information a rider still needs (Bug 2). When the
+      // device is online with nothing pending this collapses to just
+      // "N sync error(s) — tap to review".
+      final segments = <String>[
+        if (!s.online) 'Offline',
+        if (s.pendingCount > 0) '${s.pendingCount} pending',
+        '$errorCount sync error${errorCount == 1 ? "" : "s"}',
+      ];
+      final label = '${segments.join(" · ")} — tap to review';
       return Material(
         color: Colors.red.shade100,
         child: InkWell(
