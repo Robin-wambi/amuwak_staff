@@ -61,7 +61,10 @@ String friendlySyncError(String? raw) {
     return 'Sign-in expired — sign out and back in.';
   }
   if (isTransientSyncError(raw)) {
-    return 'Connection problem — will retry automatically.';
+    // This text is only ever shown on a dead-lettered row, which does NOT
+    // retry on its own — so point the rider at the Retry button rather than
+    // promising automatic recovery.
+    return 'Connection problem — tap Retry to try again.';
   }
   return 'Could not be saved (server rejected it).';
 }

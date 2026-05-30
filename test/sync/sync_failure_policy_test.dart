@@ -74,9 +74,12 @@ void main() {
           'Sign-in expired — sign out and back in.');
     });
 
-    test('maps transport text to a retry message', () {
+    test('maps transport text to a Retry hint (not an auto-retry promise)', () {
+      // friendlySyncError is only shown on DEAD-LETTERED rows, which do NOT
+      // retry on their own — so the message must point at the Retry button
+      // rather than promising automatic recovery.
       expect(friendlySyncError('SocketException: failed host lookup'),
-          'Connection problem — will retry automatically.');
+          'Connection problem — tap Retry to try again.');
     });
 
     test('falls back to a server-rejected line', () {

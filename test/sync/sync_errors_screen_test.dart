@@ -281,4 +281,37 @@ void main() {
       expect(find.textContaining('Dismiss failed'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'outbox tile with a long rowId does not overflow on a narrow screen',
+    (tester) async {
+      // Guard against the trailing Retry+Discard buttons colliding with a long
+      // title on a small phone. A RenderFlex overflow throws during layout and
+      // is captured by tester.takeException.
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-long',
+            forTable: 'order_status_events',
+            op: 'update',
+            rowId: '8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f',
+            lastError: 'boom',
+          ),
+        ],
+        pullRows: const [],
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull,
+          reason: 'the tile must lay out without a RenderFlex overflow');
+      expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Discard'), findsOneWidget);
+    },
+  );
 }

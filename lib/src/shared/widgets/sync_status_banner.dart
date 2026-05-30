@@ -32,28 +32,30 @@ class SyncStatusBanner extends ConsumerWidget {
         '$errorCount sync error${errorCount == 1 ? "" : "s"}',
       ];
       final label = '${segments.join(" · ")} — tap to review';
+      final tappable = onShowErrors != null;
+      final content = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, size: 16, color: Colors.red.shade900),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(color: Colors.red.shade900, fontSize: 13)),
+            ),
+            // Only advertise tappability (the chevron) when there's actually
+            // somewhere to navigate; otherwise the banner would look
+            // interactive but do nothing.
+            if (tappable)
+              Icon(Icons.chevron_right, size: 18, color: Colors.red.shade900),
+          ],
+        ),
+      );
       return Material(
         color: Colors.red.shade100,
-        child: InkWell(
-          onTap: onShowErrors,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline,
-                    size: 16, color: Colors.red.shade900),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(label,
-                      style:
-                          TextStyle(color: Colors.red.shade900, fontSize: 13)),
-                ),
-                Icon(Icons.chevron_right,
-                    size: 18, color: Colors.red.shade900),
-              ],
-            ),
-          ),
-        ),
+        child: tappable
+            ? InkWell(onTap: onShowErrors, child: content)
+            : content,
       );
     }
 
