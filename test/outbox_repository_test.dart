@@ -95,6 +95,24 @@ void main() {
     });
   });
 
+  test('discard permanently removes a dead-lettered row from the queue',
+      () async {
+    await repo.enqueue(
+      id: 'm1', forTable: 'orders', op: 'update',
+      rowId: 'r1', payload: const {},
+    );
+    for (var i = 0; i < 6; i++) {
+      await repo.markFailed('m1', 'boom');
+    }
+    expect(await repo.watchDeadLettered().first, hasLength(1),
+        reason: 'row should be dead-lettered after exceeding the budget');
+
+    await repo.discard('m1');
+
+    expect(await repo.watchDeadLettered().first, isEmpty);
+    expect(await repo.peekPending(limit: 10), isEmpty);
+  });
+
   group('dedupKeyFor (Plan 4 Task 2)', () {
     test('produces a stable string from (forTable, op, rowId, extra)', () {
       expect(

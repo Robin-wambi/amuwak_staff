@@ -96,6 +96,15 @@ class OutboxRepository {
     );
   }
 
+  /// Permanently drops a dead-lettered mutation the rider has chosen to give
+  /// up on. Unlike [requeue], this does NOT retry — the local change is
+  /// discarded for good. Intended only for `dead_letter` rows surfaced in the
+  /// SyncErrorsScreen, where retrying a genuinely-poison row would loop
+  /// forever.
+  Future<void> discard(String id) {
+    return (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
+  }
+
   /// Record a failed dispatch attempt for [id]. Bumps `retry_count` and stores
   /// [error]. Once `retry_count > deadLetterAfter`, the row is flipped to
   /// `dead_letter` status, which excludes it from [peekPending] so a single
