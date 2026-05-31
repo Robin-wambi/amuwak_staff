@@ -14,6 +14,7 @@ import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/shared/widgets/app_theme.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
@@ -95,6 +96,7 @@ Widget _wrap(
   final effectiveProofEventsRepo =
       proofEventsRepo ?? ProofEventsRepository(_ensurePlaceholderDb());
   return MaterialApp(
+    theme: buildAmuwakTheme(),
     home: OrderDetailsScreen(
       order: order,
       photoStorage: storage,
