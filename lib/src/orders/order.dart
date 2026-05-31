@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import '../data/app_database.dart' as drift;
 import 'order_status.dart';
 import 'proof_event.dart';
@@ -96,19 +98,46 @@ class LaundryOrder {
     );
   }
 
-  static OrderStatus _statusFromString(String s) => switch (s) {
-        'pending_pickup' => OrderStatus.pendingPickup,
-        'received' || 'in_progress' => OrderStatus.inProgress,
-        'ready' || 'out_for_delivery' => OrderStatus.readyForDelivery,
-        'completed' => OrderStatus.completed,
-        _ => throw StateError('Unknown order status: "$s"'),
-      };
+  static OrderStatus _statusFromString(String s) {
+    switch (s) {
+      case 'pending_pickup':
+        return OrderStatus.pendingPickup;
+      case 'received':
+      case 'in_progress':
+        return OrderStatus.inProgress;
+      case 'ready':
+      case 'out_for_delivery':
+        return OrderStatus.readyForDelivery;
+      case 'completed':
+        return OrderStatus.completed;
+      default:
+        // A status added server-side before this app is updated must NOT crash
+        // the whole orders stream (which would blank the rider's list and block
+        // all work). Degrade gracefully to pendingPickup and log for diagnosis.
+        developer.log(
+          'Unknown order status "$s" — defaulting to pendingPickup.',
+          name: 'LaundryOrder',
+        );
+        return OrderStatus.pendingPickup;
+    }
+  }
 
-  static ProofEventType _proofTypeFromString(String s) => switch (s) {
-        'pickup' => ProofEventType.pickup,
-        'delivery' => ProofEventType.delivery,
-        _ => throw StateError('Unknown proof event type: "$s"'),
-      };
+  static ProofEventType _proofTypeFromString(String s) {
+    switch (s) {
+      case 'pickup':
+        return ProofEventType.pickup;
+      case 'delivery':
+        return ProofEventType.delivery;
+      default:
+        // Same rationale as _statusFromString: never crash the stream on an
+        // unrecognized proof-event type synced from a newer backend.
+        developer.log(
+          'Unknown proof event type "$s" — defaulting to pickup.',
+          name: 'LaundryOrder',
+        );
+        return ProofEventType.pickup;
+    }
+  }
 
   static String _formatTime(DateTime t) {
     final hour12 = switch (t.hour) {
