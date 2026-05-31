@@ -235,7 +235,8 @@ class _StatusBreakdownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColors = Theme.of(context).extension<StatusColors>()!;
+    final statusColors =
+        Theme.of(context).extension<StatusColors>() ?? StatusColors.light;
     return AppCard(
       child: Column(
         children: [

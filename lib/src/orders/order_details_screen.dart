@@ -204,7 +204,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final statusPair = Theme.of(context).extension<StatusColors>()!.of(_order.status);
+    final statusPair = (Theme.of(context).extension<StatusColors>() ??
+            StatusColors.light)
+        .of(_order.status);
 
     return PopScope<bool>(
       canPop: false,
