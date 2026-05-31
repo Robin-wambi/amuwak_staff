@@ -93,6 +93,27 @@ void main() {
       final pending = await repo.peekPending(limit: 10);
       expect(pending.map((r) => r.id), contains('k-stuck'));
     });
+
+    test('requeue leaves a still-failed (not dead-lettered) row untouched',
+        () async {
+      await repo.enqueue(
+        id: 'k-failed', forTable: 'orders', op: 'update', rowId: 'A',
+        payload: const {},
+      );
+      // One failure → status 'failed', retryCount 1, but NOT dead-lettered.
+      await repo.markFailed('k-failed', 'boom');
+
+      // A stale reference must not reset the retry counter on this row.
+      await repo.requeue('k-failed');
+
+      final row =
+          await (db.select(db.outbox)..where((t) => t.id.equals('k-failed')))
+              .getSingle();
+      expect(row.status, 'failed',
+          reason: 'requeue must only act on dead_letter rows');
+      expect(row.retryCount, 1,
+          reason: 'requeue must not reset the budget on a non-dead row');
+    });
   });
 
   test('discard permanently removes a dead-lettered row from the queue',

@@ -85,8 +85,14 @@ class OutboxRepository {
   /// Resets a dead-lettered row back to `'pending'` so the outbox worker
   /// picks it up on its next drain.  Retry counter and last-error text are
   /// cleared so the user-visible counter starts fresh.
+  ///
+  /// Guarded to `dead_letter` status (mirroring [discard]) so a stale id can
+  /// never reset the retry counter on a still-`pending`/`failed` row out from
+  /// under an in-flight drain.
   Future<void> requeue(String id) {
-    return (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+    return (_db.update(_db.outbox)
+          ..where((t) => t.id.equals(id) & t.status.equals('dead_letter')))
+        .write(
       const OutboxCompanion(
         status: Value('pending'),
         retryCount: Value(0),
