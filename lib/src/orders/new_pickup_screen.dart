@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart' show Customer;
-import '../shared/widgets/app_theme.dart';
+import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
 import 'geo_services.dart';
@@ -180,7 +180,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               if (match.address != null) ...[
                 const SizedBox(height: 4),
                 Text(match.address!,
-                    style: const TextStyle(color: Colors.black54)),
+                    style: const TextStyle(color: AppColors.secondaryText)),
               ],
               const SizedBox(height: 16),
               Row(
@@ -298,10 +298,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         title: const Text('New pickup'),
       ),
@@ -412,7 +412,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Scheduled for: ${LaundryOrder.formatScheduled(_scheduledFor!, now: widget.clock)}',
-                  style: const TextStyle(color: Colors.black54),
+                  style: const TextStyle(color: AppColors.secondaryText),
                 ),
               ],
             ],
@@ -428,10 +428,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                         ? Icons.expand_less
                         : Icons.expand_more),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Add optional details',
                       style: TextStyle(
-                          fontWeight: FontWeight.bold, color: amuwakDark),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface),
                     ),
                   ],
                 ),

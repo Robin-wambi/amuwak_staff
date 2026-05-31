@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 
 class OrderSearchScreen extends StatelessWidget {
@@ -9,10 +8,10 @@ class OrderSearchScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         title: const Text('Order search'),
       ),
