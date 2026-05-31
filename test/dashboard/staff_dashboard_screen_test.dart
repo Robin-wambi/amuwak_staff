@@ -357,6 +357,12 @@ void main() {
       // is replaced by the login screen.
       var signOutCalls = 0;
 
+      // The sign-out control now lives at the bottom of the Account tab; give
+      // the surface enough height that the NavigationBar does not overlap it.
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(ProviderScope(
         overrides: [
           ordersStreamProvider
@@ -365,6 +371,10 @@ void main() {
               .overrideWith((ref) => const Stream<int>.empty()),
           lastSyncedAtProvider
               .overrideWith((ref) => const Stream<DateTime?>.empty()),
+          outboxDeadLetteredProvider
+              .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
+          pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
           home: StaffDashboardScreen(
@@ -377,10 +387,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Open the account menu and tap "Sign out".
-      await tester.tap(find.byTooltip('Account'));
+      // Open the Account tab and tap its "Sign out" button. (The button is an
+      // OutlinedButton.icon, whose internal type does not match
+      // find.byType(OutlinedButton); target the label text instead.)
+      await tester.tap(find.text('Account').last);
       await tester.pumpAndSettle();
-      expect(find.text('Sign out'), findsOneWidget);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
 
@@ -395,9 +406,8 @@ void main() {
       expect(signOutCalls, 0);
       expect(find.byType(StaffDashboardScreen), findsOneWidget);
 
-      // Open the menu again and this time confirm.
-      await tester.tap(find.byTooltip('Account'));
-      await tester.pumpAndSettle();
+      // Tap the Account-tab sign-out again and this time confirm via the
+      // dialog's TextButton (disambiguated from the tab button behind it).
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
@@ -415,6 +425,10 @@ void main() {
     'Sign-out shows a SnackBar and stays on the dashboard when the callback '
     'throws',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(ProviderScope(
         overrides: [
           ordersStreamProvider
@@ -423,6 +437,10 @@ void main() {
               .overrideWith((ref) => const Stream<int>.empty()),
           lastSyncedAtProvider
               .overrideWith((ref) => const Stream<DateTime?>.empty()),
+          outboxDeadLetteredProvider
+              .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
+          pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
           home: StaffDashboardScreen(
@@ -435,7 +453,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Account'));
+      await tester.tap(find.text('Account').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
@@ -461,6 +479,15 @@ void main() {
     // downstream writes would otherwise persist an empty actorStaffId into
     // intake_recorded_by/created_by, FK-failing the outbox dispatch and
     // silently dead-lettering the row.
+
+    // Use a tall surface so the single order card renders fully on-screen,
+    // above the bottom NavigationBar. On the default 800x600 surface the card
+    // sits below the fold and, once scrolled in, lands under the nav bar where
+    // the tap silently misses.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     const seeded = LaundryOrder(
       orderId: 'AMW-NULL',
       customerName: 'No Session',
@@ -489,9 +516,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Tap the card. ListView is lazy so we need to scroll the card on-screen
-    // first.
-    await tester.scrollUntilVisible(find.text('No Session'), 200);
+    // Tap the card directly — the tall surface keeps it built and on-screen.
     await tester.tap(find.text('No Session'));
     await tester.pumpAndSettle();
 

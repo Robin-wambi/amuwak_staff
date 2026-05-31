@@ -63,5 +63,26 @@ void main() {
       expect(theme.floatingActionButtonTheme.backgroundColor, amuwakPrimary);
       expect(theme.floatingActionButtonTheme.foregroundColor, amuwakDark);
     });
+
+    test('NavigationBar uses brand colors for selected destinations', () {
+      final navigationTheme = theme.navigationBarTheme;
+      const selected = <WidgetState>{WidgetState.selected};
+      const unselected = <WidgetState>{};
+
+      expect(navigationTheme.backgroundColor, amuwakWhite);
+      expect(
+        navigationTheme.indicatorColor,
+        amuwakPrimary.withValues(alpha: 0.16),
+      );
+      expect(navigationTheme.iconTheme?.resolve(selected)?.color, amuwakPrimary);
+      expect(
+        navigationTheme.iconTheme?.resolve(unselected)?.color,
+        Colors.black54,
+      );
+      expect(
+        navigationTheme.labelTextStyle?.resolve(selected)?.fontWeight,
+        FontWeight.w700,
+      );
+    });
   });
 }

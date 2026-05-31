@@ -100,7 +100,7 @@ void main() {
             forTable: 'orders',
             op: 'update',
             rowId: 'AMW-A',
-            lastError: 'network down',
+            lastError: '23505: duplicate key value',
           ),
         ]),
       );
@@ -114,7 +114,7 @@ void main() {
             forTable: 'orders',
             op: 'update',
             rowId: 'AMW-A',
-            lastError: 'network down',
+            lastError: '23505: duplicate key value',
           ),
         ],
         pullRows: const [],
@@ -123,7 +123,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('AMW-A'), findsOneWidget);
-      expect(find.textContaining('network down'), findsOneWidget);
+      expect(find.text('Already saved on the server.'), findsOneWidget);
+      expect(find.textContaining('23505'), findsNothing);
       expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(TextButton, 'Retry'));
@@ -132,6 +133,38 @@ void main() {
       verify(() => mockOutbox.requeue('k-1')).called(1);
     },
   );
+
+  testWidgets(
+      'outbox tile Discard confirms then calls discard', (tester) async {
+    final mockOutbox = _MockOutboxRepo();
+    when(() => mockOutbox.discard(any())).thenAnswer((_) async {});
+
+    await _pumpScreen(
+      tester,
+      outboxRows: [
+        _stubOutboxRow(
+          id: 'k-1', forTable: 'orders', op: 'update', rowId: 'AMW-A',
+          lastError: '23505: duplicate key value',
+        ),
+      ],
+      pullRows: const [],
+      outboxRepoOverride: mockOutbox,
+    );
+    await tester.pumpAndSettle();
+
+    // Friendly text replaces the raw "23505: ..." string.
+    expect(find.text('Already saved on the server.'), findsOneWidget);
+    expect(find.textContaining('23505'), findsNothing);
+
+    // The tile's 'Discard' opens a confirm dialog; the dialog's
+    // 'Discard upload' action is what calls repo.discard.
+    await tester.tap(find.widgetWithText(TextButton, 'Discard'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Discard upload'));
+    await tester.pumpAndSettle();
+
+    verify(() => mockOutbox.discard('k-1')).called(1);
+  });
 
   testWidgets(
     'a failing requeue surfaces a SnackBar instead of being swallowed',
@@ -246,6 +279,68 @@ void main() {
 
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.textContaining('Dismiss failed'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'outbox tile with a long rowId does not overflow on a narrow screen',
+    (tester) async {
+      // Guard against the trailing Retry+Discard buttons colliding with a long
+      // title on a small phone. A RenderFlex overflow throws during layout and
+      // is captured by tester.takeException.
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-long',
+            forTable: 'order_status_events',
+            op: 'update',
+            rowId: '8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f',
+            lastError: 'boom',
+          ),
+        ],
+        pullRows: const [],
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull,
+          reason: 'the tile must lay out without a RenderFlex overflow');
+      expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Discard'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'outbox tile title ellipsizes a long rowId instead of wrapping',
+    (tester) async {
+      // The title carries a UUID rowId; without a maxLines cap it wraps to
+      // several lines on a narrow phone, leaving a ragged multi-line tile next
+      // to the Retry/Discard buttons. It should ellipsize to a single line.
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-long',
+            forTable: 'order_status_events',
+            op: 'update',
+            rowId: '8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f',
+            lastError: 'boom',
+          ),
+        ],
+        pullRows: const [],
+      );
+      await tester.pumpAndSettle();
+
+      final title = tester.widget<Text>(
+        find.textContaining('8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f'),
+      );
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
     },
   );
 }

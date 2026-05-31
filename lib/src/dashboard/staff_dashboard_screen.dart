@@ -259,6 +259,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     });
   }
 
+  void _openSyncErrors() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
+    );
+  }
+
   String get _title {
     switch (_selectedTabIndex) {
       case 1:
@@ -267,7 +273,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         return 'Daily report';
       case 3:
         return 'Account';
-      case 0:
       default:
         return 'Amuwak Staff';
     }
@@ -307,26 +312,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               );
             },
           ),
-          PopupMenuButton<String>(
-            tooltip: 'Account',
-            icon: const Icon(Icons.account_circle_outlined),
-            onSelected: (value) {
-              if (value == 'sign_out') _onSignOutPressed();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem<String>(
-                value: 'sign_out',
-                child: ListTile(
-                  leading: Icon(Icons.logout),
-                  title: Text('Sign out'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
       body: _DashboardTabShell(
+        onShowErrors: _openSyncErrors,
         child: switch (_selectedTabIndex) {
           1 => ordersAsync.when(
               data: (orders) => _OrdersBody(
@@ -366,8 +355,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTabIndex,
         onDestinationSelected: _selectTab,
-        backgroundColor: amuwakWhite,
-        indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
@@ -400,16 +387,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
 // ---------------------------------------------------------------------------
 
 class _DashboardTabShell extends StatelessWidget {
-  const _DashboardTabShell({required this.child});
+  const _DashboardTabShell({required this.child, this.onShowErrors});
 
   final Widget child;
+  final VoidCallback? onShowErrors;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         children: [
-          const SyncStatusBanner(),
+          SyncStatusBanner(onShowErrors: onShowErrors),
           Expanded(child: child),
         ],
       ),
