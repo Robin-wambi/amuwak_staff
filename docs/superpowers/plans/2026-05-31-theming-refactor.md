@@ -1105,7 +1105,7 @@ git commit -m "refactor(theme): drop deprecated brand-constant aliases"
 ## Self-Review Notes (for the implementer)
 
 - **Spec coverage:** color/text roles (Tasks 6–7), spacing/radius tokens (Task 1, applied in 7), AppCard/CardTheme (Tasks 5–6, applied in 7), StatusColors extension + contrast fix (Tasks 3–4), trimmed `fromSeed` (Task 6). All spec sections map to tasks.
-- **Type consistency:** `StatusColors.of()` returns `StatusColorPair {color, onColor}`; `_StatusChip` takes `color`+`onColor`+`label` in both screens; `AppCard({child, onTap, padding})` used consistently in Task 7.
-- **CardThemeData vs CardTheme:** Flutter 3.35 `ThemeData.cardTheme` expects `CardThemeData` (used in Task 6). If a future SDK bump warns, follow the deprecation.
+- **Type consistency:** `StatusColors.of()` returns `StatusColorPair {color, onColor}`; the order-details `_StatusChip` class takes `color`+`onColor`+`label`, while the dashboard chip is inline (no class) and reads `statusPair.color`/`statusPair.onColor` directly; `AppCard({child, onTap, padding})` used consistently in Task 7.
+- **CardThemeData vs CardTheme:** Flutter 3.32 `ThemeData.cardTheme` expects `CardThemeData` (used in Task 6). If `flutter analyze` reports a type mismatch on this SDK, switch to `CardTheme(...)`.
 - **Per-file testing:** every code task runs exactly one test file per command, per the Windows-host constraint.
 ```
