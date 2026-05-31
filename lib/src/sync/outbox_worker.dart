@@ -17,7 +17,7 @@ class OutboxWorker {
   OutboxWorker({
     required this.repo,
     required this.dispatch,
-    this.isOnline,
+    required this.isOnline,
     this.batchSize = 25,
     this.deadLetterAfter = 5,
   });
@@ -28,10 +28,15 @@ class OutboxWorker {
   /// Reports whether the device currently has connectivity. Used to tell an
   /// offline blip (skip without penalty) apart from an online, row-specific
   /// transient failure (must count toward the dead-letter budget so a poison
-  /// head row can't block the queue forever). When null, the worker assumes
-  /// offline — the conservative choice that never dead-letters a transient
-  /// error, at the cost of head-of-line blocking until connectivity is wired.
-  final bool Function()? isOnline;
+  /// head row can't block the queue forever).
+  ///
+  /// Required so the offline-vs-online decision is always an explicit caller
+  /// choice. A caller with no real signal should pass `() => false` ("assume
+  /// offline") — the fail-safe that never turns a flaky-signal rider's good
+  /// writes into false errors — but must opt into it deliberately rather than
+  /// inherit it from a forgotten parameter, which would silently reintroduce
+  /// unbounded head-of-line blocking for transient errors.
+  final bool Function() isOnline;
 
   final int batchSize;
 
@@ -96,7 +101,7 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        if (isTransientSyncError(e) && !(isOnline?.call() ?? false)) {
+        if (isTransientSyncError(e) && !isOnline()) {
           // Offline (or connectivity unknown): a whole-device transport blip,
           // not this row's fault. Leave it pending and stop this drain; the
           // next cycle retries WITHOUT burning the dead-letter budget. Keeps a
