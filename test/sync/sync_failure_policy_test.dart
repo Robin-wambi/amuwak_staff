@@ -113,7 +113,8 @@ void main() {
   });
 
   group('friendlyPullError', () {
-    test('maps a generic server error to a read-oriented line', () {
+    test('maps server-read errors (generic/RLS/JWT/transient) to read-oriented '
+        'lines', () {
       expect(friendlyPullError(null), 'Server data could not be loaded.');
       expect(friendlyPullError('   '), 'Server data could not be loaded.');
       expect(friendlyPullError('TypeError: null is not a String'),
