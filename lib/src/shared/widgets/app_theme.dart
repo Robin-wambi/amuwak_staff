@@ -92,10 +92,3 @@ ThemeData buildAmuwakTheme() {
     ),
   );
 }
-
-// Deprecated brand-constant aliases. Removed as screens migrate to AppColors.
-const Color amuwakPrimary = AppColors.primary;
-const Color amuwakSurfaceBrand = AppColors.surfaceBrand;
-const Color amuwakDark = AppColors.dark;
-const Color amuwakBackground = AppColors.background;
-const Color amuwakWhite = AppColors.white;
