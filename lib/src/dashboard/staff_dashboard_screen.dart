@@ -962,8 +962,9 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusPair =
-        Theme.of(context).extension<StatusColors>()!.of(order.status);
+    final statusPair = (Theme.of(context).extension<StatusColors>() ??
+            StatusColors.light)
+        .of(order.status);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
