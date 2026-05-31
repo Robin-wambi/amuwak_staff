@@ -37,7 +37,8 @@
 - `lib/src/auth/login_screen.dart` — inline colors/fontSize.
 - `lib/src/orders/proof/pickup_capture_screen.dart`, `delivery_capture_screen.dart` — card BoxDecorations.
 - `lib/src/shared/widgets/sync_status_banner.dart` — banner colors via StatusColors.
-- `test/orders/order_status_test.dart` — remove any `color` assertions (none currently, but verify).
+- `test/orders/order_status_test.dart` — **delete the `exposes the brand color for each status` test** (lines 53-58 assert `OrderStatus.*.color`, which is removed).
+- `test/shared/widgets/app_theme_test.dart` — **already exists**; rewrite it (asserts the old `amuwak*` constants, `surface == amuwakWhite`, and nav unselected `Colors.black54`, all of which change in Task 6).
 
 ---
 
@@ -439,89 +440,105 @@ enum OrderStatus {
 Run: `flutter analyze lib/src/orders/order_status.dart lib/src/orders/order_details_screen.dart lib/src/dashboard/staff_dashboard_screen.dart`
 Expected: errors at `order_details_screen.dart:202` and `staff_dashboard_screen.dart:977` ("The getter 'color' isn't defined for OrderStatus"). These confirm the only two read sites (matches the spec).
 
-- [ ] **Step 4: Migrate `_StatusChip` to take a resolved pair (both screens)**
+- [ ] **Step 4: Update `order_details_screen.dart` — `_StatusChip` class + call site**
 
-The chip is duplicated in both files with identical bodies. Change BOTH to take `color` + `onColor` and render `onColor` for the text.
+Add the import near the other imports:
 
-In `lib/src/orders/order_details_screen.dart` and `lib/src/dashboard/staff_dashboard_screen.dart`, replace the `_StatusChip` class body with:
+```dart
+import '../shared/theme/status_colors.dart';
+```
+
+(`order_details_screen.dart` is at `lib/src/orders/`, so `../shared/theme/...` is correct.)
+
+Give `_StatusChip` an `onColor` and use it for the text (the dot keeps `color`). Replace the class (lines ~390-415):
 
 ```dart
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.color, required this.onColor, required this.label});
-
+  const _StatusChip({
+    required this.color,
+    required this.onColor,
+    required this.label,
+  });
   final Color color;
   final Color onColor;
   final String label;
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs + 2),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.chip),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: onColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 10, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(color: onColor, fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }
 }
 ```
 
-Add these imports to BOTH files if not present:
-
-```dart
-import '../../shared/theme/app_radii.dart';
-import '../../shared/theme/app_spacing.dart';
-import '../../shared/theme/status_colors.dart';
-```
-
-(`order_details_screen.dart` and `staff_dashboard_screen.dart` are both at `lib/src/<dir>/`, so `../../shared/theme/...` is correct.)
-
-- [ ] **Step 5: Migrate the call sites**
-
-In `lib/src/orders/order_details_screen.dart`, replace line 202:
-
-```dart
-    final status = StatusColors.light; // resolved from theme below
-```
-
-with a context-based lookup. Since line 202 is inside a `build` with `context`, use:
+Replace the call site at line 202:
 
 ```dart
     final statusPair = Theme.of(context).extension<StatusColors>()!.of(_order.status);
 ```
 
-Then at the `_StatusChip(...)` construction (was line 236):
+and the chip construction at lines ~235-236:
 
 ```dart
-                          _StatusChip(
-                            color: statusPair.color,
-                            onColor: statusPair.onColor,
-                            label: _order.status.label,
-                          ),
+                      _StatusChip(
+                        color: statusPair.color,
+                        onColor: statusPair.onColor,
+                        label: _order.status.label,
+                      ),
 ```
 
-In `lib/src/dashboard/staff_dashboard_screen.dart`, replace line 977:
+- [ ] **Step 5: Update `staff_dashboard_screen.dart` — inline chip in `_OrderCard`**
+
+Add the import near the other imports:
+
+```dart
+import '../shared/theme/status_colors.dart';
+```
+
+(`staff_dashboard_screen.dart` is at `lib/src/dashboard/`, so `../shared/theme/...` is correct.)
+
+Replace the call site at line 977:
 
 ```dart
     final statusPair = Theme.of(context).extension<StatusColors>()!.of(order.status);
 ```
 
-and the chip construction:
+Then update the inline chip `Container` (lines ~1053-1070) — only the tint and the text color change:
 
 ```dart
-      child: _StatusChip(
-        color: statusPair.color,
-        onColor: statusPair.onColor,
-        label: order.status.label,
-      ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: statusPair.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  order.status.label,
+                  style: TextStyle(
+                    color: statusPair.onColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
 ```
 
 - [ ] **Step 6: Run analyze + the status test + both screen tests**
@@ -535,9 +552,30 @@ flutter test test/orders/order_details_screen_test.dart
 flutter test test/dashboard/staff_dashboard_screen_test.dart
 ```
 
-Expected: analyze clean; all three test files PASS. If a screen test asserted on `status.color`, update it to assert on the chip's rendered text/`onColor` instead.
+Expected: analyze clean. **`order_status_test.dart` will FAIL** on the `exposes the brand color for each status` test (it asserts `OrderStatus.*.color`, now removed) — proceed to Step 7 to delete it. The two screen tests should PASS; if either asserted on `status.color`, update it to assert on the chip's rendered text/`onColor` instead.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Delete the stale color test**
+
+In `test/orders/order_status_test.dart`, delete this whole test block (lines ~53-58):
+
+```dart
+    test('exposes the brand color for each status', () {
+      expect(OrderStatus.pendingPickup.color, const Color(0xFF9A5B00));
+      expect(OrderStatus.inProgress.color, const Color(0xFF7A4CC2));
+      expect(OrderStatus.readyForDelivery.color, const Color(0xFF0B7285));
+      expect(OrderStatus.completed.color, const Color(0xFF2F7D32));
+    });
+```
+
+The `import 'package:flutter/material.dart';` at the top stays (used by `_orderRow`'s `drift.Order`). Re-run:
+
+```
+flutter test test/orders/order_status_test.dart
+```
+
+Expected: PASS (color test gone; label/nextStatus/toDbString remain).
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add lib/src/orders/order_status.dart lib/src/shared/widgets/app_theme.dart lib/src/orders/order_details_screen.dart lib/src/dashboard/staff_dashboard_screen.dart test/orders/order_status_test.dart
@@ -668,9 +706,9 @@ git commit -m "feat(theme): add AppCard widget for the shared card pattern"
 
 Rewrites the assembler to consume `AppColors`/`AppRadii`, trim the redundant `fromSeed` overrides, complete the `TextTheme` ramp, and add `CardThemeData`. Keeps `buildAmuwakTheme()` signature so `main.dart` is untouched.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Rewrite the failing test**
 
-Create `test/shared/widgets/app_theme_test.dart`:
+`test/shared/widgets/app_theme_test.dart` **already exists** and asserts the old `amuwak*` constants, `surface == amuwakWhite`, and nav unselected `Colors.black54` — all removed/changed by this task. **Replace its full contents** with:
 
 ```dart
 import 'package:amuwak_staff/src/shared/theme/app_colors.dart';
