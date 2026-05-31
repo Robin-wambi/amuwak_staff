@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../shared/uuid.dart';
-import '../../shared/widgets/app_theme.dart';
+import '../../shared/theme/app_colors.dart';
+import '../../shared/theme/app_radii.dart';
+import '../../shared/theme/app_spacing.dart';
 import '../../sync/orders_repository.dart';
 import '../../sync/proof_events_repository.dart';
 import '../order.dart';
@@ -224,10 +226,10 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: amuwakBackground,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: amuwakBackground,
-          foregroundColor: amuwakDark,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
           elevation: 0,
           title: Text(
             _stage == _Stage.collecting ? 'Confirm pickup' : 'Tag the bag',
@@ -248,20 +250,16 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
       children: [
         Text(
           widget.order.customerName,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: amuwakDark,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
         Text(
           'Expected ${widget.order.itemCount} items · ${widget.order.address}',
-          style: const TextStyle(color: Colors.black54),
+          style: const TextStyle(color: AppColors.secondaryText),
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'How many items?',
-          style: TextStyle(fontWeight: FontWeight.bold, color: amuwakDark),
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         Row(
@@ -295,10 +293,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         const SizedBox(height: 20),
         Text(
           'Photos (${_photoBytes.length}/$_maxPhotos)',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: amuwakDark,
-          ),
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -309,8 +304,8 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: amuwakPrimary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.memory(
@@ -329,12 +324,14 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                    border: Border.all(color: amuwakPrimary),
-                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.field),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add_a_photo_outlined,
-                    color: amuwakPrimary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -363,30 +360,22 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          const Text(
+          Text(
             'Tie tag to the bag',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: amuwakDark,
-            ),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Write order #${widget.order.orderId} on the bag, or scan this QR.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54),
+            style: const TextStyle(color: AppColors.secondaryText),
           ),
           const SizedBox(height: 24),
           QrDisplayWidget(data: widget.order.orderId),
           const SizedBox(height: 16),
           Text(
             widget.order.orderId,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: amuwakDark,
-            ),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const Spacer(),
           SizedBox(
