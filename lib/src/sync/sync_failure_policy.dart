@@ -52,11 +52,11 @@ String friendlySyncError(String? raw) {
   if (t.contains('row-level security') ||
       t.contains('42501') ||
       t.contains('permission denied') ||
-      t.contains('403')) {
+      _hasStatus(t, 403)) {
     return 'Not allowed on the server (permissions).';
   }
   if (t.contains('jwt') ||
-      t.contains('401') ||
+      _hasStatus(t, 401) ||
       t.contains('not authenticated')) {
     return 'Sign-in expired — sign out and back in.';
   }
@@ -68,3 +68,10 @@ String friendlySyncError(String? raw) {
   }
   return 'Could not be saved (server rejected it).';
 }
+
+/// True when [haystack] mentions HTTP status [code] as a standalone token
+/// rather than as digits embedded in a longer number or identifier. Avoids
+/// a bare `contains('401')` misfiring on e.g. `"4012 retries"`, Postgres
+/// code `"42P01"`, or a rowId that happens to contain those digits.
+bool _hasStatus(String haystack, int code) =>
+    RegExp('\\b$code\\b').hasMatch(haystack);
