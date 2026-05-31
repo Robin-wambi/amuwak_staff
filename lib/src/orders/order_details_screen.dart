@@ -378,8 +378,8 @@ class _OrderHeader extends StatelessWidget {
               children: [
                 Text(
                   order.orderId,
-                  style: const TextStyle(
-                    color: AppColors.white,
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -387,8 +387,8 @@ class _OrderHeader extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   order.customerName,
-                  style: const TextStyle(
-                    color: AppColors.white,
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
                     fontSize: 23,
                     fontWeight: FontWeight.bold,
                   ),
@@ -396,8 +396,8 @@ class _OrderHeader extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   order.serviceType.label,
-                  style: const TextStyle(
-                    color: AppColors.white,
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
                     fontSize: 14,
                   ),
                 ),
