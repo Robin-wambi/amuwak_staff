@@ -101,8 +101,13 @@ class OutboxRepository {
   /// discarded for good. Intended only for `dead_letter` rows surfaced in the
   /// SyncErrorsScreen, where retrying a genuinely-poison row would loop
   /// forever.
+  ///
+  /// Guarded to `dead_letter` status so a stale id can never silently drop a
+  /// still-`pending` row out from under the worker.
   Future<void> discard(String id) {
-    return (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
+    return (_db.delete(_db.outbox)
+          ..where((t) => t.id.equals(id) & t.status.equals('dead_letter')))
+        .go();
   }
 
   /// Record a failed dispatch attempt for [id]. Bumps `retry_count` and stores
