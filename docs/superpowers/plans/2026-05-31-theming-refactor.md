@@ -6,11 +6,13 @@
 
 **Architecture:** Add a `lib/src/shared/theme/` design-system folder (const token classes for spacing/radii, a `StatusColors` `ThemeExtension`, an `AppCard` widget) and rewrite `lib/src/shared/widgets/app_theme.dart` to assemble them into `ThemeData`. Migrate call sites bottom-up so every commit compiles and tests stay green.
 
-**Tech Stack:** Flutter 3.35.5, Dart SDK ^3.8.1, Riverpod, `flutter_test`. Package name: `amuwak_staff`.
+**Tech Stack:** Flutter 3.32.0 (stable), Dart SDK ^3.8.0, Riverpod, `flutter_test`. Package name: `amuwak_staff`.
 
 **Spec:** `docs/superpowers/specs/2026-05-31-theming-refactor-design.md`
 
-**Host constraint:** This Windows host hangs when `flutter test` is given multiple files. Run **one test file per invocation** (e.g. `flutter test test/src/shared/theme/status_colors_test.dart`).
+**Host constraint:** This Windows host hangs when `flutter test` is given multiple files. Run **one test file per invocation** (e.g. `flutter test test/shared/theme/status_colors_test.dart`).
+
+**Test path convention:** the `test/` tree mirrors `lib/src/` **without** a `src/` segment — e.g. `lib/src/orders/order_status.dart` → `test/orders/order_status_test.dart`, `lib/src/shared/widgets/app_theme.dart` → `test/shared/widgets/app_theme_test.dart`. New theme tests go under `test/shared/theme/`.
 
 ---
 
@@ -22,9 +24,9 @@
 - `lib/src/shared/theme/app_radii.dart` — const radius scale.
 - `lib/src/shared/theme/status_colors.dart` — `StatusColors` `ThemeExtension` + WCAG contrast helper.
 - `lib/src/shared/theme/app_card.dart` — `AppCard` widget over Material `Card`.
-- `test/src/shared/theme/status_colors_test.dart` — mapping + contrast tests.
-- `test/src/shared/theme/app_card_test.dart` — AppCard widget test.
-- `test/src/shared/widgets/app_theme_test.dart` — theme-builder unit test.
+- `test/shared/theme/status_colors_test.dart` — mapping + contrast tests.
+- `test/shared/theme/app_card_test.dart` — AppCard widget test.
+- `test/shared/widgets/app_theme_test.dart` — theme-builder unit test.
 
 **Modified files:**
 - `lib/src/shared/widgets/app_theme.dart` — rewritten assembler.
@@ -35,7 +37,7 @@
 - `lib/src/auth/login_screen.dart` — inline colors/fontSize.
 - `lib/src/orders/proof/pickup_capture_screen.dart`, `delivery_capture_screen.dart` — card BoxDecorations.
 - `lib/src/shared/widgets/sync_status_banner.dart` — banner colors via StatusColors.
-- `test/src/orders/order_status_test.dart` — remove any `color` assertions (none currently, but verify).
+- `test/orders/order_status_test.dart` — remove any `color` assertions (none currently, but verify).
 
 ---
 
@@ -44,11 +46,11 @@
 **Files:**
 - Create: `lib/src/shared/theme/app_spacing.dart`
 - Create: `lib/src/shared/theme/app_radii.dart`
-- Test: `test/src/shared/theme/tokens_test.dart`
+- Test: `test/shared/theme/tokens_test.dart`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/src/shared/theme/tokens_test.dart`:
+Create `test/shared/theme/tokens_test.dart`:
 
 ```dart
 import 'package:amuwak_staff/src/shared/theme/app_radii.dart';
@@ -75,7 +77,7 @@ void main() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `flutter test test/src/shared/theme/tokens_test.dart`
+Run: `flutter test test/shared/theme/tokens_test.dart`
 Expected: FAIL — "Target of URI doesn't exist" (files not created).
 
 - [ ] **Step 3: Write minimal implementation**
@@ -107,13 +109,13 @@ abstract final class AppRadii {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `flutter test test/src/shared/theme/tokens_test.dart`
+Run: `flutter test test/shared/theme/tokens_test.dart`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/src/shared/theme/app_spacing.dart lib/src/shared/theme/app_radii.dart test/src/shared/theme/tokens_test.dart
+git add lib/src/shared/theme/app_spacing.dart lib/src/shared/theme/app_radii.dart test/shared/theme/tokens_test.dart
 git commit -m "feat(theme): add spacing and radius token scales"
 ```
 
@@ -123,13 +125,13 @@ git commit -m "feat(theme): add spacing and radius token scales"
 
 **Files:**
 - Create: `lib/src/shared/theme/app_colors.dart`
-- Test: `test/src/shared/theme/app_colors_test.dart`
+- Test: `test/shared/theme/app_colors_test.dart`
 
 Moves the brand constants out of `app_theme.dart` into one palette file and adds the two semantic constants the screen sweep needs. `app_theme.dart` will re-import these in Task 6 (until then it keeps its own copies, so nothing breaks).
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/src/shared/theme/app_colors_test.dart`:
+Create `test/shared/theme/app_colors_test.dart`:
 
 ```dart
 import 'dart:ui';
@@ -157,7 +159,7 @@ void main() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `flutter test test/src/shared/theme/app_colors_test.dart`
+Run: `flutter test test/shared/theme/app_colors_test.dart`
 Expected: FAIL — URI doesn't exist.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -186,13 +188,13 @@ abstract final class AppColors {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `flutter test test/src/shared/theme/app_colors_test.dart`
+Run: `flutter test test/shared/theme/app_colors_test.dart`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/src/shared/theme/app_colors.dart test/src/shared/theme/app_colors_test.dart
+git add lib/src/shared/theme/app_colors.dart test/shared/theme/app_colors_test.dart
 git commit -m "feat(theme): add centralized AppColors palette"
 ```
 
@@ -202,7 +204,7 @@ git commit -m "feat(theme): add centralized AppColors palette"
 
 **Files:**
 - Create: `lib/src/shared/theme/status_colors.dart`
-- Test: `test/src/shared/theme/status_colors_test.dart`
+- Test: `test/shared/theme/status_colors_test.dart`
 
 `StatusColors` maps each `OrderStatus` to a `(color, onColor)` pair. `color` is the saturated status hue (for the dot/border); `onColor` is the text color used on the 12%-alpha chip tint and is chosen to pass WCAG 4.5:1 against that tint. This task does NOT yet touch the enum or screens — it only adds the extension and its tests.
 
@@ -210,7 +212,7 @@ The chip tint is `color.withValues(alpha: 0.12)` composited over the white card 
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/src/shared/theme/status_colors_test.dart`:
+Create `test/shared/theme/status_colors_test.dart`:
 
 ```dart
 import 'dart:ui';
@@ -271,7 +273,7 @@ void main() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `flutter test test/src/shared/theme/status_colors_test.dart`
+Run: `flutter test test/shared/theme/status_colors_test.dart`
 Expected: FAIL — `status_colors.dart` URI doesn't exist.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -359,13 +361,13 @@ class StatusColors extends ThemeExtension<StatusColors> {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `flutter test test/src/shared/theme/status_colors_test.dart`
+Run: `flutter test test/shared/theme/status_colors_test.dart`
 Expected: PASS (3 tests). If any contrast assertion fails, darken that status's `onColor` until ≥4.5:1 and re-run.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/src/shared/theme/status_colors.dart test/src/shared/theme/status_colors_test.dart
+git add lib/src/shared/theme/status_colors.dart test/shared/theme/status_colors_test.dart
 git commit -m "feat(theme): add StatusColors theme extension with contrast guard"
 ```
 
@@ -378,7 +380,7 @@ git commit -m "feat(theme): add StatusColors theme extension with contrast guard
 - Modify: `lib/src/orders/order_status.dart` (remove `color` field)
 - Modify: `lib/src/orders/order_details_screen.dart:202,236,436`
 - Modify: `lib/src/dashboard/staff_dashboard_screen.dart:977,1046`
-- Test: `test/src/orders/order_status_test.dart` (verify still green)
+- Test: `test/orders/order_status_test.dart` (verify still green)
 
 This is the one behavioral change. After it, no code reads `OrderStatus.color`.
 
@@ -528,9 +530,9 @@ Run each separately (host constraint):
 
 ```
 flutter analyze lib/src/orders/order_status.dart lib/src/orders/order_details_screen.dart lib/src/dashboard/staff_dashboard_screen.dart
-flutter test test/src/orders/order_status_test.dart
-flutter test test/src/orders/order_details_screen_test.dart
-flutter test test/src/dashboard/staff_dashboard_screen_test.dart
+flutter test test/orders/order_status_test.dart
+flutter test test/orders/order_details_screen_test.dart
+flutter test test/dashboard/staff_dashboard_screen_test.dart
 ```
 
 Expected: analyze clean; all three test files PASS. If a screen test asserted on `status.color`, update it to assert on the chip's rendered text/`onColor` instead.
@@ -538,7 +540,7 @@ Expected: analyze clean; all three test files PASS. If a screen test asserted on
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/src/orders/order_status.dart lib/src/shared/widgets/app_theme.dart lib/src/orders/order_details_screen.dart lib/src/dashboard/staff_dashboard_screen.dart test/src/orders/order_status_test.dart
+git add lib/src/orders/order_status.dart lib/src/shared/widgets/app_theme.dart lib/src/orders/order_details_screen.dart lib/src/dashboard/staff_dashboard_screen.dart test/orders/order_status_test.dart
 git commit -m "refactor(theme): move order-status colors into StatusColors extension"
 ```
 
@@ -548,13 +550,13 @@ git commit -m "refactor(theme): move order-status colors into StatusColors exten
 
 **Files:**
 - Create: `lib/src/shared/theme/app_card.dart`
-- Test: `test/src/shared/theme/app_card_test.dart`
+- Test: `test/shared/theme/app_card_test.dart`
 
 `AppCard` is a thin wrapper over Material `Card`, giving the repeated white-container pattern (radius `AppRadii.card`, `AppColors.cardBorder` hairline, `AppSpacing.lg` padding) one definition. Swapping the ~20 `BoxDecoration` sites happens during the screen sweep (Task 7), not here.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/src/shared/theme/app_card_test.dart`:
+Create `test/shared/theme/app_card_test.dart`:
 
 ```dart
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
@@ -594,7 +596,7 @@ void main() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `flutter test test/src/shared/theme/app_card_test.dart`
+Run: `flutter test test/shared/theme/app_card_test.dart`
 Expected: FAIL — `app_card.dart` URI doesn't exist.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -646,13 +648,13 @@ class AppCard extends StatelessWidget {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `flutter test test/src/shared/theme/app_card_test.dart`
+Run: `flutter test test/shared/theme/app_card_test.dart`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/src/shared/theme/app_card.dart test/src/shared/theme/app_card_test.dart
+git add lib/src/shared/theme/app_card.dart test/shared/theme/app_card_test.dart
 git commit -m "feat(theme): add AppCard widget for the shared card pattern"
 ```
 
@@ -662,13 +664,13 @@ git commit -m "feat(theme): add AppCard widget for the shared card pattern"
 
 **Files:**
 - Modify: `lib/src/shared/widgets/app_theme.dart`
-- Test: `test/src/shared/widgets/app_theme_test.dart`
+- Test: `test/shared/widgets/app_theme_test.dart`
 
 Rewrites the assembler to consume `AppColors`/`AppRadii`, trim the redundant `fromSeed` overrides, complete the `TextTheme` ramp, and add `CardThemeData`. Keeps `buildAmuwakTheme()` signature so `main.dart` is untouched.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/src/shared/widgets/app_theme_test.dart`:
+Create `test/shared/widgets/app_theme_test.dart`:
 
 ```dart
 import 'package:amuwak_staff/src/shared/theme/app_colors.dart';
@@ -711,7 +713,7 @@ void main() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `flutter test test/src/shared/widgets/app_theme_test.dart`
+Run: `flutter test test/shared/widgets/app_theme_test.dart`
 Expected: FAIL — `secondary` still equals primary and/or `cardTheme.shape` is null.
 
 - [ ] **Step 3: Rewrite the implementation**
@@ -831,7 +833,7 @@ const Color amuwakWhite = AppColors.white;
 - [ ] **Step 5: Run the theme test + analyze the app**
 
 ```
-flutter test test/src/shared/widgets/app_theme_test.dart
+flutter test test/shared/widgets/app_theme_test.dart
 flutter analyze lib
 ```
 
@@ -842,11 +844,11 @@ Expected: theme test PASS (5 tests); `flutter analyze lib` clean (aliases keep s
 The trimmed scheme changes generated `surface`/`secondary`. Run the existing screen tests (one file each) to confirm nothing asserts on the old generated values:
 
 ```
-flutter test test/src/dashboard/staff_dashboard_screen_test.dart
-flutter test test/src/orders/order_details_screen_test.dart
-flutter test test/src/reports/daily_report_screen_test.dart
-flutter test test/src/auth/login_screen_test.dart
-flutter test test/src/sync/sync_status_banner_test.dart
+flutter test test/dashboard/staff_dashboard_screen_test.dart
+flutter test test/orders/order_details_screen_test.dart
+flutter test test/reports/daily_report_screen_test.dart
+flutter test test/auth/login_screen_test.dart
+flutter test test/sync/sync_status_banner_test.dart
 ```
 
 Expected: all PASS. Fix any test asserting on a now-changed generated color by pointing it at the role (`colorScheme.secondary`) rather than a literal.
@@ -854,7 +856,7 @@ Expected: all PASS. Fix any test asserting on a now-changed generated color by p
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/src/shared/widgets/app_theme.dart test/src/shared/widgets/app_theme_test.dart
+git add lib/src/shared/widgets/app_theme.dart test/shared/widgets/app_theme_test.dart
 git commit -m "refactor(theme): assemble theme from tokens; trim scheme; add CardTheme + text ramp"
 ```
 
@@ -898,7 +900,7 @@ import '../../shared/theme/app_spacing.dart';
 
 **Files:**
 - Modify: `lib/src/dashboard/staff_dashboard_screen.dart`
-- Test: `test/src/dashboard/staff_dashboard_screen_test.dart`
+- Test: `test/dashboard/staff_dashboard_screen_test.dart`
 
 - [ ] **Step 1:** Apply the mapping table across the file. Convert `_OrderCard`'s `DecoratedBox(decoration: BoxDecoration(color: amuwakWhite, borderRadius: circular(24), border: ...))` + inner `Material`/`InkWell`/`Padding` into:
 
@@ -915,11 +917,11 @@ import '../../shared/theme/app_spacing.dart';
 Replace `_SummaryCard`/`_ActionButton`/section containers' white `BoxDecoration`s with `AppCard` likewise. Replace `Colors.black54` → `AppColors.secondaryText`, header `Colors.white`/`white70` → `AppColors.white`, `fontSize:` section headers → `textTheme` roles, magic spacing → `AppSpacing`.
 
 - [ ] **Step 2:** Run: `flutter analyze lib/src/dashboard/staff_dashboard_screen.dart` → clean.
-- [ ] **Step 3:** Run: `flutter test test/src/dashboard/staff_dashboard_screen_test.dart` → PASS. Adjust any test that found a widget by an old literal color.
+- [ ] **Step 3:** Run: `flutter test test/dashboard/staff_dashboard_screen_test.dart` → PASS. Adjust any test that found a widget by an old literal color.
 - [ ] **Step 4:** Commit:
 
 ```bash
-git add lib/src/dashboard/staff_dashboard_screen.dart test/src/dashboard/staff_dashboard_screen_test.dart
+git add lib/src/dashboard/staff_dashboard_screen.dart test/dashboard/staff_dashboard_screen_test.dart
 git commit -m "refactor(theme): route dashboard styling through theme roles and AppCard"
 ```
 
@@ -929,15 +931,15 @@ git commit -m "refactor(theme): route dashboard styling through theme roles and 
 
 **Files:**
 - Modify: `lib/src/orders/order_details_screen.dart`
-- Test: `test/src/orders/order_details_screen_test.dart`
+- Test: `test/orders/order_details_screen_test.dart`
 
 - [ ] **Step 1:** Apply the mapping table. Convert the detail-block `BoxDecoration` containers (incl. the one near :199) to `AppCard`. Header sub-labels using `Colors.white70` → `AppColors.white`. `_DetailRow` label/value `fontSize:` → `textTheme` roles.
 - [ ] **Step 2:** Run: `flutter analyze lib/src/orders/order_details_screen.dart` → clean.
-- [ ] **Step 3:** Run: `flutter test test/src/orders/order_details_screen_test.dart` → PASS.
+- [ ] **Step 3:** Run: `flutter test test/orders/order_details_screen_test.dart` → PASS.
 - [ ] **Step 4:** Commit:
 
 ```bash
-git add lib/src/orders/order_details_screen.dart test/src/orders/order_details_screen_test.dart
+git add lib/src/orders/order_details_screen.dart test/orders/order_details_screen_test.dart
 git commit -m "refactor(theme): route order-details styling through theme roles and AppCard"
 ```
 
@@ -947,15 +949,15 @@ git commit -m "refactor(theme): route order-details styling through theme roles 
 
 **Files:**
 - Modify: `lib/src/reports/daily_report_screen.dart`
-- Test: `test/src/reports/daily_report_screen_test.dart`
+- Test: `test/reports/daily_report_screen_test.dart`
 
 - [ ] **Step 1:** Apply the mapping table; convert the 5 `BoxDecoration` summary/progress cards to `AppCard`; reconcile the 42/46px icon tiles to a single `AppSpacing`-based size; `fontSize:` metric numbers → `textTheme.headlineMedium`.
 - [ ] **Step 2:** Run: `flutter analyze lib/src/reports/daily_report_screen.dart` → clean.
-- [ ] **Step 3:** Run: `flutter test test/src/reports/daily_report_screen_test.dart` → PASS.
+- [ ] **Step 3:** Run: `flutter test test/reports/daily_report_screen_test.dart` → PASS.
 - [ ] **Step 4:** Commit:
 
 ```bash
-git add lib/src/reports/daily_report_screen.dart test/src/reports/daily_report_screen_test.dart
+git add lib/src/reports/daily_report_screen.dart test/reports/daily_report_screen_test.dart
 git commit -m "refactor(theme): route daily-report styling through theme roles and AppCard"
 ```
 
@@ -965,15 +967,15 @@ git commit -m "refactor(theme): route daily-report styling through theme roles a
 
 **Files:**
 - Modify: `lib/src/auth/login_screen.dart`
-- Test: `test/src/auth/login_screen_test.dart`
+- Test: `test/auth/login_screen_test.dart`
 
 - [ ] **Step 1:** Apply the mapping table. `amuwakDark` title → `textTheme.headlineMedium`; `Colors.black54` subtitle → `AppColors.secondaryText`; error `Colors.red`/`red.shade50` → `colorScheme.error`/`colorScheme.errorContainer`.
 - [ ] **Step 2:** Run: `flutter analyze lib/src/auth/login_screen.dart` → clean.
-- [ ] **Step 3:** Run: `flutter test test/src/auth/login_screen_test.dart` → PASS.
+- [ ] **Step 3:** Run: `flutter test test/auth/login_screen_test.dart` → PASS.
 - [ ] **Step 4:** Commit:
 
 ```bash
-git add lib/src/auth/login_screen.dart test/src/auth/login_screen_test.dart
+git add lib/src/auth/login_screen.dart test/auth/login_screen_test.dart
 git commit -m "refactor(theme): route login styling through theme roles"
 ```
 
@@ -984,15 +986,15 @@ git commit -m "refactor(theme): route login styling through theme roles"
 **Files:**
 - Modify: `lib/src/orders/proof/pickup_capture_screen.dart`
 - Modify: `lib/src/orders/proof/delivery_capture_screen.dart`
-- Test: `test/src/orders/proof/pickup_capture_screen_test.dart`, `test/src/orders/proof/delivery_capture_screen_test.dart`
+- Test: `test/orders/proof/pickup_capture_screen_test.dart`, `test/orders/proof/delivery_capture_screen_test.dart`
 
 - [ ] **Step 1:** Apply the mapping table to BOTH; convert their white-container `BoxDecoration`s to `AppCard`. Note the `../../../shared/theme/` import depth here.
 - [ ] **Step 2:** Run: `flutter analyze lib/src/orders/proof/pickup_capture_screen.dart lib/src/orders/proof/delivery_capture_screen.dart` → clean.
 - [ ] **Step 3:** Run each test file separately:
 
 ```
-flutter test test/src/orders/proof/pickup_capture_screen_test.dart
-flutter test test/src/orders/proof/delivery_capture_screen_test.dart
+flutter test test/orders/proof/pickup_capture_screen_test.dart
+flutter test test/orders/proof/delivery_capture_screen_test.dart
 ```
 
 Expected: PASS.
@@ -1009,7 +1011,7 @@ git commit -m "refactor(theme): route capture-screen styling through theme roles
 
 **Files:**
 - Modify: `lib/src/shared/widgets/sync_status_banner.dart`
-- Test: `test/src/sync/sync_status_banner_test.dart`
+- Test: `test/sync/sync_status_banner_test.dart`
 
 The banner hardcodes `Colors.red/orange/blue.shade100/900`. Route error → `colorScheme.error`/`errorContainer`; keep offline (orange) and pending (blue) as named constants in `AppColors` so they're centralized. The banner test asserts on copy/visibility, not specific shades — confirm it still passes.
 
@@ -1025,11 +1027,11 @@ The banner hardcodes `Colors.red/orange/blue.shade100/900`. Route error → `col
 
 - [ ] **Step 2:** In `sync_status_banner.dart`, replace error `Colors.red.shade900`/`shade100` with `Theme.of(context).colorScheme.onErrorContainer`/`errorContainer`; replace offline/pending shades with the `AppColors` constants above. Add `import '../theme/app_colors.dart';`.
 - [ ] **Step 3:** Run: `flutter analyze lib/src/shared/widgets/sync_status_banner.dart` → clean.
-- [ ] **Step 4:** Run: `flutter test test/src/sync/sync_status_banner_test.dart` → PASS.
+- [ ] **Step 4:** Run: `flutter test test/sync/sync_status_banner_test.dart` → PASS.
 - [ ] **Step 5:** Commit:
 
 ```bash
-git add lib/src/shared/widgets/sync_status_banner.dart lib/src/shared/theme/app_colors.dart test/src/sync/sync_status_banner_test.dart
+git add lib/src/shared/widgets/sync_status_banner.dart lib/src/shared/theme/app_colors.dart test/sync/sync_status_banner_test.dart
 git commit -m "refactor(theme): route sync banner colors through theme and AppColors"
 ```
 
