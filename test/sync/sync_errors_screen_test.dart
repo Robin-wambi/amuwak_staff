@@ -350,4 +350,56 @@ void main() {
       expect(title.overflow, TextOverflow.ellipsis);
     },
   );
+
+  testWidgets(
+    'outbox load failure shows friendly copy, not the raw exception',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            outboxDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<OutboxData>>.error(
+                StateError('drift read failed'),
+              ),
+            ),
+            pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.value(const []),
+            ),
+          ],
+          child: const MaterialApp(home: SyncErrorsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load sync errors — please try again.'),
+          findsOneWidget);
+      expect(find.textContaining('drift read failed'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'pull load failure shows friendly copy, not the raw exception',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            outboxDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<OutboxData>>.value(const []),
+            ),
+            pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.error(
+                StateError('drift read failed'),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: SyncErrorsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load sync errors — please try again.'),
+          findsOneWidget);
+      expect(find.textContaining('drift read failed'), findsNothing);
+    },
+  );
 }
