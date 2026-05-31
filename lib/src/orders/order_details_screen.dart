@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../shared/widgets/app_theme.dart';
+import '../shared/theme/app_card.dart';
+import '../shared/theme/app_colors.dart';
+import '../shared/theme/app_radii.dart';
+import '../shared/theme/app_spacing.dart';
+import '../shared/theme/status_colors.dart';
 import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
@@ -153,7 +157,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.qr_code_2_rounded),
-              SizedBox(width: 8),
+              SizedBox(width: AppSpacing.sm),
               Text('Confirm pickup'),
             ],
           ),
@@ -165,7 +169,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.update_rounded),
-              SizedBox(width: 8),
+              SizedBox(width: AppSpacing.sm),
               Text('Move to Ready for delivery'),
             ],
           ),
@@ -177,7 +181,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.delivery_dining_rounded),
-              SizedBox(width: 8),
+              SizedBox(width: AppSpacing.sm),
               Text('Deliver'),
             ],
           ),
@@ -189,7 +193,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.check_circle_outline_rounded),
-              SizedBox(width: 8),
+              SizedBox(width: AppSpacing.sm),
               Text('Order completed'),
             ],
           ),
@@ -199,7 +203,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _order.status.color;
+    final colorScheme = Theme.of(context).colorScheme;
+    final statusPair = Theme.of(context).extension<StatusColors>()!.of(_order.status);
 
     return PopScope<bool>(
       canPop: false,
@@ -207,10 +212,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         if (!didPop) _handleBackNavigation();
       },
       child: Scaffold(
-        backgroundColor: amuwakBackground,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: amuwakBackground,
-          foregroundColor: amuwakDark,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          foregroundColor: colorScheme.onSurface,
           elevation: 0,
           title: const Text(
             'Order details',
@@ -226,15 +231,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    AppSpacing.sm,
+                    AppSpacing.xl,
+                    AppSpacing.sm,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _OrderHeader(order: _order),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.xl),
                       _StatusChip(
-                          color: statusColor, label: _order.status.label),
-                      const SizedBox(height: 18),
+                        color: statusPair.color,
+                        onColor: statusPair.onColor,
+                        label: _order.status.label,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
                       _DetailsSection(
                         title: 'Customer',
                         children: [
@@ -255,7 +268,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md),
                       _DetailsSection(
                         title: 'Laundry details',
                         children: [
@@ -281,22 +294,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md),
                       _DetailsSection(
                         title: 'Notes',
                         children: [
-                          Text(
-                            _order.notes.isEmpty ? '—' : _order.notes,
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 15,
-                              height: 1.4,
+                          Builder(
+                            builder: (context) => Text(
+                              _order.notes.isEmpty ? '—' : _order.notes,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       if (_order.proofEvents.isNotEmpty) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: AppSpacing.md),
                         _DetailsSection(
                           title: 'History',
                           children: [
@@ -305,13 +320,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ],
                         ),
                       ],
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                     ],
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                  AppSpacing.xl,
+                  AppSpacing.xxl,
+                ),
                 child: _buildPrimaryAction(),
               ),
             ],
@@ -327,11 +347,12 @@ class _OrderHeader extends StatelessWidget {
   final LaundryOrder order;
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.lg + 2), // 18 — nearest is lg(16)+2
       decoration: BoxDecoration(
-        color: amuwakSurfaceBrand,
-        borderRadius: BorderRadius.circular(24),
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Row(
         children: [
@@ -339,16 +360,16 @@ class _OrderHeader extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppRadii.field),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.local_laundry_service_rounded,
-              color: amuwakPrimary,
+              color: colorScheme.primary,
               size: 30,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,25 +377,25 @@ class _OrderHeader extends StatelessWidget {
                 Text(
                   order.orderId,
                   style: const TextStyle(
-                    color: Colors.white70,
+                    color: AppColors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   order.customerName,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.white,
                     fontSize: 23,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   order.serviceType.label,
                   style: const TextStyle(
-                    color: Colors.white70,
+                    color: AppColors.white,
                     fontSize: 14,
                   ),
                 ),
@@ -388,25 +409,33 @@ class _OrderHeader extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.color, required this.label});
+  const _StatusChip({
+    required this.color,
+    required this.onColor,
+    required this.label,
+  });
   final Color color;
+  final Color onColor;
   final String label;
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.circle, size: 10, color: color),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Text(
             label,
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            style: TextStyle(color: onColor, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -420,26 +449,13 @@ class _DetailsSection extends StatelessWidget {
   final List<Widget> children;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: amuwakDark,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
+          Text(title, style: textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.md),
           ...children,
         ],
       ),
@@ -458,28 +474,27 @@ class _DetailRow extends StatelessWidget {
   final String value;
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: amuwakPrimary, size: 21),
-          const SizedBox(width: 10),
+          Icon(icon, color: colorScheme.primary, size: 21),
+          const SizedBox(width: AppSpacing.sm),
           SizedBox(
             width: 78,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.black45,
-                fontWeight: FontWeight.w600,
-              ),
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: amuwakDark,
+              style: TextStyle(
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -515,6 +530,7 @@ class _ProofEventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: Row(
@@ -523,16 +539,16 @@ class _ProofEventRow extends StatelessWidget {
             event.type == ProofEventType.pickup
                 ? Icons.qr_code_2_rounded
                 : Icons.delivery_dining_rounded,
-            color: amuwakPrimary,
+            color: colorScheme.primary,
             size: 21,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               '$_label · $_timestampText · ${event.count} items · '
               '${event.photoPaths.length} photo(s)',
-              style: const TextStyle(
-                color: amuwakDark,
+              style: TextStyle(
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
