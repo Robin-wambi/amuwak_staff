@@ -355,8 +355,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTabIndex,
         onDestinationSelected: _selectTab,
-        backgroundColor: amuwakWhite,
-        indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
