@@ -58,10 +58,13 @@ class SyncErrorsScreen extends ConsumerWidget {
                             await ref
                                 .read(outboxRepositoryProvider)
                                 .requeue(row.id);
-                          } catch (e) {
+                          } catch (_) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Retry failed: $e')),
+                              const SnackBar(
+                                content: Text('Could not retry — please '
+                                    'try again.'),
+                              ),
                             );
                           }
                         },
@@ -93,10 +96,13 @@ class SyncErrorsScreen extends ConsumerWidget {
                             await ref
                                 .read(outboxRepositoryProvider)
                                 .discard(row.id);
-                          } catch (e) {
+                          } catch (_) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Discard failed: $e')),
+                              const SnackBar(
+                                content: Text('Could not discard — please '
+                                    'try again.'),
+                              ),
                             );
                           }
                         },
@@ -113,10 +119,13 @@ class SyncErrorsScreen extends ConsumerWidget {
                             await ref
                                 .read(pullDeadLetterRepositoryProvider)
                                 .delete(row.id);
-                          } catch (e) {
+                          } catch (_) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Dismiss failed: $e')),
+                              const SnackBar(
+                                content: Text('Could not dismiss — please '
+                                    'try again.'),
+                              ),
                             );
                           }
                         },
