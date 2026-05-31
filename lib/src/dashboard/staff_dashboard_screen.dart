@@ -18,8 +18,12 @@ import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
+import '../shared/theme/app_card.dart';
+import '../shared/theme/app_colors.dart';
+import '../shared/theme/app_radii.dart';
+import '../shared/theme/app_spacing.dart';
+import '../shared/theme/status_colors.dart';
 import '../shared/uuid.dart';
-import '../shared/widgets/app_theme.dart';
 import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
 import '../sync/sync_errors_provider.dart';
@@ -282,7 +286,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersStreamProvider);
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           _title,
@@ -427,10 +431,15 @@ class _DashboardBody extends StatelessWidget {
     final completed = orders.countByStatus(OrderStatus.completed);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xxl,
+      ),
       children: [
         const _DashboardHeader(),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         _SummaryGrid(
           totalOrders: totalOrders,
           pendingPickup: pendingPickup,
@@ -438,24 +447,20 @@ class _DashboardBody extends StatelessWidget {
           readyForDelivery: readyForDelivery,
           completed: completed,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         _QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
         ),
-        const SizedBox(height: 24),
-        const Text(
+        const SizedBox(height: AppSpacing.xxl),
+        Text(
           'Assigned orders',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-            color: amuwakDark,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         for (final order in orders) ...[
           _OrderCard(order: order, onTap: () => onOrderTap(order)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
@@ -474,15 +479,20 @@ class _DashboardLoadingBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xxl,
+      ),
       children: [
         const _DashboardHeader(),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: LinearProgressIndicator(),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         _QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
@@ -504,20 +514,21 @@ class _OrdersBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xxl,
+      ),
       children: [
-        const Text(
+        Text(
           'Assigned orders',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-            color: amuwakDark,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         for (final order in orders) ...[
           _OrderCard(order: order, onTap: () => onOrderTap(order)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
@@ -531,44 +542,42 @@ class _AccountTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xxl,
+      ),
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: amuwakWhite,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-          ),
-          child: const Row(
+        AppCard(
+          padding: const EdgeInsets.all(AppSpacing.lg + 2), // original was 18
+          child: Row(
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: amuwakBackground,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 child: Icon(
                   Icons.person_rounded,
-                  color: amuwakPrimary,
+                  color: colorScheme.primary,
                   size: 30,
                 ),
               ),
-              SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Staff account',
-                      style: TextStyle(
-                        color: amuwakDark,
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: textTheme.titleLarge,
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Operations workspace',
-                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                      style: textTheme.bodySmall,
                     ),
                   ],
                 ),
@@ -576,19 +585,19 @@ class _AccountTab extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        const _AccountDetailRow(
+        const SizedBox(height: AppSpacing.lg - 2), // original was 14
+        _AccountDetailRow(
           icon: Icons.badge_outlined,
           label: 'Role',
           value: 'Laundry operations staff',
         ),
-        const SizedBox(height: 10),
-        const _AccountDetailRow(
+        const SizedBox(height: AppSpacing.sm + 2), // original was 10
+        _AccountDetailRow(
           icon: Icons.schedule_outlined,
           label: 'Shift',
           value: 'Today',
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: AppSpacing.lg + 2), // original was 18
         OutlinedButton.icon(
           onPressed: onSignOut,
           icon: const Icon(Icons.logout_rounded),
@@ -612,30 +621,24 @@ class _AccountDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
       child: Row(
         children: [
-          Icon(icon, color: amuwakPrimary),
-          const SizedBox(width: 12),
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.black54,
+              style: textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: amuwakDark,
+            style: textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -657,7 +660,7 @@ class _ErrorRetry extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text('Could not load orders. Please try again.'),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextButton(
             onPressed: onRetry,
             child: const Text('Retry'),
@@ -678,51 +681,55 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.lg + 2), // original was 18
       decoration: BoxDecoration(
-        color: amuwakSurfaceBrand,
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.surfaceBrand,
+        borderRadius: BorderRadius.circular(AppRadii.card),
         boxShadow: [
           BoxShadow(
-            color: amuwakSurfaceBrand.withValues(alpha: 0.18),
+            color: AppColors.surfaceBrand.withValues(alpha: 0.18),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.white,
             child: Icon(
               Icons.local_laundry_service_rounded,
-              color: amuwakPrimary,
+              color: AppColors.primary,
               size: 30,
             ),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Welcome back',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.white,
+                  ),
                 ),
-                SizedBox(height: 3),
-                Text(
+                const SizedBox(height: 3),
+                const Text(
                   'Staff Workspace',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.white,
                     fontSize: 23,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   "Today's laundry operations",
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.white,
+                  ),
                 ),
               ],
             ),
@@ -761,7 +768,7 @@ class _SummaryGrid extends StatelessWidget {
                 icon: Icons.assignment_outlined,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.pendingPickup.label,
@@ -771,7 +778,7 @@ class _SummaryGrid extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Row(
           children: [
             Expanded(
@@ -781,7 +788,7 @@ class _SummaryGrid extends StatelessWidget {
                 icon: Icons.timelapse_rounded,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.readyForDelivery.label,
@@ -791,7 +798,7 @@ class _SummaryGrid extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         _SummaryCard(
           title: 'Completed today',
           value: '$completed',
@@ -818,46 +825,40 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: wide ? double.infinity : null,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: amuwakPrimary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
+      child: SizedBox(
+        width: wide ? double.infinity : null,
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: colorScheme.primary),
             ),
-            child: Icon(icon, color: amuwakPrimary),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: amuwakDark,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: AppSpacing.md + 1), // original was 13
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: textTheme.headlineMedium,
                   ),
-                ),
-                Text(
-                  title,
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
-                ),
-              ],
+                  Text(
+                    title,
+                    style: textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -877,15 +878,11 @@ class _QuickActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Quick actions',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-            color: amuwakDark,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Row(
           children: [
             Expanded(
@@ -895,7 +892,7 @@ class _QuickActions extends StatelessWidget {
                 onTap: onNewPickup,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm + 2), // original was 10
             Expanded(
               child: _ActionButton(
                 label: 'Check order',
@@ -905,7 +902,7 @@ class _QuickActions extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm + 2), // original was 10
             Expanded(
               child: _ActionButton(
                 label: 'Report',
@@ -933,34 +930,25 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: amuwakWhite,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.lg,
+        horizontal: AppSpacing.sm,
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          child: Column(
-            children: [
-              Icon(icon, color: amuwakPrimary),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: amuwakDark,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -974,103 +962,87 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = order.status.color;
+    final statusPair =
+        Theme.of(context).extension<StatusColors>()!.of(order.status);
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: amuwakWhite,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: amuwakPrimary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_bag_outlined,
-                      color: amuwakPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order.customerName,
-                          style: const TextStyle(
-                            color: amuwakDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${order.orderCode} - ${order.serviceType.label}',
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.black38,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _InfoChip(
-                    icon: Icons.access_time_rounded,
-                    label: order.timeLabel,
-                  ),
-                  const SizedBox(width: 8),
-                  _InfoChip(
-                    icon: Icons.inventory_2_outlined,
-                    label: '${order.itemCount} items',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.field - 2),
                 ),
-                child: Text(
-                  order.status.label,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
+                child: Icon(
+                  Icons.shopping_bag_outlined,
+                  color: colorScheme.primary,
                 ),
+              ),
+              const SizedBox(width: AppSpacing.md + 1), // original was 13
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.customerName,
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.xs / 2), // original was 2
+                    Text(
+                      '${order.orderCode} - ${order.serviceType.label}',
+                      style: textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.secondaryText,
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg - 2), // original was 14
+          Row(
+            children: [
+              _InfoChip(
+                icon: Icons.access_time_rounded,
+                label: order.timeLabel,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _InfoChip(
+                icon: Icons.inventory_2_outlined,
+                label: '${order.itemCount} items',
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: statusPair.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.chip),
+            ),
+            child: Text(
+              order.status.label,
+              style: TextStyle(
+                color: statusPair.onColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1086,23 +1058,28 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Flexible(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm + 2, // original was 10
+          vertical: 7,
+        ),
         decoration: BoxDecoration(
-          color: amuwakBackground,
-          borderRadius: BorderRadius.circular(999),
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: amuwakPrimary),
+            Icon(
+              icon,
+              size: 15,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(width: 5),
             Flexible(
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 12,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
