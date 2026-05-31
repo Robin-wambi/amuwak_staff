@@ -267,7 +267,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         return 'Daily report';
       case 3:
         return 'Account';
-      case 0:
       default:
         return 'Amuwak Staff';
     }
@@ -306,23 +305,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 ),
               );
             },
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Account',
-            icon: const Icon(Icons.account_circle_outlined),
-            onSelected: (value) {
-              if (value == 'sign_out') _onSignOutPressed();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem<String>(
-                value: 'sign_out',
-                child: ListTile(
-                  leading: Icon(Icons.logout),
-                  title: Text('Sign out'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
           ),
         ],
       ),

@@ -357,6 +357,12 @@ void main() {
       // is replaced by the login screen.
       var signOutCalls = 0;
 
+      // The sign-out control now lives at the bottom of the Account tab; give
+      // the surface enough height that the NavigationBar does not overlap it.
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(ProviderScope(
         overrides: [
           ordersStreamProvider
@@ -365,6 +371,10 @@ void main() {
               .overrideWith((ref) => const Stream<int>.empty()),
           lastSyncedAtProvider
               .overrideWith((ref) => const Stream<DateTime?>.empty()),
+          outboxDeadLetteredProvider
+              .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
+          pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
           home: StaffDashboardScreen(
@@ -377,15 +387,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Open the account menu and tap "Sign out".
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AppBar),
-          matching: find.byTooltip('Account'),
-        ),
-      );
+      // Open the Account tab and tap its "Sign out" button. (The button is an
+      // OutlinedButton.icon, whose internal type does not match
+      // find.byType(OutlinedButton); target the label text instead.)
+      await tester.tap(find.text('Account').last);
       await tester.pumpAndSettle();
-      expect(find.text('Sign out'), findsOneWidget);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
 
@@ -400,14 +406,8 @@ void main() {
       expect(signOutCalls, 0);
       expect(find.byType(StaffDashboardScreen), findsOneWidget);
 
-      // Open the menu again and this time confirm.
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AppBar),
-          matching: find.byTooltip('Account'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      // Tap the Account-tab sign-out again and this time confirm via the
+      // dialog's TextButton (disambiguated from the tab button behind it).
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
@@ -425,6 +425,10 @@ void main() {
     'Sign-out shows a SnackBar and stays on the dashboard when the callback '
     'throws',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(ProviderScope(
         overrides: [
           ordersStreamProvider
@@ -433,6 +437,10 @@ void main() {
               .overrideWith((ref) => const Stream<int>.empty()),
           lastSyncedAtProvider
               .overrideWith((ref) => const Stream<DateTime?>.empty()),
+          outboxDeadLetteredProvider
+              .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
+          pullDeadLetteredProvider.overrideWith(
+              (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
           home: StaffDashboardScreen(
@@ -445,12 +453,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AppBar),
-          matching: find.byTooltip('Account'),
-        ),
-      );
+      await tester.tap(find.text('Account').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
