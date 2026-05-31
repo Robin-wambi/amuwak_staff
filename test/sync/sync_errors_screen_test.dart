@@ -218,7 +218,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('orders'), findsWidgets);
-      expect(find.textContaining('TypeError'), findsOneWidget);
+      // Pull errors get rider-readable copy too; the raw exception is hidden.
+      expect(find.text('Server data could not be loaded — needs a fix '
+          'on the server.'), findsOneWidget);
+      expect(find.textContaining('TypeError'), findsNothing);
       expect(find.widgetWithText(TextButton, 'Retry'), findsNothing);
       expect(find.text('Server fix required'), findsOneWidget);
     },
