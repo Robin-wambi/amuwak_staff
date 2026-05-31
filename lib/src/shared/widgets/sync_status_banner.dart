@@ -31,8 +31,12 @@ class SyncStatusBanner extends ConsumerWidget {
         if (s.pendingCount > 0) '${s.pendingCount} pending',
         '$errorCount sync error${errorCount == 1 ? "" : "s"}',
       ];
-      final label = '${segments.join(" · ")} — tap to review';
       final tappable = onShowErrors != null;
+      // Only promise "tap to review" when there's somewhere to navigate;
+      // otherwise the copy would tell the rider to tap an inert banner.
+      final label = tappable
+          ? '${segments.join(" · ")} — tap to review'
+          : segments.join(' · ');
       final content = Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(

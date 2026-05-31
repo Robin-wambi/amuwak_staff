@@ -124,9 +124,11 @@ void main() {
     ));
     await t.pump();
 
-    // The error text still shows, but the affordance that implies "tap me"
-    // (the chevron) must be absent when there's nowhere to navigate.
-    expect(find.text('1 sync error — tap to review'), findsOneWidget);
+    // The error text still shows, but both the chevron AND the "tap to
+    // review" copy must be absent when there's nowhere to navigate.
+    expect(find.text('1 sync error'), findsOneWidget);
+    expect(find.textContaining('tap to review'), findsNothing,
+        reason: 'no "tap to review" copy when the banner cannot navigate');
     expect(find.byIcon(Icons.chevron_right), findsNothing,
         reason: 'no chevron when the banner cannot navigate');
     expect(find.byType(InkWell), findsNothing,
