@@ -97,6 +97,16 @@ class OutboxWorker {
         await repo.markSent(row.id);
         sent++;
       } on PostgrestException catch (e) {
+        if (e.code == '23505') {
+          // Unique-violation: the row is already on the server. This happens
+          // when a prior attempt's INSERT succeeded but the client never got
+          // the ack (network dropped after the write). Treat it as success so
+          // we don't burn the dead-letter budget and surface a false sync
+          // error for data that was actually saved.
+          await repo.markSent(row.id);
+          sent++;
+          continue;
+        }
         await repo.markFailed(row.id, '${e.code ?? ''}: ${e.message}',
             deadLetterAfter: deadLetterAfter);
         return sent;
