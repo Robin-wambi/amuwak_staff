@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/widgets/app_theme.dart';
 import 'barcode_reader.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -69,10 +68,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         title: const Text('Scan order tag'),
         leading: IconButton(
@@ -143,11 +142,11 @@ class _ManualEntryView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Order ID written on the bag',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: amuwakDark,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 15,
             ),
           ),
