@@ -1,81 +1,101 @@
 import 'package:flutter/material.dart';
 
-const Color amuwakPrimary = Color(0xFFFF6E11); // Sampled logo orange (60% role)
-const Color amuwakSurfaceBrand = Color(0xFFC75A0E); // Deep terracotta (30% role)
-const Color amuwakDark = Color(0xFF1F1F1F);
-const Color amuwakBackground = Color(0xFFFFF8F2);
-const Color amuwakWhite = Color(0xFFFFFFFF);
+import '../theme/app_colors.dart';
+import '../theme/app_radii.dart';
+import '../theme/status_colors.dart';
 
 ThemeData buildAmuwakTheme() {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: AppColors.primary,
+    // Brand-critical overrides only. Let the algorithm derive secondary,
+    // surface, and onSurface so the palette stays harmonious.
+    primary: AppColors.primary,
+    onPrimary: AppColors.dark,
+    primaryContainer: AppColors.surfaceBrand,
+    onPrimaryContainer: AppColors.white,
+  );
+
   return ThemeData(
     useMaterial3: true,
-    scaffoldBackgroundColor: amuwakBackground,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: amuwakPrimary,
-      primary: amuwakPrimary,
-      onPrimary: amuwakDark,
-      primaryContainer: amuwakSurfaceBrand,
-      onPrimaryContainer: amuwakWhite,
-      secondary: amuwakPrimary,
-      onSecondary: amuwakWhite,
-      surface: amuwakWhite,
-      onSurface: amuwakDark,
-    ),
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: AppColors.background,
+    extensions: const <ThemeExtension<dynamic>>[StatusColors.light],
     appBarTheme: const AppBarTheme(
-      backgroundColor: amuwakSurfaceBrand,
-      foregroundColor: amuwakWhite,
+      backgroundColor: AppColors.surfaceBrand,
+      foregroundColor: AppColors.white,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: amuwakWhite,
-      indicatorColor: amuwakPrimary.withValues(alpha: 0.16),
+      backgroundColor: AppColors.white,
+      indicatorColor: AppColors.primary.withValues(alpha: 0.16),
       iconTheme: WidgetStateProperty.resolveWith((states) {
-        final isSelected = states.contains(WidgetState.selected);
+        final selected = states.contains(WidgetState.selected);
         return IconThemeData(
-          color: isSelected ? amuwakPrimary : Colors.black54,
+          color: selected ? AppColors.primary : AppColors.secondaryText,
           size: 24,
         );
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        final isSelected = states.contains(WidgetState.selected);
+        final selected = states.contains(WidgetState.selected);
         return TextStyle(
-          color: isSelected ? amuwakDark : Colors.black54,
+          color: selected ? AppColors.dark : AppColors.secondaryText,
           fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
         );
       }),
     ),
     textTheme: const TextTheme(
-      headlineLarge: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
-      headlineMedium: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(color: amuwakDark, fontWeight: FontWeight.bold),
-      bodyMedium: TextStyle(color: amuwakDark),
+      headlineLarge: TextStyle(color: AppColors.dark, fontWeight: FontWeight.bold),
+      headlineMedium: TextStyle(color: AppColors.dark, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(
+          color: AppColors.dark, fontSize: 21, fontWeight: FontWeight.bold),
+      titleMedium: TextStyle(
+          color: AppColors.dark, fontSize: 16, fontWeight: FontWeight.w700),
+      bodyMedium: TextStyle(color: AppColors.dark),
+      bodySmall: TextStyle(color: AppColors.secondaryText, fontSize: 13),
+    ),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: AppColors.white,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: const BorderSide(color: AppColors.cardBorder),
+      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: amuwakPrimary,
-        foregroundColor: amuwakDark,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.dark,
         minimumSize: const Size(double.infinity, 54),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.field)),
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: amuwakPrimary,
-      foregroundColor: amuwakDark,
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.dark,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: amuwakWhite,
-      prefixIconColor: amuwakPrimary,
+      fillColor: AppColors.white,
+      prefixIconColor: AppColors.primary,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.field),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: amuwakPrimary, width: 1.5),
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     ),
   );
 }
+
+// Deprecated brand-constant aliases. Removed as screens migrate to AppColors.
+const Color amuwakPrimary = AppColors.primary;
+const Color amuwakSurfaceBrand = AppColors.surfaceBrand;
+const Color amuwakDark = AppColors.dark;
+const Color amuwakBackground = AppColors.background;
+const Color amuwakWhite = AppColors.white;
