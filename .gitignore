@@ -50,3 +50,6 @@ app.*.map.json
 .env.*.local
 **/.env
 **/.env.local
+
+# Claude Code runtime locks (machine-specific, transient)
+.claude/scheduled_tasks.lock
