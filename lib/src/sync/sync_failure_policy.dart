@@ -69,6 +69,34 @@ String friendlySyncError(String? raw) {
   return 'Could not be saved (server rejected it).';
 }
 
+/// Maps a stored pull (server-read) dead-letter error to a short, rider-
+/// readable line for the SyncErrorsScreen. Mirrors [friendlySyncError] but
+/// uses read-oriented phrasing — these rows are server-side data the rider
+/// cannot retry locally, so the copy points at "needs a fix on the server"
+/// rather than a Retry affordance. The raw error stays in local logs for
+/// whoever fixes the server; it is kept out of the rider's face here.
+String friendlyPullError(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return 'Server data could not be loaded.';
+  }
+  final t = raw.toLowerCase();
+  if (t.contains('row-level security') ||
+      t.contains('42501') ||
+      t.contains('permission denied') ||
+      _hasStatus(t, 403)) {
+    return 'Not allowed to read this from the server (permissions).';
+  }
+  if (t.contains('jwt') ||
+      _hasStatus(t, 401) ||
+      t.contains('not authenticated')) {
+    return 'Sign-in expired — sign out and back in.';
+  }
+  if (isTransientSyncError(raw)) {
+    return 'Connection problem — could not load this server data.';
+  }
+  return 'Server data could not be loaded — needs a fix on the server.';
+}
+
 /// True when [haystack] mentions HTTP status [code] as a standalone token
 /// rather than as digits embedded in a longer number or identifier. Avoids
 /// a bare `contains('401')` misfiring on e.g. `"4012 retries"`, Postgres
