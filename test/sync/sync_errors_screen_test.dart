@@ -195,7 +195,9 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.byType(SnackBar), findsOneWidget);
-      expect(find.textContaining('Retry failed'), findsOneWidget);
+      expect(find.textContaining('Could not retry'), findsOneWidget);
+      // The raw exception must not leak into rider-facing copy.
+      expect(find.textContaining('drift write failed'), findsNothing);
     },
   );
 
@@ -278,7 +280,9 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.byType(SnackBar), findsOneWidget);
-      expect(find.textContaining('Dismiss failed'), findsOneWidget);
+      expect(find.textContaining('Could not dismiss'), findsOneWidget);
+      // The raw exception must not leak into rider-facing copy.
+      expect(find.textContaining('drift delete failed'), findsNothing);
     },
   );
 
