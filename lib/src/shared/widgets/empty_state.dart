@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'app_theme.dart';
+import '../theme/app_colors.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -22,22 +22,26 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 72, color: amuwakPrimary.withValues(alpha: 0.45)),
+            Icon(
+              icon,
+              size: 72,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.45),
+            ),
             const SizedBox(height: 16),
             Text(
               headline,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: amuwakDark,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black54),
+              style: const TextStyle(color: AppColors.secondaryText),
             ),
           ],
         ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../dashboard/staff_dashboard_screen.dart';
-import '../shared/widgets/app_theme.dart';
+import '../shared/theme/app_colors.dart';
+import '../shared/theme/app_radii.dart';
 import 'auth_service.dart';
 import 'session.dart';
 
@@ -52,8 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -66,28 +68,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: 88,
                     height: 88,
                     decoration: BoxDecoration(
-                      color: amuwakPrimary,
-                      borderRadius: BorderRadius.circular(28),
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(AppRadii.card),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.local_laundry_service_rounded,
-                      color: amuwakDark,
+                      color: colorScheme.onSurface,
                       size: 46,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'Amuwak Staff',
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,
-                      color: amuwakDark,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Login to manage laundry orders',
-                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                    style: TextStyle(fontSize: 16, color: AppColors.secondaryText),
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
@@ -119,12 +121,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(14),
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(AppRadii.field),
                       ),
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
+                        style: TextStyle(color: colorScheme.onErrorContainer),
                       ),
                     ),
                   const SizedBox(height: 24),
