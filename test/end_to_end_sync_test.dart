@@ -72,6 +72,7 @@ void main() {
     final worker = OutboxWorker(
       repo: repo,
       dispatch: OutboxWorker.supabaseDispatcher(supabase),
+      isOnline: () => true,
     );
     final puller = SyncPuller(
       db: db,

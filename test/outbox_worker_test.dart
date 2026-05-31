@@ -35,7 +35,13 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     repo = OutboxRepository(db);
     recorder = _DispatchRecorder();
-    worker = OutboxWorker(repo: repo, dispatch: recorder.dispatch);
+    // Default to "assume offline" so the transient-skip path is exercised;
+    // tests that need the online path build their own worker with () => true.
+    worker = OutboxWorker(
+      repo: repo,
+      dispatch: recorder.dispatch,
+      isOnline: () => false,
+    );
   });
 
   tearDown(() async => db.close());
