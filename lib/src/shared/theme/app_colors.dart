@@ -14,4 +14,10 @@ abstract final class AppColors {
   static const Color secondaryText = Color(0x99000000); // black @ 60%
   /// Hairline border for cards. Replaces `primary.withValues(alpha: 0.18)`.
   static const Color cardBorder = Color(0x2EFF6E11); // primary @ ~18%
+
+  // Sync-banner state colors (centralized; not part of the M3 scheme).
+  static const Color offlineBg = Color(0xFFFFE0B2); // orange 100
+  static const Color offlineFg = Color(0xFFE65100); // orange 900
+  static const Color pendingBg = Color(0xFFBBDEFB); // blue 100
+  static const Color pendingFg = Color(0xFF0D47A1); // blue 900
 }
