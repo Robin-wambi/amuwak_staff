@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/app_database.dart';
-import '../shared/widgets/app_theme.dart';
+import '../shared/theme/app_colors.dart';
 import 'repository_providers.dart';
 import 'sync_errors_provider.dart';
 import 'sync_failure_policy.dart';
@@ -16,10 +16,10 @@ class SyncErrorsScreen extends ConsumerWidget {
     final pullAsync = ref.watch(pullDeadLetteredProvider);
 
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         title: const Text(
           'Sync errors',
@@ -50,7 +50,7 @@ class SyncErrorsScreen extends ConsumerWidget {
                     padding: EdgeInsets.all(24),
                     child: Text(
                       'No sync errors.',
-                      style: TextStyle(color: Colors.black54),
+                      style: TextStyle(color: AppColors.secondaryText),
                     ),
                   ),
                 );
@@ -161,10 +161,10 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: amuwakDark,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );
