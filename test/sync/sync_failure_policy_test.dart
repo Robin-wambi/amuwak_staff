@@ -95,5 +95,20 @@ void main() {
       expect(friendlySyncError('Camera permission is required'),
           'Could not be saved (server rejected it).');
     });
+
+    test('status codes only match as standalone tokens, not embedded digits',
+        () {
+      // "401"/"403" embedded in a longer number or identifier must NOT be
+      // mistaken for an auth/permission rejection.
+      expect(friendlySyncError('Gave up after 4012 retries'),
+          'Could not be saved (server rejected it).');
+      expect(friendlySyncError('42P01: relation does not exist'),
+          'Could not be saved (server rejected it).');
+      // A genuine standalone status code still maps.
+      expect(friendlySyncError('AuthException statusCode: 401'),
+          'Sign-in expired — sign out and back in.');
+      expect(friendlySyncError('request failed with status 403'),
+          'Not allowed on the server (permissions).');
+    });
   });
 }
