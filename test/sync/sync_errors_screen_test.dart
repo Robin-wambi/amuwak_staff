@@ -314,4 +314,33 @@ void main() {
       expect(find.widgetWithText(TextButton, 'Discard'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'outbox tile title ellipsizes a long rowId instead of wrapping',
+    (tester) async {
+      // The title carries a UUID rowId; without a maxLines cap it wraps to
+      // several lines on a narrow phone, leaving a ragged multi-line tile next
+      // to the Retry/Discard buttons. It should ellipsize to a single line.
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-long',
+            forTable: 'order_status_events',
+            op: 'update',
+            rowId: '8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f',
+            lastError: 'boom',
+          ),
+        ],
+        pullRows: const [],
+      );
+      await tester.pumpAndSettle();
+
+      final title = tester.widget<Text>(
+        find.textContaining('8f14e45f-ceea-467a-9f4e-1a2b3c4d5e6f'),
+      );
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+    },
+  );
 }

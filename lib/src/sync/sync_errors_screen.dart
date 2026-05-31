@@ -167,7 +167,11 @@ class _OutboxErrorTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text('${row.forTable} · ${row.op} · ${row.rowId}'),
+        title: Text(
+          '${row.forTable} · ${row.op} · ${row.rowId}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
           friendlySyncError(row.lastError),
           maxLines: 2,
@@ -195,7 +199,11 @@ class _PullErrorTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text('${row.forTable} · server row'),
+        title: Text(
+          '${row.forTable} · server row',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
           row.errorText,
           maxLines: 3,
