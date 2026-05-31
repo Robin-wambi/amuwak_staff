@@ -214,7 +214,7 @@ class _PullErrorTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          row.errorText,
+          friendlyPullError(row.errorText),
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
         ),

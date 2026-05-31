@@ -96,6 +96,19 @@ void main() {
           'Could not be saved (server rejected it).');
     });
 
+    test('maps a generic server error to a read-oriented line', () {
+      expect(friendlyPullError(null), 'Server data could not be loaded.');
+      expect(friendlyPullError('   '), 'Server data could not be loaded.');
+      expect(friendlyPullError('TypeError: null is not a String'),
+          'Server data could not be loaded — needs a fix on the server.');
+      expect(friendlyPullError('new row violates row-level security policy'),
+          'Not allowed to read this from the server (permissions).');
+      expect(friendlyPullError('JWT expired'),
+          'Sign-in expired — sign out and back in.');
+      expect(friendlyPullError('SocketException: failed host lookup'),
+          'Connection problem — could not load this server data.');
+    });
+
     test('status codes only match as standalone tokens, not embedded digits',
         () {
       // "401"/"403" embedded in a longer number or identifier must NOT be
