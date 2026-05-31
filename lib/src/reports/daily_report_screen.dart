@@ -90,7 +90,7 @@ class DailyReportView extends StatelessWidget {
                       Text(
                         'Laundry operations summary',
                         style: TextStyle(
-                          color: AppColors.white,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                           fontSize: 14,
                         ),
                       ),
