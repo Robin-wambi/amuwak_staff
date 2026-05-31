@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import '../orders/order.dart';
 import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
-import '../shared/widgets/app_theme.dart';
+import '../shared/theme/app_card.dart';
+import '../shared/theme/app_colors.dart';
+import '../shared/theme/app_radii.dart';
+import '../shared/theme/app_spacing.dart';
+import '../shared/theme/status_colors.dart';
 
 class DailyReportScreen extends StatelessWidget {
   const DailyReportScreen({super.key, required this.orders});
@@ -13,10 +17,10 @@ class DailyReportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: amuwakBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: amuwakBackground,
-        foregroundColor: amuwakDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         title: const Text(
           'Daily report',
@@ -45,26 +49,31 @@ class DailyReportView extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.sm,
+          AppSpacing.xl,
+          AppSpacing.xxl,
+        ),
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.lg + 2),
             decoration: BoxDecoration(
-              color: amuwakSurfaceBrand,
-              borderRadius: BorderRadius.circular(24),
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadii.card),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.white,
                   child: Icon(
                     Icons.bar_chart_rounded,
-                    color: amuwakPrimary,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 30,
                   ),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: AppSpacing.lg - 2),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,15 +81,18 @@ class DailyReportView extends StatelessWidget {
                       Text(
                         "Today's report",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                           fontSize: 23,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Laundry operations summary',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -88,7 +100,7 @@ class DailyReportView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
               Expanded(
@@ -98,7 +110,7 @@ class DailyReportView extends StatelessWidget {
                   icon: Icons.assignment_outlined,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _ReportMetricCard(
                   title: 'Items',
@@ -108,7 +120,7 @@ class DailyReportView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
@@ -118,7 +130,7 @@ class DailyReportView extends StatelessWidget {
                   icon: Icons.check_circle_outline_rounded,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _ReportMetricCard(
                   title: 'Pending work',
@@ -128,16 +140,12 @@ class DailyReportView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          const Text(
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
             'Status breakdown',
-            style: TextStyle(
-              color: amuwakDark,
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _StatusBreakdownCard(
             pendingPickup: pendingPickup,
             inProgress: inProgress,
@@ -145,16 +153,12 @@ class DailyReportView extends StatelessWidget {
             completed: completed,
             totalOrders: totalOrders,
           ),
-          const SizedBox(height: 24),
-          const Text(
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
             'Work summary',
-            style: TextStyle(
-              color: amuwakDark,
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _WorkSummaryCard(
             totalOrders: totalOrders,
             completed: completed,
@@ -180,13 +184,8 @@ class _ReportMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,25 +193,21 @@ class _ReportMetricCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: amuwakPrimary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.field - 3),
             ),
-            child: Icon(icon, color: amuwakPrimary),
+            child: Icon(icon, color: colorScheme.primary),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg - 2),
           Text(
             value,
-            style: const TextStyle(
-              color: amuwakDark,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xs / 2),
           Text(
             title,
             style: const TextStyle(
-              color: Colors.black54,
+              color: AppColors.secondaryText,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -240,41 +235,36 @@ class _StatusBreakdownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
+    final statusColors = Theme.of(context).extension<StatusColors>()!;
+    return AppCard(
       child: Column(
         children: [
           _StatusRow(
             label: OrderStatus.pendingPickup.label,
             value: pendingPickup,
             total: totalOrders,
-            color: OrderStatus.pendingPickup.color,
+            color: statusColors.of(OrderStatus.pendingPickup).color,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg - 2),
           _StatusRow(
             label: OrderStatus.inProgress.label,
             value: inProgress,
             total: totalOrders,
-            color: OrderStatus.inProgress.color,
+            color: statusColors.of(OrderStatus.inProgress).color,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg - 2),
           _StatusRow(
             label: OrderStatus.readyForDelivery.label,
             value: readyForDelivery,
             total: totalOrders,
-            color: OrderStatus.readyForDelivery.color,
+            color: statusColors.of(OrderStatus.readyForDelivery).color,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg - 2),
           _StatusRow(
             label: OrderStatus.completed.label,
             value: completed,
             total: totalOrders,
-            color: OrderStatus.completed.color,
+            color: statusColors.of(OrderStatus.completed).color,
           ),
         ],
       ),
@@ -307,8 +297,8 @@ class _StatusRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
-                  color: amuwakDark,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -316,19 +306,19 @@ class _StatusRow extends StatelessWidget {
             Text(
               '$value/$total',
               style: const TextStyle(
-                color: Colors.black54,
+                color: AppColors.secondaryText,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         ClipRRect(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadii.chip),
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 9,
-            backgroundColor: amuwakBackground,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
@@ -356,44 +346,35 @@ class _WorkSummaryCard extends StatelessWidget {
         ? 'All assigned laundry orders are completed for today.'
         : '$pendingWork orders still need attention before the day is closed.';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: amuwakWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: amuwakPrimary.withValues(alpha: 0.18)),
-      ),
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.summarize_outlined, color: amuwakPrimary),
-              SizedBox(width: 8),
+              Icon(Icons.summarize_outlined,
+                  color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 "Today's progress",
-                style: TextStyle(
-                  color: amuwakDark,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Text(
             message,
             style: const TextStyle(
-              color: Colors.black87,
+              color: AppColors.dark,
               fontSize: 15,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Text(
             'Total items handled today: $totalItems',
             style: const TextStyle(
-              color: Colors.black54,
+              color: AppColors.secondaryText,
               fontWeight: FontWeight.w700,
             ),
           ),
