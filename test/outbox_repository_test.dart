@@ -113,6 +113,19 @@ void main() {
     expect(await repo.peekPending(limit: 10), isEmpty);
   });
 
+  test('discard leaves a still-pending row untouched', () async {
+    await repo.enqueue(
+      id: 'p1', forTable: 'orders', op: 'update',
+      rowId: 'r1', payload: const {},
+    );
+
+    // A stale reference to a row that has NOT dead-lettered must not delete it.
+    await repo.discard('p1');
+
+    expect(await repo.peekPending(limit: 10), hasLength(1),
+        reason: 'discard must only drop dead-lettered rows, not pending ones');
+  });
+
   group('dedupKeyFor (Plan 4 Task 2)', () {
     test('produces a stable string from (forTable, op, rowId, extra)', () {
       expect(
