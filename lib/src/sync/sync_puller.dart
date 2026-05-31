@@ -105,8 +105,12 @@ class SyncPuller {
     //
     // Watermark advances past EVERY row we saw, including the bad ones —
     // otherwise next cycle re-fetches the poison row and re-dead-letters it
-    // forever.  Failed rows are buffered and written outside the transaction
-    // so a single bad row can't roll back successful upserts.
+    // forever.  A single bad row can't roll back successful upserts because
+    // each row's failure is caught per-row (the upsert never throws out of the
+    // loop).  The dead-letter inserts and the watermark write live INSIDE the
+    // same transaction as the upserts, so the whole cycle commits atomically:
+    // a crash mid-cycle leaves the watermark un-advanced and the batch is
+    // simply re-pulled next time, with no lost or duplicated quarantine rows.
     DateTime maxWatermark = since;
     final failed = <_FailedRow>[];
     var written = 0;
@@ -123,27 +127,27 @@ class SyncPuller {
         final ts = _parseTimestampOrNull(row[table.watermarkColumn]);
         if (ts != null && ts.isAfter(maxWatermark)) maxWatermark = ts;
       }
-    });
 
-    for (final f in failed) {
-      // Stack stays in dev logs (debugger, `flutter logs`); the rider-visible
-      // errorText is the message only so file paths and frame numbers don't
-      // leak through the SyncErrorsScreen.
-      developer.log(
-        'pull dead-letter: ${f.tableName}',
-        name: 'SyncPuller',
-        error: f.error,
-        stackTrace: f.stack,
-      );
-      await deadLetter!.insert(
-        forTable: f.tableName,
-        rowPayload: f.row,
-        errorText: f.error.toString(),
-      );
-    }
-    if (maxWatermark.isAfter(since)) {
-      await _writeWatermark(table.name, maxWatermark);
-    }
+      for (final f in failed) {
+        // Stack stays in dev logs (debugger, `flutter logs`); the rider-visible
+        // errorText is the message only so file paths and frame numbers don't
+        // leak through the SyncErrorsScreen.
+        developer.log(
+          'pull dead-letter: ${f.tableName}',
+          name: 'SyncPuller',
+          error: f.error,
+          stackTrace: f.stack,
+        );
+        await deadLetter!.insert(
+          forTable: f.tableName,
+          rowPayload: f.row,
+          errorText: f.error.toString(),
+        );
+      }
+      if (maxWatermark.isAfter(since)) {
+        await _writeWatermark(table.name, maxWatermark);
+      }
+    });
     return written;
   }
 
