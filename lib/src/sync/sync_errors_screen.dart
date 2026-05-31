@@ -29,10 +29,20 @@ class SyncErrorsScreen extends ConsumerWidget {
       body: SafeArea(
         child: outboxAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Could not load: $e')),
+          error: (_, __) => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('Could not load sync errors — please try again.'),
+            ),
+          ),
           data: (outboxRows) => pullAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Could not load: $e')),
+            error: (_, __) => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Could not load sync errors — please try again.'),
+              ),
+            ),
             data: (pullRows) {
               if (outboxRows.isEmpty && pullRows.isEmpty) {
                 return const Center(
