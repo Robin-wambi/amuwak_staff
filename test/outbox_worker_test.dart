@@ -68,7 +68,10 @@ void main() {
 
   test('on PostgrestException, drainOnce marks failed and stops processing later rows',
       () async {
-    recorder.throwThis = const PostgrestException(message: 'unique violation', code: '23505');
+    // 23503 (FK violation) is a genuine server rejection — distinct from the
+    // 23505 duplicate-key case which is treated as success (see below).
+    recorder.throwThis = const PostgrestException(
+        message: 'foreign key violation', code: '23503');
 
     await repo.enqueue(id: 'm1', forTable: 'orders', op: 'insert',
                        rowId: 'r1', payload: const {});
@@ -80,11 +83,39 @@ void main() {
     expect(drained, 0);
     final pending = await repo.peekPending(limit: 10);
     expect(pending, hasLength(2));
-    expect(pending.first.lastError, contains('23505'));
-    expect(pending.first.lastError, contains('unique violation'));
+    expect(pending.first.lastError, contains('23503'));
+    expect(pending.first.lastError, contains('foreign key violation'));
     expect(pending.first.status, 'failed');
     expect(recorder.calls, hasLength(1),
         reason: 'second row should not be dispatched after first fails');
+  });
+
+  test('23505 duplicate-key is treated as success (already on server)',
+      () async {
+    // INSERT succeeded server-side but the ack was lost; the retry hits a
+    // unique violation. The row IS saved, so mark it sent rather than
+    // dead-lettering it and surfacing a false sync error.
+    recorder.throwThis =
+        const PostgrestException(message: 'duplicate key', code: '23505');
+
+    await repo.enqueue(id: 'm1', forTable: 'orders', op: 'insert',
+                       rowId: 'r1', payload: const {});
+    await repo.enqueue(id: 'm2', forTable: 'orders', op: 'insert',
+                       rowId: 'r2', payload: const {});
+
+    final onlineWorker = OutboxWorker(
+      repo: repo,
+      dispatch: recorder.dispatch,
+      isOnline: () => true,
+    );
+    final drained = await onlineWorker.drainOnce();
+
+    expect(drained, 2, reason: 'both already-present rows count as sent');
+    expect(await repo.peekPending(limit: 10), isEmpty,
+        reason: '23505 rows are removed via markSent, not left failed');
+    expect(await repo.watchDeadLettered().first, isEmpty);
+    expect(recorder.calls, hasLength(2),
+        reason: 'drain continues past a 23505 instead of stopping');
   });
 
   test('stop() awaits an in-flight drainOnce before returning', () async {
