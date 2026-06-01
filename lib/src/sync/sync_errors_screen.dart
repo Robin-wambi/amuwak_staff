@@ -27,23 +27,26 @@ class SyncErrorsScreen extends ConsumerWidget {
         ),
       ),
       body: SafeArea(
-        child: outboxAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load sync errors — please try again.'),
-            ),
-          ),
-          data: (outboxRows) => pullAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('Could not load sync errors — please try again.'),
-              ),
-            ),
-            data: (pullRows) {
+        child: Builder(
+          builder: (context) {
+            // Both providers are watched in parallel above; combine them into a
+            // single decision so the screen shows one loading spinner / one
+            // error state instead of waterfalling the outbox spinner then the
+            // pull spinner.
+            if (outboxAsync.isLoading || pullAsync.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (outboxAsync.hasError || pullAsync.hasError) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child:
+                      Text('Could not load sync errors — please try again.'),
+                ),
+              );
+            }
+            final outboxRows = outboxAsync.requireValue;
+            final pullRows = pullAsync.requireValue;
               if (outboxRows.isEmpty && pullRows.isEmpty) {
                 return const Center(
                   child: Padding(
@@ -143,8 +146,7 @@ class SyncErrorsScreen extends ConsumerWidget {
                   ],
                 ],
               );
-            },
-          ),
+          },
         ),
       ),
     );
