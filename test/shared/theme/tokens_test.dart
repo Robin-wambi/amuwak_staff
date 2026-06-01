@@ -8,6 +8,7 @@ void main() {
     expect(AppSpacing.sm, 8);
     expect(AppSpacing.md, 12);
     expect(AppSpacing.lg, 16);
+    expect(AppSpacing.lg2, 18);
     expect(AppSpacing.xl, 20);
     expect(AppSpacing.xxl, 24);
   });
