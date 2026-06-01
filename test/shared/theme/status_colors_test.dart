@@ -46,6 +46,20 @@ void main() {
     }
   });
 
+  test('StatusColorPair compares by value (== and hashCode)', () {
+    // Non-const so Dart can't canonicalize them into one instance — this
+    // exercises real value equality, not identity.
+    final a = StatusColorPair(Color(0xFF112233), Color(0xFF445566));
+    final b = StatusColorPair(Color(0xFF112233), Color(0xFF445566));
+    final differentColor = StatusColorPair(Color(0xFF000000), Color(0xFF445566));
+    final differentOnColor = StatusColorPair(Color(0xFF112233), Color(0xFF000000));
+
+    expect(a, equals(b));
+    expect(a.hashCode, equals(b.hashCode));
+    expect(a, isNot(equals(differentColor)));
+    expect(a, isNot(equals(differentOnColor)));
+  });
+
   test('lerp returns a StatusColors and is identity at t=0', () {
     final lerped = status.lerp(status, 0) as StatusColors;
     expect(lerped.of(OrderStatus.completed).color,
