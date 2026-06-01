@@ -61,8 +61,19 @@ void main() {
   });
 
   test('lerp returns a StatusColors and is identity at t=0', () {
-    final lerped = status.lerp(status, 0) as StatusColors;
+    final lerped = status.lerp(status, 0);
     expect(lerped.of(OrderStatus.completed).color,
         status.of(OrderStatus.completed).color);
+  });
+
+  test('lerp reaches the target palette at t=1', () {
+    final other = status.copyWith(
+      completed: const StatusColorPair(Color(0xFF000000), Color(0xFFFFFFFF)),
+    );
+    final lerped = status.lerp(other, 1);
+    // Color.lerp(a, b, 1.0) == b, so every role lands exactly on `other`.
+    expect(lerped.of(OrderStatus.completed), other.of(OrderStatus.completed));
+    expect(
+        lerped.of(OrderStatus.pendingPickup), other.of(OrderStatus.pendingPickup));
   });
 }
