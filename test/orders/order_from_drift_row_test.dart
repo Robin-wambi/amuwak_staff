@@ -86,11 +86,13 @@ void main() {
       });
     });
 
-    test('throws StateError for an unknown status string', () {
+    test('unknown status falls back to pendingPickup instead of throwing', () {
+      // A status string added server-side before an app update must NOT crash
+      // the orders stream — it degrades to pendingPickup.
       final row = _orderRow(status: 'banana');
       expect(
-        () => LaundryOrder.fromDriftRow(row, const []),
-        throwsA(isA<StateError>()),
+        LaundryOrder.fromDriftRow(row, const []).status,
+        OrderStatus.pendingPickup,
       );
     });
 
@@ -156,7 +158,9 @@ void main() {
       expect(mapped.proofEvents, isEmpty);
     });
 
-    test('throws StateError for an unknown proof event type', () {
+    test('unknown proof event type falls back to pickup instead of throwing', () {
+      // Same rationale as the unknown-status case: never crash the stream on a
+      // proof-event type synced from a newer backend.
       final row = _orderRow(id: 'AMW-1');
       final events = [
         _proofRow(
@@ -166,10 +170,8 @@ void main() {
           capturedAt: DateTime(2026, 5, 19, 10, 30),
         ),
       ];
-      expect(
-        () => LaundryOrder.fromDriftRow(row, events),
-        throwsA(isA<StateError>()),
-      );
+      final mapped = LaundryOrder.fromDriftRow(row, events);
+      expect(mapped.proofEvents.single.type, ProofEventType.pickup);
     });
 
     test('copies the simple scalar fields onto LaundryOrder', () {
