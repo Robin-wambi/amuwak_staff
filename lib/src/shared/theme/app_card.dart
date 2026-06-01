@@ -25,16 +25,16 @@ class AppCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.card),
       side: const BorderSide(color: AppColors.cardBorder),
     );
+    final padded = Padding(padding: padding, child: child);
     return Card(
       elevation: 0,
       color: AppColors.white,
       margin: EdgeInsets.zero,
       shape: shape,
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
-      ),
+      // Only wrap in an InkWell when the card is actually tappable — a null-tap
+      // InkWell is just an inert widget in the tree.
+      child: onTap == null ? padded : InkWell(onTap: onTap, child: padded),
     );
   }
 }

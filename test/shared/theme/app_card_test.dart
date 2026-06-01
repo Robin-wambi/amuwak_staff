@@ -18,6 +18,18 @@ void main() {
     expect(shape.borderRadius, BorderRadius.circular(AppRadii.card));
   });
 
+  testWidgets('AppCard without onTap inserts no InkWell', (tester) async {
+    // A non-interactive card should not carry an inert InkWell in the tree.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: AppCard(child: Text('plain'))),
+      ),
+    );
+
+    expect(find.byType(InkWell), findsNothing);
+    expect(find.text('plain'), findsOneWidget);
+  });
+
   testWidgets('AppCard onTap makes it tappable', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
