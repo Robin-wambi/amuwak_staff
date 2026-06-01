@@ -8,6 +8,15 @@ class StatusColorPair {
   const StatusColorPair(this.color, this.onColor);
   final Color color;
   final Color onColor;
+
+  @override
+  bool operator ==(Object other) =>
+      other is StatusColorPair &&
+      other.color == color &&
+      other.onColor == onColor;
+
+  @override
+  int get hashCode => Object.hash(color, onColor);
 }
 
 /// Theme extension holding order-status colors so screens resolve them from the
