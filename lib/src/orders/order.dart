@@ -1,5 +1,3 @@
-import 'dart:developer' as developer;
-
 import '../data/app_database.dart' as drift;
 import 'order_status.dart';
 import 'proof_event.dart';
@@ -53,12 +51,8 @@ class LaundryOrder {
   }
 
   /// Hydrates a [LaundryOrder] from a Drift `orders` row plus its joined
-  /// `proof_events` rows.
-  ///
-  /// Postgres has six order-status strings; the UI enum has four. `received`
-  /// folds into `inProgress` and `out_for_delivery` folds into
-  /// `readyForDelivery` — TODO(plan-3b-status-chips): split these out once
-  /// the dashboard chip set is expanded.
+  /// `proof_events` rows. The six-to-four status folding and the unknown-value
+  /// degrade live on [OrderStatus.fromDbString] / [ProofEventType.fromDbString].
   ///
   /// Photos are intentionally dropped here — `photoPaths` is always
   /// `const []` because the photo binaries live in Supabase Storage and
@@ -73,7 +67,7 @@ class LaundryOrder {
       customerId: row.customerId,
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
-      status: _statusFromString(row.status),
+      status: OrderStatus.fromDbString(row.status),
       timeLabel: computeTimeLabel(
         scheduledFor: row.scheduledFor,
         createdAt: row.createdAt,
@@ -88,7 +82,7 @@ class LaundryOrder {
       proofEvents: events
           .map((e) => ProofEvent(
                 id: e.id,
-                type: _proofTypeFromString(e.type),
+                type: ProofEventType.fromDbString(e.type),
                 capturedAt: e.capturedAt,
                 count: e.itemCount,
                 photoPaths: const [],
@@ -96,47 +90,6 @@ class LaundryOrder {
               ))
           .toList(growable: false),
     );
-  }
-
-  static OrderStatus _statusFromString(String s) {
-    switch (s) {
-      case 'pending_pickup':
-        return OrderStatus.pendingPickup;
-      case 'received':
-      case 'in_progress':
-        return OrderStatus.inProgress;
-      case 'ready':
-      case 'out_for_delivery':
-        return OrderStatus.readyForDelivery;
-      case 'completed':
-        return OrderStatus.completed;
-      default:
-        // A status added server-side before this app is updated must NOT crash
-        // the whole orders stream (which would blank the rider's list and block
-        // all work). Degrade gracefully to pendingPickup and log for diagnosis.
-        developer.log(
-          'Unknown order status "$s" — defaulting to pendingPickup.',
-          name: 'LaundryOrder',
-        );
-        return OrderStatus.pendingPickup;
-    }
-  }
-
-  static ProofEventType _proofTypeFromString(String s) {
-    switch (s) {
-      case 'pickup':
-        return ProofEventType.pickup;
-      case 'delivery':
-        return ProofEventType.delivery;
-      default:
-        // Same rationale as _statusFromString: never crash the stream on an
-        // unrecognized proof-event type synced from a newer backend.
-        developer.log(
-          'Unknown proof event type "$s" — defaulting to pickup.',
-          name: 'LaundryOrder',
-        );
-        return ProofEventType.pickup;
-    }
   }
 
   static String _formatTime(DateTime t) {

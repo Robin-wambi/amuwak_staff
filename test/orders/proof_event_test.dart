@@ -78,6 +78,16 @@ void main() {
       expect(a.notes, isNull);
     });
 
+    test('ProofEventType.fromDbString maps known types', () {
+      expect(ProofEventType.fromDbString('pickup'), ProofEventType.pickup);
+      expect(ProofEventType.fromDbString('delivery'), ProofEventType.delivery);
+    });
+
+    test('ProofEventType.fromDbString degrades an unknown type to pickup', () {
+      // Must not throw — same stream-safety rationale as OrderStatus.
+      expect(ProofEventType.fromDbString('banana'), ProofEventType.pickup);
+    });
+
     test('id is part of equality + hashCode', () {
       final a = ProofEvent(
         id: 'pe-1',
