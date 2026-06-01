@@ -38,9 +38,16 @@ enum OrderStatus {
       };
 
   static OrderStatus _degradeUnknown(String s) {
+    // Logged at WARNING (level 900), not the default level: a server status the
+    // UI can't represent is operationally significant, not noise. In particular
+    // a terminal state like "cancelled" degrades to pendingPickup and would
+    // surface a cancelled order in the rider's ACTIVE list — ops should see
+    // this. TODO(plan-3b-status-chips): add the missing enum values.
     developer.log(
-      'Unknown order status "$s" — defaulting to pendingPickup.',
+      'Unrecognized order status "$s" — showing it as pendingPickup so the '
+      'orders stream keeps working.',
       name: 'OrderStatus',
+      level: 900,
     );
     return OrderStatus.pendingPickup;
   }
