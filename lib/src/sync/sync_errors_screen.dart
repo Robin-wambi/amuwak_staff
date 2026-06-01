@@ -224,6 +224,13 @@ class _PullErrorTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      // Opt out of the global branded CardTheme (orange hairline + 22px radius);
+      // these are dense diagnostic list rows, not brand content cards.
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       child: ListTile(
         title: Text(
           '${row.forTable} · server row',
