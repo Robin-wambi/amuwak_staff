@@ -73,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     child: Icon(
                       Icons.local_laundry_service_rounded,
-                      color: colorScheme.onSurface,
+                      color: colorScheme.onPrimary,
                       size: 46,
                     ),
                   ),
