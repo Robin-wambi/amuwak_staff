@@ -66,6 +66,32 @@ void main() {
       expect(OrderStatus.completed.toDbString(), 'completed');
     });
 
+    test('fromDbString maps every Postgres status, including aliases', () {
+      // received → inProgress and out_for_delivery → readyForDelivery are the
+      // intentional six-to-four aliases (see mapper TODO).
+      expect(OrderStatus.fromDbString('pending_pickup'),
+          OrderStatus.pendingPickup);
+      expect(OrderStatus.fromDbString('received'), OrderStatus.inProgress);
+      expect(OrderStatus.fromDbString('in_progress'), OrderStatus.inProgress);
+      expect(OrderStatus.fromDbString('ready'), OrderStatus.readyForDelivery);
+      expect(OrderStatus.fromDbString('out_for_delivery'),
+          OrderStatus.readyForDelivery);
+      expect(OrderStatus.fromDbString('completed'), OrderStatus.completed);
+    });
+
+    test('fromDbString degrades an unknown status to pendingPickup', () {
+      // Must not throw — a status added server-side before an app update would
+      // otherwise crash the whole orders stream.
+      expect(OrderStatus.fromDbString('banana'), OrderStatus.pendingPickup);
+    });
+
+    test('toDbString round-trips through fromDbString', () {
+      for (final s in OrderStatus.values) {
+        expect(OrderStatus.fromDbString(s.toDbString()), s,
+            reason: 'for ${s.name}');
+      }
+    });
+
     test('toDbString round-trips through LaundryOrder.fromDriftRow', () {
       for (final s in OrderStatus.values) {
         final row = _orderRow(status: s.toDbString());
