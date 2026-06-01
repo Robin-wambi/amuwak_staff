@@ -1,4 +1,28 @@
-enum ProofEventType { pickup, delivery }
+import 'dart:developer' as developer;
+
+enum ProofEventType {
+  pickup,
+  delivery;
+
+  /// Maps a Postgres `proof_events.type` string to the UI enum.
+  ///
+  /// Same stream-safety rationale as `OrderStatus.fromDbString`: an unknown
+  /// type synced from a newer backend degrades to [pickup] + a log rather than
+  /// throwing, so it can never crash the orders stream.
+  static ProofEventType fromDbString(String s) => switch (s) {
+        'pickup' => ProofEventType.pickup,
+        'delivery' => ProofEventType.delivery,
+        _ => _degradeUnknown(s),
+      };
+
+  static ProofEventType _degradeUnknown(String s) {
+    developer.log(
+      'Unknown proof event type "$s" — defaulting to pickup.',
+      name: 'ProofEventType',
+    );
+    return ProofEventType.pickup;
+  }
+}
 
 class ProofEvent {
   const ProofEvent({
