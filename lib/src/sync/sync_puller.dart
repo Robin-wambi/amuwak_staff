@@ -77,7 +77,11 @@ class SyncPuller {
     final rows = await fetch(table, since);
     if (rows.isEmpty) return 0;
 
-    if (deadLetter == null) {
+    // Capture the nullable field into a local so Dart's flow analysis can
+    // narrow it across the guard below — the per-row path then uses `dl`
+    // directly instead of a `deadLetter!` bang.
+    final dl = deadLetter;
+    if (dl == null) {
       // Legacy all-or-nothing path.
       DateTime maxWatermark = since;
       try {
@@ -138,7 +142,7 @@ class SyncPuller {
           error: f.error,
           stackTrace: f.stack,
         );
-        await deadLetter!.insert(
+        await dl.insert(
           forTable: f.tableName,
           rowPayload: f.row,
           errorText: f.error.toString(),
