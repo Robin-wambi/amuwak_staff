@@ -564,7 +564,7 @@ class _AccountTab extends StatelessWidget {
       ),
       children: [
         AppCard(
-          padding: const EdgeInsets.all(AppSpacing.lg + 2), // original was 18
+          padding: const EdgeInsets.all(AppSpacing.lg2),
           child: Row(
             children: [
               CircleAvatar(
@@ -608,7 +608,7 @@ class _AccountTab extends StatelessWidget {
           label: 'Shift',
           value: 'Today',
         ),
-        const SizedBox(height: AppSpacing.lg + 2), // original was 18
+        const SizedBox(height: AppSpacing.lg2),
         OutlinedButton.icon(
           onPressed: onSignOut,
           icon: const Icon(Icons.logout_rounded),
@@ -692,7 +692,7 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg + 2), // original was 18
+      padding: const EdgeInsets.all(AppSpacing.lg2),
       decoration: BoxDecoration(
         color: AppColors.surfaceBrand,
         borderRadius: BorderRadius.circular(AppRadii.card),

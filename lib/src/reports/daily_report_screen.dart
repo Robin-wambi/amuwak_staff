@@ -57,7 +57,7 @@ class DailyReportView extends StatelessWidget {
         ),
         children: [
           Container(
-            padding: const EdgeInsets.all(AppSpacing.lg + 2),
+            padding: const EdgeInsets.all(AppSpacing.lg2),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(AppRadii.card),
