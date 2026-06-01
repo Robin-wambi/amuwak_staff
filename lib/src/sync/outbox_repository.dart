@@ -122,20 +122,27 @@ class OutboxRepository {
   /// permanently-failing row cannot head-of-line block the rest of the
   /// queue. Recovery from dead_letter is a separate manual / UI flow.
   Future<void> markFailed(String id, String error,
-      {int deadLetterAfter = 5}) async {
-    final row =
-        await (_db.select(_db.outbox)..where((t) => t.id.equals(id)))
-            .getSingleOrNull();
-    if (row == null) return;
-    final nextRetry = row.retryCount + 1;
-    final newStatus = nextRetry > deadLetterAfter ? 'dead_letter' : 'failed';
-    await (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
-      OutboxCompanion(
-        retryCount: Value(nextRetry),
-        lastError: Value(error),
-        status: Value(newStatus),
-        lastAttemptedAt: Value(DateTime.now()),
-      ),
-    );
+      {int deadLetterAfter = 5}) {
+    // The read (current retry_count) and the write (count + 1, new status) must
+    // be atomic: a concurrent markFailed reading the same count would otherwise
+    // clobber this one's increment and lose a retry. A transaction serializes
+    // the pair so the invariant is enforced at the storage layer rather than
+    // relying on the caller's drain-concurrency discipline.
+    return _db.transaction(() async {
+      final row =
+          await (_db.select(_db.outbox)..where((t) => t.id.equals(id)))
+              .getSingleOrNull();
+      if (row == null) return;
+      final nextRetry = row.retryCount + 1;
+      final newStatus = nextRetry > deadLetterAfter ? 'dead_letter' : 'failed';
+      await (_db.update(_db.outbox)..where((t) => t.id.equals(id))).write(
+        OutboxCompanion(
+          retryCount: Value(nextRetry),
+          lastError: Value(error),
+          status: Value(newStatus),
+          lastAttemptedAt: Value(DateTime.now()),
+        ),
+      );
+    });
   }
 }

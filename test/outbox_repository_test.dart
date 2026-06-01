@@ -52,6 +52,25 @@ void main() {
     expect(rows.first.status, 'failed');
   });
 
+  test('concurrent markFailed calls do not lose retry increments', () async {
+    await repo.enqueue(
+      id: 'race', forTable: 'orders', op: 'insert',
+      rowId: 'r', payload: const {},
+    );
+    // Fire several failures concurrently. A non-atomic read-modify-write would
+    // let each call read the same retry_count and clobber the others' writes,
+    // landing well below 5. An atomic increment must reach exactly 5.
+    await Future.wait([
+      for (var i = 0; i < 5; i++)
+        repo.markFailed('race', 'boom $i', deadLetterAfter: 100),
+    ]);
+    final row =
+        await (db.select(db.outbox)..where((t) => t.id.equals('race')))
+            .getSingle();
+    expect(row.retryCount, 5);
+    expect(row.status, 'failed');
+  });
+
   group('dead-letter surface (Plan 4 Task 4)', () {
     test('watchDeadLettered emits rows in dead_letter status', () async {
       await repo.enqueue(
