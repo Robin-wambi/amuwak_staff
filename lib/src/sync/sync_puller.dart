@@ -156,51 +156,14 @@ class SyncPuller {
     return DateTime.tryParse(v);
   }
 
-  /// Upserts ONE row outside a `batch`.  Mirrors `_upsertRow` but uses the
-  /// single-row insert API so we can catch per-row failures.
-  Future<void> _upsertRowSingle(String table, Map<String, dynamic> row) async {
-    switch (table) {
-      case 'staff':
-        await db.into(db.staff).insert(_staffFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'customers':
-        await db.into(db.customers).insert(_customersFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'orders':
-        await db.into(db.orders).insert(_ordersFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'proof_events':
-        await db.into(db.proofEvents).insert(_proofEventsFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'order_status_events':
-        await db.into(db.orderStatusEvents)
-            .insert(_orderStatusEventsFromJson(row),
-                mode: InsertMode.insertOrReplace);
-        break;
-      case 'proof_photos':
-        await db.into(db.proofPhotos).insert(_proofPhotosFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'issues':
-        await db.into(db.issues).insert(_issuesFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'shifts':
-        await db.into(db.shifts).insert(_shiftsFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      case 'valid_transitions':
-        await db.into(db.validTransitions).insert(_validTransitionsFromJson(row),
-            mode: InsertMode.insertOrReplace);
-        break;
-      default:
-        throw StateError(
-            'SyncPuller has no upsert mapper for table "$table"');
-    }
+  /// Upserts ONE row so per-row failures can be caught and dead-lettered
+  /// individually. Delegates to [_upsertRow] via a one-row `batch` so the
+  /// table dispatch lives in exactly one place — adding a synced table only
+  /// touches [_upsertRow]. A mapper exception (the failure mode the per-row
+  /// path quarantines) is thrown while building the companion, before any DB
+  /// write, so it still surfaces to the caller's try/catch unchanged.
+  Future<void> _upsertRowSingle(String table, Map<String, dynamic> row) {
+    return db.batch((batch) => _upsertRow(batch, table, row));
   }
 
   Future<int> pullAll() async {
