@@ -210,7 +210,18 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       if (!mounted) return;
     }
-    if (newOrder == null || !mounted) return;
+    if (!mounted) return;
+    if (newOrder == null) {
+      // The order was written but the stream hadn't re-emitted within the
+      // poll window (slow device / heavy load). Don't strand the rider on a
+      // silent dead-end — the order exists; point them at the list.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order created — open it from the list to start pickup.'),
+        ),
+      );
+      return;
+    }
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PickupCaptureScreen(
