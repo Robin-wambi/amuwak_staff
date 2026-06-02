@@ -157,7 +157,7 @@ class _ManualEntryView extends StatelessWidget {
             controller: controller,
             textCapitalization: TextCapitalization.characters,
             decoration: const InputDecoration(
-              hintText: 'e.g. AMW-0421',
+              hintText: 'e.g. AMW-2026-0042',
               border: OutlineInputBorder(),
             ),
             onFieldSubmitted: (_) => onSubmit(),

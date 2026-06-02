@@ -12,5 +12,24 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<String> defaultOrderCode([SupabaseClient? client]) async {
   final c = client ?? Supabase.instance.client;
   final result = await c.rpc('next_order_code');
-  return result as String;
+  return parseOrderCodeRpcResult(result);
+}
+
+/// Normalises whatever `rpc('next_order_code')` decodes to into the code string.
+///
+/// PostgREST returns a bare scalar for a `RETURNS text` function, so the common
+/// case is a plain [String]. We also tolerate the row-set shape
+/// (`[{next_order_code: ...}]`) and the single-object shape in case the SDK or
+/// PostgREST serialisation differs by version — turning an otherwise cryptic
+/// `TypeError` at this network boundary into a clear, diagnosable failure.
+String parseOrderCodeRpcResult(Object? result) {
+  if (result is String) return result;
+  if (result is List && result.isNotEmpty) {
+    return parseOrderCodeRpcResult(result.first);
+  }
+  if (result is Map && result.values.isNotEmpty) {
+    final value = result.values.first;
+    if (value is String) return value;
+  }
+  throw StateError('next_order_code RPC returned an unexpected shape: $result');
 }

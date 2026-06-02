@@ -19,8 +19,11 @@ CREATE TABLE order_code_counters (
 
 -- Only the SECURITY DEFINER function below should ever touch this table.
 -- Enable RLS with no policies so direct access from `authenticated` is denied;
--- the definer function bypasses RLS to do its single atomic upsert.
+-- the definer function bypasses RLS to do its single atomic upsert. The REVOKE
+-- is defense-in-depth: it makes the "no direct access" intent explicit so a
+-- future SELECT policy can't silently expose the counter values.
 ALTER TABLE order_code_counters ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE order_code_counters FROM PUBLIC, anon, authenticated;
 
 CREATE FUNCTION next_order_code() RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER

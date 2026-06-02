@@ -145,6 +145,45 @@ void main() {
     expect(orders.single.orderCode, 'AMW-2026-0042');
   });
 
+  testWidgets(
+      'a failed order-code reservation surfaces an error and writes no order; '
+      'a retry then succeeds', (tester) async {
+    var calls = 0;
+    Future<String> flakyGenerator() async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return 'AMW-2026-0042';
+    }
+
+    final handle =
+        await pumpFormAndOpen(tester, orderCodeGenerator: flakyGenerator);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // First attempt: the RPC throws. The form stays open with an error and no
+    // order row is written.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pump();
+    expect(find.textContaining('Could not reserve an order number'),
+        findsOneWidget);
+    expect(handle.popped, isNull);
+    expect(await db.select(db.orders).get(), isEmpty);
+
+    // Second attempt: the RPC succeeds and the order is written with its code.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+    expect(handle.popped, isNotNull);
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.orderCode, 'AMW-2026-0042');
+    expect(calls, 2);
+  });
+
   testWidgets('Cancel returns null and writes nothing', (tester) async {
     final handle = await pumpFormAndOpen(tester);
     await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
