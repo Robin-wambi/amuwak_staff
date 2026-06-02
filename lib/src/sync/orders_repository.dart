@@ -84,14 +84,27 @@ class OrdersRepository {
       final match =
           rows.where((r) => r['deleted_at'] == null).toList(growable: false);
       if (match.isEmpty) return null;
-      final proofRows = await _supabase
-          .from('proof_events')
-          .select()
-          .eq('order_id', orderId);
-      return LaundryOrder.fromSupabase(
-        match.first,
-        proofRows.cast<Map<String, dynamic>>(),
-      );
+      // Mirror watchAll: a transient failure on the secondary proof_events
+      // fetch must degrade to the order without proof events, not error the
+      // stream permanently. The orders stream re-emits and recovers.
+      List<Map<String, dynamic>> proofRows;
+      try {
+        proofRows = (await _supabase
+                .from('proof_events')
+                .select()
+                .eq('order_id', orderId))
+            .cast<Map<String, dynamic>>();
+      } catch (e, st) {
+        developer.log(
+          'watchById: proof_events fetch failed; showing order without '
+          'proof events this cycle.',
+          name: 'OrdersRepository',
+          error: e,
+          stackTrace: st,
+        );
+        proofRows = const [];
+      }
+      return LaundryOrder.fromSupabase(match.first, proofRows);
     });
   }
 
