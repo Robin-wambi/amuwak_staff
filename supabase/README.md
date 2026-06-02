@@ -47,6 +47,28 @@ $env:SUPABASE_DB_PASSWORD = (Select-String '^SUPABASE_DB_PASSWORD=' .env.local).
 supabase db push
 ```
 
+### Deploy order: push migrations BEFORE merging app code that depends on them
+
+Migrations are applied manually (above); the PWA auto-deploys on every push to
+`main` (`.github/workflows/deploy-pwa.yml`). The DB password never goes into CI,
+so the two steps can't be coupled there — sequencing is on us.
+
+The rule: **`supabase db push` first, then merge.** App code that calls a new
+function/table will fail until the migration is live. New migrations are
+additive and backward-compatible (old app builds don't reference the new
+objects), so applying them to production ahead of the merge is safe and carries
+no risk to the running app.
+
+Concretely, for `0017` (the `next_order_code()` RPC that order creation calls):
+
+1. `supabase db push` — adds the counter table + function (nothing calls it yet).
+2. Verify: `select next_order_code();` returns `AMW-<year>-0001`.
+3. Merge the PR → the PWA redeploys with the RPC already live.
+
+If step 1 is skipped, order creation surfaces a retryable "Could not reserve an
+order number" error (not a crash), but riders are blocked until the migration is
+applied.
+
 ### Running pgTAP tests
 
 The pooled connection string is in `supabase/.temp/pooler-url`. To run a single
@@ -80,6 +102,7 @@ Get-ChildItem supabase/tests/*.sql | Sort-Object Name | ForEach-Object {
 | `migrations/0007_…`     | RLS helper + per-table policies                           |
 | `migrations/0008_…`     | `proof-photos` storage bucket + RLS                       |
 | `migrations/0009_…`     | `custom_access_token_hook` for staff role claim           |
+| `migrations/0017_…`     | `order_code_counters` + `next_order_code()` RPC (sequential `AMW-YYYY-NNNN` codes) |
 | `tests/`                | Sibling pgTAP test per migration                          |
 | `seed.sql`              | (Empty placeholder — seeds embedded in migrations.)       |
 
