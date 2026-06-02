@@ -201,4 +201,117 @@ void main() {
       expect(order.proofEvents, isEmpty);
     });
   });
+
+  group('hydrateOrders', () {
+    test('drops soft-deleted orders and groups proofs by order_id', () {
+      final orders = hydrateOrders(
+        <Map<String, dynamic>>[
+          _orderRow(id: 'o1'),
+          _orderRow(id: 'o2'),
+          _orderRow(id: 'o3', deletedAt: '2026-06-02T12:00:00.000Z'),
+        ],
+        <Map<String, dynamic>>[
+          _proofRow(id: 'p1', orderId: 'o1', type: 'pickup'),
+          _proofRow(id: 'p2', orderId: 'o2', type: 'pickup'),
+          _proofRow(id: 'p3', orderId: 'o2', type: 'delivery'),
+          // Proof for a deleted order is simply ignored (no matching order).
+          _proofRow(id: 'p4', orderId: 'o3', type: 'pickup'),
+        ],
+      );
+
+      // o3 (soft-deleted) is excluded.
+      expect(orders.map((o) => o.orderId), ['o1', 'o2']);
+      // Proofs are routed to the right order.
+      expect(orders[0].proofEvents.map((e) => e.id), ['p1']);
+      expect(orders[1].proofEvents.map((e) => e.id).toSet(), {'p2', 'p3'});
+    });
+
+    test('order with no proofs gets an empty proofEvents list', () {
+      final orders = hydrateOrders(
+        <Map<String, dynamic>>[_orderRow(id: 'o1')],
+        const <Map<String, dynamic>>[],
+      );
+      expect(orders.single.proofEvents, isEmpty);
+    });
+
+    test('empty / all-deleted inputs yield an empty list', () {
+      expect(hydrateOrders(const [], const []), isEmpty);
+      expect(
+        hydrateOrders(
+          <Map<String, dynamic>>[
+            _orderRow(id: 'o1', deletedAt: '2026-06-02T12:00:00.000Z'),
+          ],
+          const <Map<String, dynamic>>[],
+        ),
+        isEmpty,
+      );
+    });
+  });
+
+  group('hydrateOrder', () {
+    test('returns the order with its proofs', () {
+      final order = hydrateOrder(
+        <Map<String, dynamic>>[_orderRow(id: 'o1')],
+        <Map<String, dynamic>>[
+          _proofRow(id: 'p1', orderId: 'o1', type: 'pickup'),
+        ],
+      );
+      expect(order, isNotNull);
+      expect(order!.orderId, 'o1');
+      expect(order.proofEvents.single.id, 'p1');
+    });
+
+    test('returns null when the row set is empty', () {
+      expect(hydrateOrder(const [], const []), isNull);
+    });
+
+    test('returns null when the only matching order is soft-deleted', () {
+      final order = hydrateOrder(
+        <Map<String, dynamic>>[
+          _orderRow(id: 'o1', deletedAt: '2026-06-02T12:00:00.000Z'),
+        ],
+        const <Map<String, dynamic>>[],
+      );
+      expect(order, isNull);
+    });
+  });
 }
+
+/// Minimal `orders` row for hydration tests.
+Map<String, dynamic> _orderRow({required String id, String? deletedAt}) => {
+      'id': id,
+      'order_code': 'AMW-$id',
+      'customer_id': 'c1',
+      'customer_name': 'Ada',
+      'phone': '0700',
+      'address': 'x',
+      'service_type': 'Wash & Iron',
+      'status': 'pending_pickup',
+      'intake_method': 'driver_pickup',
+      'fulfillment_method': 'delivery',
+      'item_count': 1,
+      'notes': null,
+      'scheduled_for': null,
+      'created_at': '2026-06-02T09:00:00.000Z',
+      'updated_at': '2026-06-02T09:00:00.000Z',
+      'deleted_at': deletedAt,
+    };
+
+/// Minimal non-deleted `proof_events` row for hydration tests.
+Map<String, dynamic> _proofRow({
+  required String id,
+  required String orderId,
+  required String type,
+}) =>
+    {
+      'id': id,
+      'order_id': orderId,
+      'type': type,
+      'captured_at': '2026-06-02T10:00:00.000Z',
+      'item_count': 1,
+      'notes': null,
+      'captured_by': 's1',
+      'created_at': '2026-06-02T10:00:00.000Z',
+      'updated_at': '2026-06-02T10:00:00.000Z',
+      'deleted_at': null,
+    };
