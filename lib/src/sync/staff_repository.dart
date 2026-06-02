@@ -24,11 +24,17 @@ class StaffRepository {
   }
 
   Stream<StaffData?> watchById(String id) {
+    // Filter soft-deleted client-side (same as watchAll) so a deactivated/
+    // tombstoned staff record doesn't surface on detail screens. `.stream()`
+    // can't express `IS NULL`.
     return _supabase
         .from('staff')
         .stream(primaryKey: ['id'])
         .eq('id', id)
-        .map((rows) => rows.isEmpty ? null : staffFromSupabase(rows.first));
+        .map((rows) {
+      final live = rows.where((r) => r['deleted_at'] == null);
+      return live.isEmpty ? null : staffFromSupabase(live.first);
+    });
   }
 }
 

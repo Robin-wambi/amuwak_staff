@@ -48,11 +48,14 @@ class CustomersRepository {
   /// the current snapshot without subscribing (e.g. phone-on-blur dedup in
   /// the New Pickup form).
   Future<List<Customer>> getAll() async {
-    final rows = await _supabase.from('customers').select().order('name');
-    return rows
-        .where((r) => r['deleted_at'] == null)
-        .map(customerFromSupabase)
-        .toList(growable: false);
+    // One-shot select (not a stream) so we can exclude soft-deleted rows
+    // server-side rather than fetching them and filtering client-side.
+    final rows = await _supabase
+        .from('customers')
+        .select()
+        .isFilter('deleted_at', null)
+        .order('name');
+    return rows.map(customerFromSupabase).toList(growable: false);
   }
 
   Future<void> upsertCustomer(Customer customer) async {
