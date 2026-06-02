@@ -27,7 +27,7 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.proofEventsRepo,
     required this.actorStaffId,
     this.clock = _defaultClock,
-    this.proofEventIdGenerator = defaultUuidV4,
+    this.proofEventIdGenerator = defaultUuidV7,
   });
 
   final LaundryOrder order;
