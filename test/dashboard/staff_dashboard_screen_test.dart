@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
@@ -30,6 +32,12 @@ import 'package:amuwak_staff/src/sync/sync_status.dart';
 /// that `StreamQueryStore.markAsClosed` posts when a Drift stream is
 /// cancelled, which would fail the Flutter test framework's
 /// `!timersPending` invariant.
+/// Online-only mode: the read/write repos resolve the Supabase client via
+/// [supabaseClientProvider]. Tests never initialise `Supabase.instance`, so
+/// override it with a mock — the repo constructors only store the client (no
+/// calls), which is enough for navigation tests like "open New pickup".
+class _MockSupabaseClient extends Mock implements SupabaseClient {}
+
 Future<void> pumpDashboardWithDb(
   WidgetTester tester, {
   bool lostPhoto = false,
@@ -38,6 +46,7 @@ Future<void> pumpDashboardWithDb(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
         // Provide a trivial in-memory implementation of every Drift-backed
         // stream so that no real Drift stream subscriptions are opened.
         pendingOutboxCountProvider
@@ -234,7 +243,10 @@ void main() {
       final headerTop = tester.getTopLeft(find.text('Welcome back'));
       expect(bannerTop.dy, lessThan(headerTop.dy));
     });
-  });
+  },
+      skip: 'Online-only mode: the SyncStatusBanner (offline/pending/error '
+          'indicator) was removed from the dashboard. Restore the banner in '
+          'StaffDashboardScreen to re-enable these tests.');
 
   // ------------------------------------------------------------------ Task 9
 
@@ -570,6 +582,9 @@ void main() {
       expect(find.byTooltip('Sync errors'), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
     },
+    // Online-only mode: the sync-errors badge was removed from the dashboard
+    // AppBar (no outbox/dead-letter queue online).
+    skip: true,
   );
 
   testWidgets(
@@ -582,5 +597,8 @@ void main() {
 
       expect(find.byType(SyncErrorsScreen), findsOneWidget);
     },
+    // Online-only mode: the sync-errors badge/screen entry point was removed
+    // from the dashboard AppBar.
+    skip: true,
   );
 }

@@ -92,6 +92,52 @@ class LaundryOrder {
     );
   }
 
+  /// Hydrates a [LaundryOrder] from a Supabase `orders` row (snake_case JSON)
+  /// plus its joined `proof_events` rows. The online-only read path's
+  /// counterpart to [fromDriftRow] — same status/service folding and the same
+  /// "photos live in Storage, drop them here" rule (`photoPaths` is `const []`).
+  /// Soft-deleted proof rows (`deleted_at != null`) are dropped so they don't
+  /// surface to the rider.
+  factory LaundryOrder.fromSupabase(
+    Map<String, dynamic> row,
+    List<Map<String, dynamic>> proofRows,
+  ) {
+    final createdAt = DateTime.parse(row['created_at'] as String);
+    final scheduledFor = row['scheduled_for'] == null
+        ? null
+        : DateTime.parse(row['scheduled_for'] as String);
+    return LaundryOrder(
+      orderId: row['id'] as String,
+      orderCode: row['order_code'] as String?,
+      customerId: row['customer_id'] as String?,
+      customerName: row['customer_name'] as String,
+      serviceType: ServiceType.fromDbString(row['service_type'] as String),
+      status: OrderStatus.fromDbString(row['status'] as String),
+      timeLabel: computeTimeLabel(
+        scheduledFor: scheduledFor,
+        createdAt: createdAt,
+      ),
+      itemCount: row['item_count'] as int,
+      phone: row['phone'] as String,
+      address: row['address'] as String,
+      notes: (row['notes'] as String?) ?? '',
+      intakeMethod: (row['intake_method'] as String?) ?? 'driver_pickup',
+      fulfillmentMethod: (row['fulfillment_method'] as String?) ?? 'delivery',
+      scheduledFor: scheduledFor,
+      proofEvents: proofRows
+          .where((e) => e['deleted_at'] == null)
+          .map((e) => ProofEvent(
+                id: e['id'] as String,
+                type: ProofEventType.fromDbString(e['type'] as String),
+                capturedAt: DateTime.parse(e['captured_at'] as String),
+                count: e['item_count'] as int,
+                photoPaths: const [],
+                notes: e['notes'] as String?,
+              ))
+          .toList(growable: false),
+    );
+  }
+
   static String _formatTime(DateTime t) {
     final hour12 = switch (t.hour) {
       0 => 12,
