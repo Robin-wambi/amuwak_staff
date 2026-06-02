@@ -25,8 +25,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // from firing on a widget that is mid-disposal.
   bool _matched = false;
 
+  // Accepts both the current `AMW-2026-0042` (prefix-year-counter) form and the
+  // legacy `AMW-1024` digits-only form, so older printed tags still validate.
   static final RegExp _orderIdPattern =
-      RegExp(r'^AMW-\d+$', caseSensitive: false);
+      RegExp(r'^AMW-(\d{4}-)?\d+$', caseSensitive: false);
 
   void _handleDetected(String value) {
     if (_matched || !mounted) return;

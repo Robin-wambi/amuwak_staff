@@ -28,7 +28,10 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<_FormHandle> pumpFormAndOpen(WidgetTester tester) async {
+  Future<_FormHandle> pumpFormAndOpen(
+    WidgetTester tester, {
+    Future<String> Function()? orderCodeGenerator,
+  }) async {
     final handle = _FormHandle();
     await tester.pumpWidget(
       MaterialApp(
@@ -47,6 +50,8 @@ void main() {
                         clock: () => DateTime(2026, 5, 25, 10),
                         orderIdGenerator: () => 'uuid-order-1',
                         customerIdGenerator: () => 'uuid-cust-1',
+                        orderCodeGenerator:
+                            orderCodeGenerator ?? () async => 'AMW-2026-0001',
                         geolocate: () async => null,
                         reverseGeocode: (_) async => null,
                       ),
@@ -114,7 +119,30 @@ void main() {
     expect(orders.single.serviceType, ServiceType.washAndIron.toDbString());
     expect(orders.single.status, 'pending_pickup');
     expect(orders.single.scheduledFor, isNull);
-    expect(orders.single.orderCode, startsWith('AMW-'));
+    // order_code is whatever the server-backed generator returns, not a
+    // locally-derived value.
+    expect(orders.single.orderCode, 'AMW-2026-0001');
+  });
+
+  testWidgets('order_code comes from the injected (server) generator',
+      (tester) async {
+    final handle =
+        await pumpFormAndOpen(tester, orderCodeGenerator: () async => 'AMW-2026-0042');
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    expect(handle.popped, isNotNull);
+    final orders = await db.select(db.orders).get();
+    expect(orders.single.orderCode, 'AMW-2026-0042');
   });
 
   testWidgets('Cancel returns null and writes nothing', (tester) async {
@@ -260,6 +288,7 @@ void main() {
                         clock: () => DateTime(2026, 5, 25, 10),
                         orderIdGenerator: () => 'uuid-order-1',
                         customerIdGenerator: () => 'uuid-cust-1',
+                        orderCodeGenerator: () async => 'AMW-2026-0001',
                         geolocate: () async => const GeoLocation(
                             latitude: 0.3163, longitude: 32.5822),
                         reverseGeocode: (loc) async => 'Detected address, Kampala',
@@ -306,6 +335,7 @@ void main() {
                       clock: () => DateTime(2026, 5, 25, 10),
                       orderIdGenerator: () => 'uuid-order-1',
                       customerIdGenerator: () => 'uuid-cust-1',
+                      orderCodeGenerator: () async => 'AMW-2026-0001',
                       geolocate: () async => const GeoLocation(
                           latitude: 0.3163, longitude: 32.5822),
                       reverseGeocode: (_) async => null,
@@ -356,6 +386,7 @@ void main() {
                         clock: () => DateTime(2026, 5, 25, 10),
                         orderIdGenerator: () => 'uuid-order-1',
                         customerIdGenerator: () => 'uuid-cust-1',
+                        orderCodeGenerator: () async => 'AMW-2026-0001',
                         geolocate: () async => null,
                         reverseGeocode: (_) async => null,
                       ),

@@ -23,6 +23,7 @@ class NewPickupScreen extends StatefulWidget {
     required this.clock,
     required this.orderIdGenerator,
     required this.customerIdGenerator,
+    required this.orderCodeGenerator,
     required this.geolocate,
     required this.reverseGeocode,
   });
@@ -33,6 +34,12 @@ class NewPickupScreen extends StatefulWidget {
   final DateTime Function() clock;
   final String Function() orderIdGenerator;
   final String Function() customerIdGenerator;
+
+  /// Reserves the next human-facing `order_code` (e.g. `AMW-2026-0042`).
+  /// Production wires this to a Supabase RPC backed by a per-year counter so
+  /// the code is server-assigned and sequential; tests inject a deterministic
+  /// stand-in. Async because it round-trips to the server.
+  final Future<String> Function() orderCodeGenerator;
   final GeolocateFn geolocate;
   final ReverseGeocodeFn reverseGeocode;
 
@@ -53,6 +60,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // create a duplicate customer row by tapping "Create pickup" again.
   String? _pendingCustomerId;
   String? _pendingOrderId;
+  String? _pendingOrderCode;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
   // Which quick-chip preset is currently selected, if any. Cleared when
@@ -242,10 +250,25 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       return;
     }
     final orderId = _pendingOrderId ??= widget.orderIdGenerator();
+    // `??=` so a retried submit reuses the first code instead of burning a
+    // second value off the server-side counter.
+    final String orderCode;
+    try {
+      orderCode = _pendingOrderCode ??= await widget.orderCodeGenerator();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not reserve an order number. '
+                'Check your connection and tap Create pickup again.')),
+      );
+      return;
+    }
     final scheduled = _scheduledFor;
     final order = LaundryOrder(
       orderId: orderId,
-      orderCode: 'AMW-${now.millisecondsSinceEpoch}',
+      orderCode: orderCode,
       customerId: customer.id,
       customerName: customer.name,
       phone: customer.phone,
