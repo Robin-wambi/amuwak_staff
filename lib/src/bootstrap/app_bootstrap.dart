@@ -14,16 +14,17 @@ class AppBootstrap {
       url: config.supabaseUrl,
       anonKey: config.supabaseAnonKey,
     );
-    // The seeder runs against its own short-lived AppDatabase instance and
-    // closes it before the Riverpod-managed instance is ever created — this
-    // avoids two long-lived SQLite connections (and the cross-instance
-    // stream-invalidation gap) sharing the same file.
-    final db = AppDatabase();
-    try {
-      await runSeed(db, OrdersSeeder());
-    } finally {
-      await db.close();
-    }
+    // ONLINE-ONLY: the local Drift database is no longer used at runtime, so we
+    // skip opening/seeding it here. Data comes straight from Supabase. Restore
+    // the block below (and re-enable the sync orchestrator) to bring offline
+    // back:
+    //
+    //   final db = AppDatabase();
+    //   try {
+    //     await runSeed(db, OrdersSeeder());
+    //   } finally {
+    //     await db.close();
+    //   }
   }
 
   /// Test-visible seed entry — accepts an injected DB + seeder so tests

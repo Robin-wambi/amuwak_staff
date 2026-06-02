@@ -16,36 +16,46 @@ import 'auth_service.dart';
 /// 3. `AuthService.signOut()` — drops the Supabase session last so the
 ///    truncate above isn't running against an already-revoked JWT.
 ///
-/// Takes the three dependencies directly rather than a [Ref] /
-/// [ProviderContainer], which keeps the function pure-Dart and lets
-/// tests mock with mocktail. UI callers resolve each via
-/// `ref.read(...)` at the call site (a single line each).
+/// ONLINE-ONLY: the offline teardown is disabled. [orchestrator] and [db] are
+/// now optional and ignored — there is no running sync engine to stop and no
+/// local database to truncate. Only [auth] is required. To restore offline,
+/// make orchestrator/db required again and uncomment the teardown below
+/// (and the [_truncateAllTables] helper in the OFFLINE block).
+///
+/// Takes dependencies directly rather than a [Ref] / [ProviderContainer],
+/// which keeps the function pure-Dart and lets tests mock with mocktail.
 Future<void> signOutAndReset({
-  required SyncOrchestrator orchestrator,
-  required AppDatabase db,
   required AuthService auth,
+  SyncOrchestrator? orchestrator,
+  AppDatabase? db,
 }) async {
-  await orchestrator.stop();
-  await _truncateAllTables(db);
+  // ONLINE-ONLY: skip offline teardown. Was:
+  //   await orchestrator!.stop();
+  //   await _truncateAllTables(db!);
   await auth.signOut();
 }
 
-/// Explicit table list — do NOT swap for db.allTables introspection.
-/// A future "diagnostics" table that shouldn't be wiped on sign-out
-/// would silently disappear under the introspection variant.
-Future<void> _truncateAllTables(AppDatabase db) async {
-  await db.transaction(() async {
-    await db.delete(db.outbox).go();
-    await db.delete(db.syncWatermarks).go();
-    await db.delete(db.proofPhotos).go();
-    await db.delete(db.proofEvents).go();
-    await db.delete(db.orderStatusEvents).go();
-    await db.delete(db.orders).go();
-    await db.delete(db.customers).go();
-    await db.delete(db.staff).go();
-    await db.delete(db.issues).go();
-    await db.delete(db.shifts).go();
-    await db.delete(db.validTransitions).go();
-    await db.delete(db.pullDeadLetter).go();
-  });
-}
+/* ============================================================================
+ * OFFLINE teardown — PRESERVED FOR RE-ENABLE
+ * ----------------------------------------------------------------------------
+ * Explicit table list — do NOT swap for db.allTables introspection. A future
+ * "diagnostics" table that shouldn't be wiped on sign-out would silently
+ * disappear under the introspection variant.
+ *
+ * Future<void> _truncateAllTables(AppDatabase db) async {
+ *   await db.transaction(() async {
+ *     await db.delete(db.outbox).go();
+ *     await db.delete(db.syncWatermarks).go();
+ *     await db.delete(db.proofPhotos).go();
+ *     await db.delete(db.proofEvents).go();
+ *     await db.delete(db.orderStatusEvents).go();
+ *     await db.delete(db.orders).go();
+ *     await db.delete(db.customers).go();
+ *     await db.delete(db.staff).go();
+ *     await db.delete(db.issues).go();
+ *     await db.delete(db.shifts).go();
+ *     await db.delete(db.validTransitions).go();
+ *     await db.delete(db.pullDeadLetter).go();
+ *   });
+ * }
+ * ========================================================================== */
