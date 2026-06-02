@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_database.dart';
 import 'supabase_mappers.dart';
+import 'supabase_payloads.dart';
 
 /// Read + write repository for customers — ONLINE-ONLY mode.
 ///
@@ -30,11 +31,17 @@ class CustomersRepository {
   }
 
   Stream<Customer?> watchById(String id) {
+    // Filter soft-deleted client-side (same as watchAll) so a back-office
+    // tombstone doesn't surface on detail screens. `.stream()` can't express
+    // `IS NULL`.
     return _supabase
         .from('customers')
         .stream(primaryKey: ['id'])
         .eq('id', id)
-        .map((rows) => rows.isEmpty ? null : customerFromSupabase(rows.first));
+        .map((rows) {
+      final live = rows.where((r) => r['deleted_at'] == null);
+      return live.isEmpty ? null : customerFromSupabase(live.first);
+    });
   }
 
   /// One-shot fetch of all non-deleted customers. Used by callers that need
@@ -50,15 +57,9 @@ class CustomersRepository {
 
   Future<void> upsertCustomer(Customer customer) async {
     final now = _clock();
-    await _supabase.from('customers').upsert(<String, dynamic>{
-      'id': customer.id,
-      'name': customer.name,
-      'phone': customer.phone,
-      'address': customer.address,
-      'notes': customer.notes,
-      'created_at': customer.createdAt.toUtc().toIso8601String(),
-      'updated_at': now.toUtc().toIso8601String(),
-    });
+    await _supabase
+        .from('customers')
+        .upsert(customerUpsertPayload(customer, now: now));
   }
 }
 

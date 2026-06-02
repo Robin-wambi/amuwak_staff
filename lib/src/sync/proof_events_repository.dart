@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/app_database.dart' as drift;
 import '../orders/proof_event.dart';
 import 'supabase_mappers.dart';
+import 'supabase_payloads.dart';
 
 /// Read/write repository for proof events — ONLINE-ONLY mode.
 ///
@@ -46,17 +47,12 @@ class ProofEventsRepository {
     required String actorStaffId,
   }) async {
     final now = _clock();
-    await _supabase.from('proof_events').upsert(<String, dynamic>{
-      'id': event.id,
-      'order_id': orderId,
-      'type': event.type.name,
-      'captured_at': event.capturedAt.toUtc().toIso8601String(),
-      'item_count': event.count,
-      'notes': event.notes,
-      'captured_by': actorStaffId,
-      'created_at': now.toUtc().toIso8601String(),
-      'updated_at': now.toUtc().toIso8601String(),
-    });
+    await _supabase.from('proof_events').upsert(proofEventUpsertPayload(
+          event,
+          orderId: orderId,
+          actorStaffId: actorStaffId,
+          now: now,
+        ));
   }
 }
 

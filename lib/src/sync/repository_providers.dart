@@ -23,6 +23,18 @@ import 'sync_status.dart';
 /// [outboxRepositoryProvider] to restore offline mode.
 
 /// Singleton Supabase client. Tests override this with a mock/fake client.
+///
+/// OPS DEPENDENCY — Realtime publication: the read repos use Supabase
+/// `.stream(...)`, which only pushes *live* changes for tables in the
+/// `supabase_realtime` publication. Without it, lists load the initial
+/// snapshot but never update after a write in the same session (and the
+/// new-pickup → capture auto-advance won't fire). Every environment must run:
+///
+///   alter publication supabase_realtime add table
+///     public.orders, public.customers, public.proof_events,
+///     public.staff, public.order_status_events;
+///
+/// See docs/online-only-mode.md for the full ops checklist.
 final supabaseClientProvider =
     Provider<SupabaseClient>((_) => Supabase.instance.client);
 
