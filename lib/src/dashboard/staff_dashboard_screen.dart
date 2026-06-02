@@ -120,8 +120,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: const Text(
-          'Sign out and clear local data on this device? Any '
-          'pending uploads will be discarded.',
+          'Sign out of this device? You will need to sign in again to '
+          'continue.',
         ),
         actions: [
           TextButton(
@@ -190,13 +190,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
-    // The order was just written to Drift; the stream emits asynchronously
-    // after the transaction settles. Poll the snapshot a few times before
-    // giving up — without this the first pickup after app start lands on
-    // the dashboard instead of PickupCaptureScreen because the stream
-    // hadn't pre-emitted the order yet.
+    // The order was just written to Supabase; the realtime stream re-emits
+    // asynchronously once the insert round-trips back over the WebSocket. Poll
+    // the snapshot before giving up — without this the new pickup lands on the
+    // dashboard instead of PickupCaptureScreen because the stream hadn't
+    // delivered the order yet. The window (20 × 100ms = 2s) allows for mobile
+    // realtime latency (~100-500ms, more on a slow link); beyond it we fall
+    // back to the "open from the list" hint below.
     LaundryOrder? newOrder;
-    for (var attempt = 0; attempt < 10; attempt++) {
+    for (var attempt = 0; attempt < 20; attempt++) {
       final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
       for (final o in orders) {
         if (o.orderId == result.orderId) {
@@ -205,7 +207,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         }
       }
       if (newOrder != null) break;
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
     }
     if (!mounted) return;
