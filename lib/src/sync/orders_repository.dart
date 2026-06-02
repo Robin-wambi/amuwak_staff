@@ -1,7 +1,10 @@
+import 'dart:developer' as developer;
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../orders/order.dart';
 import '../orders/order_status.dart';
+import 'supabase_payloads.dart';
 
 /// Read/write repository for orders — ONLINE-ONLY mode.
 ///
@@ -40,10 +43,25 @@ class OrdersRepository {
           rows.where((r) => r['deleted_at'] == null).toList(growable: false);
       if (orders.isEmpty) return const <LaundryOrder>[];
       final ids = orders.map((r) => r['id'] as String).toList();
-      final proofRows = await _supabase
-          .from('proof_events')
-          .select()
-          .inFilter('order_id', ids);
+      // A transient failure on this secondary fetch (network blip, RLS) must
+      // not error the whole stream — degrade to orders without proof events.
+      // The orders stream re-emits on the next change and recovers.
+      List<Map<String, dynamic>> proofRows;
+      try {
+        proofRows = await _supabase
+            .from('proof_events')
+            .select()
+            .inFilter('order_id', ids);
+      } catch (e, st) {
+        developer.log(
+          'watchAll: proof_events fetch failed; showing orders without '
+          'proof events this cycle.',
+          name: 'OrdersRepository',
+          error: e,
+          stackTrace: st,
+        );
+        proofRows = const [];
+      }
       final grouped = <String, List<Map<String, dynamic>>>{};
       for (final p in proofRows) {
         (grouped[p['order_id'] as String] ??= <Map<String, dynamic>>[]).add(p);
@@ -84,12 +102,16 @@ class OrdersRepository {
     final now = _clock();
     await _supabase
         .from('orders')
-        .upsert(_toPayload(order, actorStaffId, now: now));
+        .upsert(orderUpsertPayload(order, actorStaffId: actorStaffId, now: now));
   }
 
   /// Updates an order's status. [updatedAt] is optional and kept for call-site
   /// compatibility with the offline path (where it stabilised the outbox dedup
   /// key); online it just sets the row's `updated_at`.
+  ///
+  /// Throws a [StateError] when no order matched [orderId] (e.g. it was
+  /// soft-deleted server-side while the rider was on the capture screen) —
+  /// matching the old offline path so callers don't treat a no-op as success.
   Future<void> updateStatus(
     String orderId,
     OrderStatus newStatus, {
@@ -97,36 +119,15 @@ class OrdersRepository {
     DateTime? updatedAt,
   }) async {
     final now = updatedAt ?? _clock();
-    final dbStatus = newStatus.toDbString();
-    await _supabase.from('orders').update(<String, dynamic>{
-      'status': dbStatus,
-      'updated_at': now.toUtc().toIso8601String(),
-    }).eq('id', orderId);
+    final updated = await _supabase
+        .from('orders')
+        .update(orderStatusUpdatePayload(newStatus, now: now))
+        .eq('id', orderId)
+        .select('id');
+    if (updated.isEmpty) {
+      throw StateError('updateStatus: no order with id "$orderId"');
+    }
   }
-
-  // ----- PRIVATE HELPERS -----
-
-  Map<String, dynamic> _toPayload(LaundryOrder order, String actorStaffId,
-          {required DateTime now}) =>
-      {
-        'id': order.orderId,
-        'order_code': order.orderCode,
-        'customer_id': order.customerId,
-        'customer_name': order.customerName,
-        'phone': order.phone,
-        'address': order.address,
-        'service_type': order.serviceType.toDbString(),
-        'status': order.status.toDbString(),
-        'intake_method': order.intakeMethod,
-        'fulfillment_method': order.fulfillmentMethod,
-        'item_count': order.itemCount,
-        'notes': order.notes,
-        'scheduled_for': order.scheduledFor?.toUtc().toIso8601String(),
-        'intake_recorded_by': actorStaffId,
-        'created_by': actorStaffId,
-        'created_at': now.toUtc().toIso8601String(),
-        'updated_at': now.toUtc().toIso8601String(),
-      };
 }
 
 /* ============================================================================

@@ -29,6 +29,13 @@ Future<void> signOutAndReset({
   SyncOrchestrator? orchestrator,
   AppDatabase? db,
 }) async {
+  // Guard against a caller wiring up the offline teardown and expecting it to
+  // run: in online-only mode these are ignored, so passing them is a mistake.
+  assert(
+    orchestrator == null && db == null,
+    'signOutAndReset: orchestrator/db are ignored in online-only mode. '
+    'Re-enable the offline teardown before passing them.',
+  );
   // ONLINE-ONLY: skip offline teardown. Was:
   //   await orchestrator!.stop();
   //   await _truncateAllTables(db!);
