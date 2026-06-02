@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../orders/order.dart';
 import '../orders/order_status.dart';
+import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
 /// Read/write repository for orders — ONLINE-ONLY mode.
@@ -39,10 +40,11 @@ class OrdersRepository {
         .stream(primaryKey: ['id'])
         .order('created_at')
         .asyncMap((rows) async {
-      final orders =
-          rows.where((r) => r['deleted_at'] == null).toList(growable: false);
-      if (orders.isEmpty) return const <LaundryOrder>[];
-      final ids = orders.map((r) => r['id'] as String).toList();
+      final ids = rows
+          .where((r) => r['deleted_at'] == null)
+          .map((r) => r['id'] as String)
+          .toList(growable: false);
+      if (ids.isEmpty) return const <LaundryOrder>[];
       // A transient failure on this secondary fetch (network blip, RLS) must
       // not error the whole stream — degrade to orders without proof events.
       // The orders stream re-emits on the next change and recovers.
@@ -62,16 +64,7 @@ class OrdersRepository {
         );
         proofRows = const [];
       }
-      final grouped = <String, List<Map<String, dynamic>>>{};
-      for (final p in proofRows) {
-        (grouped[p['order_id'] as String] ??= <Map<String, dynamic>>[]).add(p);
-      }
-      return orders
-          .map((r) => LaundryOrder.fromSupabase(
-                r,
-                grouped[r['id'] as String] ?? const [],
-              ))
-          .toList(growable: false);
+      return hydrateOrders(rows, proofRows);
     });
   }
 
@@ -81,9 +74,8 @@ class OrdersRepository {
         .stream(primaryKey: ['id'])
         .eq('id', orderId)
         .asyncMap((rows) async {
-      final match =
-          rows.where((r) => r['deleted_at'] == null).toList(growable: false);
-      if (match.isEmpty) return null;
+      final hasLiveOrder = rows.any((r) => r['deleted_at'] == null);
+      if (!hasLiveOrder) return null;
       // Mirror watchAll: a transient failure on the secondary proof_events
       // fetch must degrade to the order without proof events, not error the
       // stream permanently. The orders stream re-emits and recovers.
@@ -104,12 +96,23 @@ class OrdersRepository {
         );
         proofRows = const [];
       }
-      return LaundryOrder.fromSupabase(match.first, proofRows);
+      return hydrateOrder(rows, proofRows);
     });
   }
 
   // ----- WRITE -----
 
+  /// Creates an order. **Insert-only in practice:** the only caller is the New
+  /// Pickup flow creating a brand-new order; subsequent changes go through
+  /// [updateStatus], never back through here. It is implemented as an `upsert`
+  /// so a submit retry with the same (cached) `orderId` is idempotent rather
+  /// than a duplicate-key crash.
+  ///
+  /// Caveat: because `upsert` writes every column on conflict, calling this for
+  /// an *existing* order would overwrite `created_at`/`created_by` with the
+  /// current actor/time. Don't repurpose it for edits — add a dedicated update
+  /// method (or a DB rule pinning the creation columns) if an edit flow is ever
+  /// needed.
   Future<void> upsertOrder(LaundryOrder order,
       {required String actorStaffId}) async {
     final now = _clock();
