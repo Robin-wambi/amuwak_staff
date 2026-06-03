@@ -159,6 +159,39 @@ void main() {
     expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
   });
 
+  testWidgets('scanning a tag fills the field and filters to that order',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+              (ref) => Stream<List<LaundryOrder>>.value([_jane, _bob, _carol])),
+        ],
+        child: MaterialApp(
+          home: OrderSearchScreen(
+            onOrderTap: (_) {},
+            cameraViewBuilder: (context, onDetected) => FakeCameraView(
+              scannedValue: 'AMW-2026-0099',
+              onDetected: onDetected,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.qr_code_scanner_rounded));
+    await tester.pumpAndSettle();
+
+    // On the scan screen — simulate a detection.
+    await tester.tap(find.text('Simulate scan'));
+    await tester.pumpAndSettle();
+
+    // Back on search, filtered to the scanned order code.
+    expect(find.text('Bob Jones'), findsOneWidget);
+    expect(find.text('Jane Smith'), findsNothing);
+  });
+
   testWidgets('tapping a result invokes onOrderTap with that order',
       (tester) async {
     LaundryOrder? tapped;
