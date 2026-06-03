@@ -25,7 +25,6 @@ class NewPickupScreen extends StatefulWidget {
     required this.clock,
     required this.orderIdGenerator,
     required this.customerIdGenerator,
-    required this.orderCodeGenerator,
     required this.geolocate,
     required this.reverseGeocode,
   });
@@ -36,12 +35,6 @@ class NewPickupScreen extends StatefulWidget {
   final DateTime Function() clock;
   final String Function() orderIdGenerator;
   final String Function() customerIdGenerator;
-
-  /// Reserves the next human-facing `order_code` (e.g. `AMW-2026-0042`).
-  /// Production wires this to a Supabase RPC backed by a per-year counter so
-  /// the code is server-assigned and sequential; tests inject a deterministic
-  /// stand-in. Async because it round-trips to the server.
-  final Future<String> Function() orderCodeGenerator;
   final GeolocateFn geolocate;
   final ReverseGeocodeFn reverseGeocode;
 
@@ -255,7 +248,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     // second value off the server-side counter.
     final String orderCode;
     try {
-      orderCode = _pendingOrderCode ??= await widget.orderCodeGenerator();
+      orderCode = _pendingOrderCode ??= await widget.ordersRepo.reserveOrderCode();
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);

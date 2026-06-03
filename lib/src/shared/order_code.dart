@@ -1,20 +1,8 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-/// Reserves the next human-facing order code (e.g. `AMW-2026-0042`) from the
-/// server. Backed by the `next_order_code()` Postgres function, which atomically
-/// bumps a per-year counter — so codes are sequential and never collide across
-/// devices, even though several riders may create orders at once.
-///
-/// Used as the production tear-off for [NewPickupScreen.orderCodeGenerator];
-/// tests inject a deterministic stand-in instead. Requires connectivity at
-/// order-creation time: the RPC throws when offline, which the form surfaces as
-/// a retryable error.
-Future<String> defaultOrderCode() async {
-  final result = await Supabase.instance.client.rpc('next_order_code');
-  return parseOrderCodeRpcResult(result);
-}
-
 /// Normalises whatever `rpc('next_order_code')` decodes to into the code string.
+///
+/// Called by [OrdersRepository.reserveOrderCode], which owns the actual RPC
+/// call; this is the pure boundary parser, kept separate so it is unit-testable
+/// without a Supabase client.
 ///
 /// PostgREST returns a bare scalar for a `RETURNS text` function, so the common
 /// case is a plain [String]. We also tolerate the row-set shape

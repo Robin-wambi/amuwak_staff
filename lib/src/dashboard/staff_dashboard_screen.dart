@@ -24,7 +24,6 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
-import '../shared/order_code.dart';
 import '../shared/uuid.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
@@ -185,7 +184,6 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           clock: DateTime.now,
           orderIdGenerator: defaultUuidV7,
           customerIdGenerator: defaultUuidV7,
-          orderCodeGenerator: defaultOrderCode,
           geolocate: createDefaultGeolocate(),
           reverseGeocode: createDefaultReverseGeocode(),
         ),

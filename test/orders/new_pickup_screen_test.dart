@@ -68,6 +68,8 @@ void main() {
     // writes succeed.
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
     when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
+    when(() => ordersRepo.reserveOrderCode())
+        .thenAnswer((_) async => 'AMW-2026-0001');
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
   });
@@ -85,7 +87,6 @@ void main() {
 
   Future<_FormHandle> pumpFormAndOpen(
     WidgetTester tester, {
-    Future<String> Function()? orderCodeGenerator,
     GeolocateFn? geolocate,
     ReverseGeocodeFn? reverseGeocode,
   }) async {
@@ -107,8 +108,6 @@ void main() {
                         clock: () => DateTime(2026, 5, 25, 10),
                         orderIdGenerator: () => 'uuid-order-1',
                         customerIdGenerator: () => 'uuid-cust-1',
-                        orderCodeGenerator:
-                            orderCodeGenerator ?? () async => 'AMW-2026-0001',
                         geolocate: geolocate ?? () async => null,
                         reverseGeocode: reverseGeocode ?? (_) async => null,
                       ),
@@ -222,10 +221,11 @@ void main() {
     expect(order.orderCode, 'AMW-2026-0001');
   });
 
-  testWidgets('order_code comes from the injected (server) generator',
+  testWidgets('order_code comes from the repository (server) reservation',
       (tester) async {
-    final handle = await pumpFormAndOpen(tester,
-        orderCodeGenerator: () async => 'AMW-2026-0042');
+    when(() => ordersRepo.reserveOrderCode())
+        .thenAnswer((_) async => 'AMW-2026-0042');
+    final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
     await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
@@ -246,14 +246,13 @@ void main() {
       'a failed order-code reservation surfaces an error and writes no order; '
       'a retry then succeeds', (tester) async {
     var calls = 0;
-    Future<String> flakyGenerator() async {
+    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
       calls++;
       if (calls == 1) throw Exception('offline');
       return 'AMW-2026-0042';
-    }
+    });
 
-    final handle =
-        await pumpFormAndOpen(tester, orderCodeGenerator: flakyGenerator);
+    final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
     await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
@@ -540,8 +539,8 @@ void main() {
     // Gate the order-code reservation so the submit stays in flight while we
     // assert, then release it to let the form finish.
     final gate = Completer<String>();
-    final handle =
-        await pumpFormAndOpen(tester, orderCodeGenerator: () => gate.future);
+    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) => gate.future);
+    final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
     await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
