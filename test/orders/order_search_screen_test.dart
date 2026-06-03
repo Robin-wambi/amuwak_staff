@@ -90,15 +90,52 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'bob');
+    await tester.pump(const Duration(milliseconds: 350)); // past debounce
     await tester.pumpAndSettle();
     expect(find.text('Bob Jones'), findsOneWidget);
     expect(find.text('Jane Smith'), findsNothing);
 
     // Address fragment matches too.
     await tester.enterText(find.byType(TextField), 'kololo');
+    await tester.pump(const Duration(milliseconds: 350)); // past debounce
     await tester.pumpAndSettle();
     expect(find.text('Jane Smith'), findsOneWidget);
     expect(find.text('Bob Jones'), findsNothing);
+  });
+
+  testWidgets('debounces filtering — applies only after the debounce window',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+              (ref) => Stream<List<LaundryOrder>>.value([_jane, _bob, _carol])),
+        ],
+        child: MaterialApp(
+          home: OrderSearchScreen(
+            onOrderTap: (_) {},
+            cameraViewBuilder: (context, onDetected) => FakeCameraView(
+              scannedValue: 'x',
+              onDetected: onDetected,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'bob');
+    // Within the debounce window the filter has NOT applied yet, so the
+    // empty-query active zero-state (Jane + Carol, Bob hidden as completed) is
+    // still showing.
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Jane Smith'), findsOneWidget);
+    expect(find.text('Bob Jones'), findsNothing);
+
+    // After the window elapses, the filter applies.
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Bob Jones'), findsOneWidget);
+    expect(find.text('Jane Smith'), findsNothing);
   });
 
   testWidgets('clear button resets back to the zero-state', (tester) async {
@@ -122,6 +159,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'bob');
+    await tester.pump(const Duration(milliseconds: 350)); // past debounce
     await tester.pumpAndSettle();
     expect(find.text('Jane Smith'), findsNothing);
 
@@ -153,6 +191,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'zzz-no-match');
+    await tester.pump(const Duration(milliseconds: 350)); // past debounce
     await tester.pumpAndSettle();
 
     expect(find.text('No orders found'), findsOneWidget);

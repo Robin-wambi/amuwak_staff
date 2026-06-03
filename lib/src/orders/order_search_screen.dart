@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,16 +38,40 @@ class OrderSearchScreen extends ConsumerStatefulWidget {
 class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+
+  /// Debounced filter query. Lags the raw field text by [_debounceDuration] so
+  /// the list isn't refiltered on every keystroke (the clear button keys off
+  /// the controller text directly, so it stays immediate).
   String _query = '';
+  Timer? _debounce;
+  static const _debounceDuration = Duration(milliseconds: 300);
+
+  // Memoized last filter result, so per-keystroke rebuilds (which run with an
+  // unchanged [_query] until the debounce fires) don't re-scan the whole list.
+  String? _cachedQuery;
+  List<LaundryOrder>? _cachedFor;
+  List<LaundryOrder>? _cachedMatches;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      if (mounted) setState(() => _query = value.trim());
+    });
+    // Rebuild now so the clear (X) button reflects the field text immediately,
+    // without waiting for the debounce window.
+    setState(() {});
+  }
+
   void _clear() {
+    _debounce?.cancel();
     _controller.clear();
     setState(() => _query = '');
     _focusNode.requestFocus();
@@ -60,8 +86,20 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
       ),
     );
     if (code == null || !mounted) return;
+    _debounce?.cancel();
     _controller.text = code;
-    setState(() => _query = code);
+    setState(() => _query = code.trim());
+  }
+
+  List<LaundryOrder> _matchesFor(List<LaundryOrder> orders, String query) {
+    if (query == _cachedQuery && identical(orders, _cachedFor)) {
+      return _cachedMatches!;
+    }
+    final matches = orders.searchBy(query);
+    _cachedQuery = query;
+    _cachedFor = orders;
+    _cachedMatches = matches;
+    return matches;
   }
 
   @override
@@ -79,11 +117,11 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
           focusNode: _focusNode,
           autofocus: true,
           textInputAction: TextInputAction.search,
-          onChanged: (value) => setState(() => _query = value),
+          onChanged: _onQueryChanged,
           decoration: InputDecoration(
             hintText: 'Search by code, name, phone…',
             prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: _query.isEmpty
+            suffixIcon: _controller.text.isEmpty
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.close_rounded),
@@ -148,7 +186,7 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
       );
     }
 
-    final matches = orders.searchBy(query);
+    final matches = _matchesFor(orders, query);
     if (matches.isEmpty) {
       return EmptyState(
         icon: Icons.search_off_rounded,
