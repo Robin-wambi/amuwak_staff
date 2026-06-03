@@ -8,6 +8,7 @@ import 'order.dart';
 import 'order_list_extensions.dart';
 import 'order_status.dart';
 import 'proof/barcode_reader.dart';
+import 'widgets/barcode_search_scan_screen.dart';
 import 'widgets/order_card.dart';
 
 /// Lets a rider find one known order fast: live text filtering over the
@@ -50,6 +51,19 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
     _focusNode.requestFocus();
   }
 
+  Future<void> _openScanner() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeSearchScanScreen(
+          cameraViewBuilder: widget.cameraViewBuilder,
+        ),
+      ),
+    );
+    if (code == null || !mounted) return;
+    _controller.text = code;
+    setState(() => _query = code);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersStreamProvider);
@@ -79,6 +93,13 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
             border: InputBorder.none,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            tooltip: 'Scan order tag',
+            onPressed: _openScanner,
+          ),
+        ],
       ),
       body: ordersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
