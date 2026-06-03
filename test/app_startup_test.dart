@@ -1,3 +1,11 @@
+@Skip('Online-only mode: main.dart no longer mounts syncLifecycleProvider, so '
+    'the SyncOrchestrator is not started/stopped on auth changes. This test '
+    'asserts that removed startup wiring. Original preserved in git history; '
+    'restore alongside the syncLifecycleProvider watch in lib/main.dart when '
+    're-enabling offline. The login-renders-at-startup case is covered by '
+    'test/widget_test.dart.')
+library;
+
 import 'dart:async';
 
 import 'package:drift/native.dart';

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../orders/order.dart';
 import 'customers_repository.dart';
@@ -10,43 +11,56 @@ import 'staff_repository.dart';
 import 'status_events_repository.dart';
 import 'sync_status.dart';
 
-/// Riverpod providers for the sync-layer repositories (read and write).
-/// Read-side repos (Plan 3a Tasks 2–4): [ordersRepositoryProvider],
-/// [customersRepositoryProvider], [staffRepositoryProvider],
-/// [proofEventsRepositoryProvider], [statusEventsRepositoryProvider].
-/// Write-side infra (Plan 3b Task 3+): [outboxRepositoryProvider].
-/// Each provider depends on [appDatabaseProvider] so test suites can
-/// override the database with an in-memory instance.
+/// Riverpod providers for the repositories.
+///
+/// ONLINE-ONLY mode: the read/write repos talk directly to Supabase via
+/// [supabaseClientProvider]. The offline write infrastructure
+/// ([outboxRepositoryProvider], [pullDeadLetterRepositoryProvider]) is kept
+/// defined but is no longer watched by the live app — the SyncOrchestrator is
+/// disabled, the banner removed, and the SyncErrorsScreen unreachable, so the
+/// local Drift database (lazily opened on first query) is never opened.
+/// Re-point the five repo providers back at [appDatabaseProvider] +
+/// [outboxRepositoryProvider] to restore offline mode.
+
+/// Singleton Supabase client. Tests override this with a mock/fake client.
+///
+/// OPS DEPENDENCY — Realtime publication: the read repos use Supabase
+/// `.stream(...)`, which only pushes *live* changes for tables in the
+/// `supabase_realtime` publication. Without it, lists load the initial
+/// snapshot but never update after a write in the same session (and the
+/// new-pickup → capture auto-advance won't fire). Every environment must run:
+///
+///   alter publication supabase_realtime add table
+///     public.orders, public.customers, public.proof_events,
+///     public.staff, public.order_status_events;
+///
+/// See docs/online-only-mode.md for the full ops checklist.
+final supabaseClientProvider =
+    Provider<SupabaseClient>((_) => Supabase.instance.client);
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(
-  (ref) => OrdersRepository(
-    ref.watch(appDatabaseProvider),
-    outbox: ref.watch(outboxRepositoryProvider),
-  ),
+  (ref) => OrdersRepository(ref.watch(supabaseClientProvider)),
 );
 
 final customersRepositoryProvider = Provider<CustomersRepository>(
-  (ref) => CustomersRepository(
-    ref.watch(appDatabaseProvider),
-    outbox: ref.watch(outboxRepositoryProvider),
-  ),
+  (ref) => CustomersRepository(ref.watch(supabaseClientProvider)),
 );
 
 final staffRepositoryProvider = Provider<StaffRepository>(
-  (ref) => StaffRepository(ref.watch(appDatabaseProvider)),
+  (ref) => StaffRepository(ref.watch(supabaseClientProvider)),
 );
 
 final proofEventsRepositoryProvider = Provider<ProofEventsRepository>(
-  (ref) => ProofEventsRepository(
-    ref.watch(appDatabaseProvider),
-    outbox: ref.watch(outboxRepositoryProvider),
-  ),
+  (ref) => ProofEventsRepository(ref.watch(supabaseClientProvider)),
 );
 
 final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
-  (ref) => StatusEventsRepository(ref.watch(appDatabaseProvider)),
+  (ref) => StatusEventsRepository(ref.watch(supabaseClientProvider)),
 );
 
+// OFFLINE write infra — preserved, unused in online-only mode. Still depends on
+// [appDatabaseProvider]; only ever constructed if something watches them
+// (nothing in the live app does), so the local DB stays closed.
 final outboxRepositoryProvider = Provider<OutboxRepository>(
   (ref) => OutboxRepository(ref.watch(appDatabaseProvider)),
 );

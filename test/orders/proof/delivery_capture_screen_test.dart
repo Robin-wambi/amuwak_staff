@@ -1,13 +1,10 @@
 import 'dart:async';
 
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
-// Hide Drift's row class `ProofEvent` so the tests can keep referring to the
-// domain `ProofEvent` from `orders/proof_event.dart` without ambiguity.
-import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/delivery_capture_screen.dart';
@@ -15,8 +12,18 @@ import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
-import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
+
+/// Online-only mode: DeliveryCaptureScreen takes Supabase-backed repos via its
+/// constructor. These tests mock them — UI-only cases use mocks that are never
+/// called; write-path cases stub `insertEvent` / `updateStatus` and verify what
+/// the screen passed. The repo's own idempotency (upsert on the proof-event PK)
+/// is its contract; here we verify the *screen* reuses a cached event id across
+/// retries (so the repo upsert dedupes).
+class _MockOrdersRepository extends Mock implements OrdersRepository {}
+
+class _MockProofEventsRepository extends Mock
+    implements ProofEventsRepository {}
 
 class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
   @override
@@ -27,35 +34,6 @@ class _ThrowingProofPhotoStorage implements ProofPhotoStorage {
     required List<int> bytes,
   }) async {
     throw Exception('disk full');
-  }
-}
-
-/// Wraps a real [OrdersRepository] but rigs `updateStatus` to throw on the
-/// first call and delegate on subsequent calls. Used to exercise the
-/// capture-screen retry path: insert proof succeeds, status update fails,
-/// user retries, status update succeeds.
-class _FlakyUpdateOrdersRepo extends OrdersRepository {
-  _FlakyUpdateOrdersRepo(super.db, {required super.outbox});
-
-  int _calls = 0;
-
-  @override
-  Future<void> updateStatus(
-    String orderId,
-    OrderStatus newStatus, {
-    required String actorStaffId,
-    DateTime? updatedAt,
-  }) async {
-    _calls += 1;
-    if (_calls == 1) {
-      throw Exception('transient flake');
-    }
-    return super.updateStatus(
-      orderId,
-      newStatus,
-      actorStaffId: actorStaffId,
-      updatedAt: updatedAt,
-    );
   }
 }
 
@@ -82,88 +60,128 @@ LaundryOrder _orderReadyForDelivery() {
   );
 }
 
-/// Bundles an in-memory Drift DB + outbox + wired repos for tests that need
-/// to assert the write path lands the right rows.
-class _DeliveryFixture {
-  _DeliveryFixture._(this.db, this.outbox, this.ordersRepo, this.proofEventsRepo);
-
-  final AppDatabase db;
-  final OutboxRepository outbox;
-  final OrdersRepository ordersRepo;
-  final ProofEventsRepository proofEventsRepo;
-
-  static _DeliveryFixture create() {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    final outbox = OutboxRepository(db);
-    final ordersRepo = OrdersRepository(
-      db,
-      outbox: outbox,
-      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-    );
-    final proofEventsRepo = ProofEventsRepository(
-      db,
-      outbox: outbox,
-      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-    );
-    return _DeliveryFixture._(db, outbox, ordersRepo, proofEventsRepo);
-  }
+_MockOrdersRepository _flakyUpdateOrdersRepo() {
+  final repo = _MockOrdersRepository();
+  var calls = 0;
+  when(() => repo.updateStatus(any(), any(),
+      actorStaffId: any(named: 'actorStaffId'),
+      updatedAt: any(named: 'updatedAt'))).thenAnswer((_) async {
+    calls += 1;
+    if (calls == 1) throw Exception('transient flake');
+  });
+  return repo;
 }
 
-/// Seeds an `orders` row matching [order] directly into the Drift DB.
-Future<void> _seedOrder(AppDatabase db, LaundryOrder order) {
-  return db.into(db.orders).insert(OrdersCompanion.insert(
-        id: order.orderId,
-        orderCode: order.orderId,
-        customerName: order.customerName,
-        phone: order.phone,
-        address: order.address,
-        serviceType: order.serviceType.toDbString(),
-        status: order.status.toDbString(),
-        intakeMethod: 'driver_pickup',
-        fulfillmentMethod: 'delivery',
-        itemCount: order.itemCount,
-        intakeRecordedBy: 's-test',
-        createdBy: 's-test',
-      ));
+_MockOrdersRepository _okOrdersRepo() {
+  final repo = _MockOrdersRepository();
+  when(() => repo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'),
+          updatedAt: any(named: 'updatedAt')))
+      .thenAnswer((_) async {});
+  return repo;
 }
 
-/// Lazily-constructed placeholder DB shared by tests that don't supply repos.
-/// Read-only by construction (no outbox wired), so any accidental write
-/// surfaces as a `StateError` rather than silently succeeding.
-AppDatabase? _placeholderDb;
-AppDatabase _ensurePlaceholderDb() =>
-    _placeholderDb ??= AppDatabase.forTesting(NativeDatabase.memory());
+_MockProofEventsRepository _okProofRepo() {
+  final repo = _MockProofEventsRepository();
+  when(() => repo.insertEvent(any(),
+          orderId: any(named: 'orderId'),
+          actorStaffId: any(named: 'actorStaffId')))
+      .thenAnswer((_) async {});
+  return repo;
+}
 
-/// Builds a `DeliveryCaptureScreen` with placeholder repos for tests that only
-/// exercise UI (photo picker, notes field, etc.) and never tap "Mark delivered".
 DeliveryCaptureScreen _buildScreen({
   required LaundryOrder order,
   required ProofPhotoStorage storage,
   required Future<List<int>?> Function() pickPhoto,
   required DateTime Function() clock,
+  OrdersRepository? ordersRepo,
+  ProofEventsRepository? proofEventsRepo,
 }) {
   return DeliveryCaptureScreen(
     order: order,
     photoStorage: storage,
     pickPhoto: pickPhoto,
     clock: clock,
-    ordersRepo: OrdersRepository(_ensurePlaceholderDb()),
-    proofEventsRepo: ProofEventsRepository(_ensurePlaceholderDb()),
+    ordersRepo: ordersRepo ?? _okOrdersRepo(),
+    proofEventsRepo: proofEventsRepo ?? _okProofRepo(),
     actorStaffId: 's-test',
     proofEventIdGenerator: () => 'pe-test',
   );
 }
 
+Future<void> _pumpAndPushDelivery(
+  WidgetTester tester, {
+  required ProofPhotoStorage storage,
+  required LaundryOrder order,
+  Future<List<int>?> Function()? pickPhoto,
+  DateTime Function()? clock,
+  OrdersRepository? ordersRepo,
+  ProofEventsRepository? proofEventsRepo,
+  String Function()? proofEventIdGenerator,
+}) async {
+  final handle = _PopHandle();
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) {
+          return Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  handle.result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => DeliveryCaptureScreen(
+                        order: order,
+                        photoStorage: storage,
+                        pickPhoto: pickPhoto ?? () async => const [50, 60, 70],
+                        clock: clock ?? () => DateTime(2026, 5, 12, 16, 13),
+                        ordersRepo: ordersRepo ?? _okOrdersRepo(),
+                        proofEventsRepo: proofEventsRepo ?? _okProofRepo(),
+                        actorStaffId: 's-test',
+                        proofEventIdGenerator:
+                            proofEventIdGenerator ?? () => 'pe-test',
+                      ),
+                    ),
+                  );
+                  handle.resolved = true;
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+  await tester.tap(find.text('Open'));
+  await tester.pumpAndSettle();
+  _lastHandle = handle;
+}
+
+_PopHandle? _lastHandle;
+
 void main() {
+  setUpAll(() {
+    registerFallbackValue(ProofEvent(
+      id: 'fb',
+      type: ProofEventType.delivery,
+      capturedAt: DateTime(2026, 1, 1),
+      count: 1,
+      photoPaths: const [],
+    ));
+    registerFallbackValue(OrderStatus.readyForDelivery);
+    registerFallbackValue(DateTime(2026, 1, 1));
+  });
+
   testWidgets('Mark delivered is disabled until a handover photo is captured',
       (tester) async {
     final storage = InMemoryProofPhotoStorage();
-    final order = _orderReadyForDelivery();
 
     await tester.pumpWidget(
       MaterialApp(
         home: _buildScreen(
-          order: order,
+          order: _orderReadyForDelivery(),
           storage: storage,
           pickPhoto: () async => const [1, 2, 3],
           clock: () => DateTime(2026, 5, 12, 16, 13),
@@ -182,229 +200,109 @@ void main() {
   });
 
   testWidgets(
-      'Tapping Mark delivered flips the order to completed, inserts a delivery '
-      'proof_events row, and enqueues both outbox writes',
-      (tester) async {
-    final fixture = _DeliveryFixture.create();
-    addTearDown(() async => fixture.db.close());
-    final order = _orderReadyForDelivery();
-    await _seedOrder(fixture.db, order);
-
+      'Tapping Mark delivered flips the order to completed and inserts a '
+      'delivery proof event through the repos', (tester) async {
+    final ordersRepo = _okOrdersRepo();
+    final proofEventsRepo = _okProofRepo();
     final storage = InMemoryProofPhotoStorage();
-    bool? popResult;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) {
-            return Scaffold(
-              body: Center(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    popResult = await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => DeliveryCaptureScreen(
-                          order: order,
-                          photoStorage: storage,
-                          pickPhoto: () async => const [50, 60, 70],
-                          clock: () => DateTime(2026, 5, 12, 16, 13),
-                          ordersRepo: fixture.ordersRepo,
-                          proofEventsRepo: fixture.proofEventsRepo,
-                          actorStaffId: 's-test',
-                          proofEventIdGenerator: () => 'pe-task-12',
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('Open'),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+    await _pumpAndPushDelivery(
+      tester,
+      storage: storage,
+      order: _orderReadyForDelivery(),
+      pickPhoto: () async => const [50, 60, 70],
+      ordersRepo: ordersRepo,
+      proofEventsRepo: proofEventsRepo,
+      proofEventIdGenerator: () => 'pe-task-12',
     );
-
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('add_handover_photo')));
     await tester.pumpAndSettle();
-
     await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
     await tester.pumpAndSettle();
 
-    expect(popResult, isTrue);
+    expect(_lastHandle!.result, isTrue);
 
-    // Orders row was flipped to completed.
-    final orderRow = await (fixture.db.select(fixture.db.orders)
-          ..where((t) => t.id.equals('AMW-0421')))
-        .getSingle();
-    expect(orderRow.status, 'completed');
+    final event = verify(() => proofEventsRepo.insertEvent(
+          captureAny(),
+          orderId: 'AMW-0421',
+          actorStaffId: 's-test',
+        )).captured.single as ProofEvent;
+    expect(event.id, 'pe-task-12');
+    expect(event.type, ProofEventType.delivery);
+    expect(event.count, 12);
 
-    // proof_events row landed with the right type + count + actor.
-    final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
-    expect(proofRows, hasLength(1));
-    expect(proofRows.single.id, 'pe-task-12');
-    expect(proofRows.single.orderId, 'AMW-0421');
-    expect(proofRows.single.type, 'delivery');
-    expect(proofRows.single.itemCount, 12);
-    expect(proofRows.single.capturedBy, 's-test');
+    verify(() => ordersRepo.updateStatus(
+          'AMW-0421',
+          OrderStatus.completed,
+          actorStaffId: 's-test',
+          updatedAt: any(named: 'updatedAt'),
+        )).called(1);
 
-    // Outbox has the proof_events insert AND the orders update.
-    final outboxRows = await fixture.db.select(fixture.db.outbox).get();
-    expect(outboxRows, hasLength(2));
-    final tableOps = outboxRows.map((r) => '${r.forTable}:${r.op}').toSet();
-    expect(
-      tableOps,
-      containsAll(<String>['proof_events:insert', 'orders:update']),
-    );
-
-    // Photo bytes were actually persisted to storage.
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [50, 60, 70]));
   });
 
   testWidgets(
-    'Mark delivered re-enables itself, surfaces an error, and lands no DB rows '
-    'when photo save fails',
+    'Mark delivered re-enables itself, surfaces an error, and performs NO repo '
+    'writes when photo save fails',
     (tester) async {
-      final fixture = _DeliveryFixture.create();
-      addTearDown(() async => fixture.db.close());
-      final order = _orderReadyForDelivery();
-      await _seedOrder(fixture.db, order);
+      final ordersRepo = _okOrdersRepo();
+      final proofEventsRepo = _okProofRepo();
 
-      bool? popResult;
-      var popResolved = false;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) {
-              return Scaffold(
-                body: Center(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      popResult = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => DeliveryCaptureScreen(
-                            order: order,
-                            photoStorage: _ThrowingProofPhotoStorage(),
-                            pickPhoto: () async => const [50, 60, 70],
-                            clock: () => DateTime(2026, 5, 12, 16, 13),
-                            ordersRepo: fixture.ordersRepo,
-                            proofEventsRepo: fixture.proofEventsRepo,
-                            actorStaffId: 's-test',
-                            proofEventIdGenerator: () => 'pe-task-12',
-                          ),
-                        ),
-                      );
-                      popResolved = true;
-                    },
-                    child: const Text('Open'),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+      await _pumpAndPushDelivery(
+        tester,
+        storage: _ThrowingProofPhotoStorage(),
+        order: _orderReadyForDelivery(),
+        pickPhoto: () async => const [50, 60, 70],
+        ordersRepo: ordersRepo,
+        proofEventsRepo: proofEventsRepo,
+        proofEventIdGenerator: () => 'pe-task-12',
       );
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('add_handover_photo')));
       await tester.pumpAndSettle();
-
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
 
-      // Push has not resolved — the screen did not pop.
-      expect(popResolved, isFalse);
-      expect(popResult, isNull);
+      expect(_lastHandle!.resolved, isFalse);
+      expect(_lastHandle!.result, isNull);
       expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
-      // Mark-delivered button is re-enabled so the user can retry.
-      final markDelivered = find.widgetWithText(
-        ElevatedButton,
-        'Mark delivered',
-      );
+      final markDelivered =
+          find.widgetWithText(ElevatedButton, 'Mark delivered');
+      expect(tester.widget<ElevatedButton>(markDelivered).onPressed, isNotNull);
       expect(
-        tester.widget<ElevatedButton>(markDelivered).onPressed,
-        isNotNull,
-      );
-      // User-facing error feedback is visible.
-      expect(
-        find.textContaining('Could not save delivery proof'),
-        findsOneWidget,
-      );
-      // The exception was handled, not left dangling.
+          find.textContaining('Could not save delivery proof'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      // Photo-save failure short-circuited before any repo write:
-      // orders row still ready (for delivery), no proof_events row, no outbox rows.
-      final orderRow = await (fixture.db.select(fixture.db.orders)
-            ..where((t) => t.id.equals('AMW-0421')))
-          .getSingle();
-      expect(orderRow.status, 'ready');
-      final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
-      expect(proofRows, isEmpty);
-      final outboxRows = await fixture.db.select(fixture.db.outbox).get();
-      expect(outboxRows, isEmpty);
+      verifyNever(() => proofEventsRepo.insertEvent(any(),
+          orderId: any(named: 'orderId'),
+          actorStaffId: any(named: 'actorStaffId')));
+      verifyNever(() => ordersRepo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'),
+          updatedAt: any(named: 'updatedAt')));
     },
   );
 
   testWidgets(
-    'Retrying Mark delivered after a transient status-update failure lands '
-    'exactly ONE proof_events row and ONE proof_events outbox row '
-    '(cached event id + persisted-flag short-circuit)',
+    'Retrying Mark delivered after a transient status-update failure reuses '
+    'the cached proof-event id (so the repo upsert stays idempotent)',
     (tester) async {
-      // Critical #2: without the cached event id + `_proofPersisted` short-
-      // circuit, the second tap would either crash on a duplicate PK or land
-      // a duplicate proof_events outbox row (the outbox enqueue uses a fresh
-      // mutation UUID per call). With the fix the second tap only retries
-      // the orders status flip.
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(() async => db.close());
-      final outbox = OutboxRepository(db);
-      final flakyOrdersRepo = _FlakyUpdateOrdersRepo(db, outbox: outbox);
-      final proofEventsRepo = ProofEventsRepository(db, outbox: outbox);
-      final order = _orderReadyForDelivery();
-      await _seedOrder(db, order);
+      // Critical #2: a fresh UUID per tap would land a duplicate delivery
+      // proof on retry. The screen caches the id, so both insertEvent calls use
+      // the SAME id and the repo's upsert dedupes server-side.
+      final flakyOrdersRepo = _flakyUpdateOrdersRepo();
+      final proofEventsRepo = _okProofRepo();
 
-      bool? popResult;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) {
-              return Scaffold(
-                body: Center(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      popResult = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => DeliveryCaptureScreen(
-                            order: order,
-                            photoStorage: InMemoryProofPhotoStorage(),
-                            pickPhoto: () async => const [50, 60, 70],
-                            clock: () => DateTime(2026, 5, 12, 16, 13),
-                            ordersRepo: flakyOrdersRepo,
-                            proofEventsRepo: proofEventsRepo,
-                            actorStaffId: 's-test',
-                            proofEventIdGenerator: () => 'pe-retry-once',
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Open'),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+      await _pumpAndPushDelivery(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: _orderReadyForDelivery(),
+        pickPhoto: () async => const [50, 60, 70],
+        ordersRepo: flakyOrdersRepo,
+        proofEventsRepo: proofEventsRepo,
+        proofEventIdGenerator: () => 'pe-retry-once',
       );
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('add_handover_photo')));
       await tester.pumpAndSettle();
@@ -412,68 +310,41 @@ void main() {
       // First Mark delivered — proof insert succeeds, status update throws.
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
-      expect(popResult, isNull);
+      expect(_lastHandle!.result, isNull);
       expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
-      expect(
-        find.textContaining('status update failed'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('status update failed'), findsOneWidget);
 
-      var proofRows = await db.select(db.proofEvents).get();
-      expect(proofRows, hasLength(1));
-      expect(proofRows.single.id, 'pe-retry-once');
-      var outboxRows = await db.select(db.outbox).get();
-      expect(
-        outboxRows.where((r) => r.forTable == 'proof_events'),
-        hasLength(1),
-      );
-      expect(outboxRows.where((r) => r.forTable == 'orders'), isEmpty);
-      var orderRow = await (db.select(db.orders)
-            ..where((t) => t.id.equals('AMW-0421')))
-          .getSingle();
-      expect(orderRow.status, 'ready');
-
-      // Flush the in-flight SnackBar so it doesn't overlap the button on the
-      // next tap. SnackBars auto-dismiss after ~4s; pumping past that clears
-      // the bottom of the screen.
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
 
-      // Second tap — status update succeeds. proof_events stays at 1.
+      // Second tap — status update succeeds → pops.
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
-      expect(popResult, isTrue);
+      expect(_lastHandle!.result, isTrue);
 
-      proofRows = await db.select(db.proofEvents).get();
-      expect(proofRows, hasLength(1),
-          reason:
-              'cached event id + _proofPersisted must keep proof_events at exactly one row');
-      expect(proofRows.single.id, 'pe-retry-once');
+      // insertEvent was called on BOTH taps with the SAME cached id (the repo
+      // upsert dedupes); updateStatus was attempted twice.
+      final events = verify(() => proofEventsRepo.insertEvent(
+            captureAny(),
+            orderId: 'AMW-0421',
+            actorStaffId: 's-test',
+          )).captured.cast<ProofEvent>();
+      expect(events, hasLength(2));
+      expect(events.every((e) => e.id == 'pe-retry-once'), isTrue);
 
-      outboxRows = await db.select(db.outbox).get();
-      expect(
-        outboxRows.where((r) => r.forTable == 'proof_events'),
-        hasLength(1),
-        reason:
-            '_proofPersisted short-circuit must keep proof_events outbox at one row',
-      );
-      expect(outboxRows.where((r) => r.forTable == 'orders'), hasLength(1));
-
-      orderRow = await (db.select(db.orders)
-            ..where((t) => t.id.equals('AMW-0421')))
-          .getSingle();
-      expect(orderRow.status, 'completed');
+      verify(() => flakyOrdersRepo.updateStatus(
+            'AMW-0421',
+            OrderStatus.completed,
+            actorStaffId: 's-test',
+            updatedAt: any(named: 'updatedAt'),
+          )).called(2);
     },
   );
 
   testWidgets(
     'Delivery falls back to itemCount when the order has no pickup proof',
     (tester) async {
-      // Defensive path: scanner flow normally guarantees a pickup proof, but
-      // if the screen is reached for an order without one, the delivery
-      // event's count must come from itemCount rather than crash.
-      final fixture = _DeliveryFixture.create();
-      addTearDown(() async => fixture.db.close());
+      final proofEventsRepo = _okProofRepo();
 
       const orderWithoutPickup = LaundryOrder(
         orderId: 'AMW-0999',
@@ -486,57 +357,30 @@ void main() {
         address: '5 Yaba',
         notes: '',
       );
-      await _seedOrder(fixture.db, orderWithoutPickup);
 
-      final storage = InMemoryProofPhotoStorage();
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) {
-              return Scaffold(
-                body: Center(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => DeliveryCaptureScreen(
-                            order: orderWithoutPickup,
-                            photoStorage: storage,
-                            pickPhoto: () async => const [50, 60, 70],
-                            clock: () => DateTime(2026, 5, 12, 16, 13),
-                            ordersRepo: fixture.ordersRepo,
-                            proofEventsRepo: fixture.proofEventsRepo,
-                            actorStaffId: 's-test',
-                            proofEventIdGenerator: () => 'pe-task-12b',
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Open'),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+      await _pumpAndPushDelivery(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: orderWithoutPickup,
+        pickPhoto: () async => const [50, 60, 70],
+        proofEventsRepo: proofEventsRepo,
+        proofEventIdGenerator: () => 'pe-task-12b',
       );
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
 
-      // The "From pickup" panel surfaces the missing-pickup state.
       expect(find.text('No pickup proof on file.'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('add_handover_photo')));
       await tester.pumpAndSettle();
-
       await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
       await tester.pumpAndSettle();
 
-      // proof_events row carries itemCount (7) because pickupProof was null.
-      final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
-      expect(proofRows, hasLength(1));
-      expect(proofRows.single.itemCount, 7);
+      // Delivery proof carries itemCount (7) because pickupProof was null.
+      final event = verify(() => proofEventsRepo.insertEvent(
+            captureAny(),
+            orderId: 'AMW-0999',
+            actorStaffId: 's-test',
+          )).captured.single as ProofEvent;
+      expect(event.count, 7);
     },
   );
 
@@ -585,14 +429,8 @@ void main() {
       await tester.tap(find.byKey(const Key('add_handover_photo')));
       await tester.pumpAndSettle();
 
-      // No photo was added — the tile is still available for retry.
       expect(find.byKey(const Key('add_handover_photo')), findsOneWidget);
-      // User-facing error feedback is visible.
-      expect(
-        find.textContaining('Could not open camera'),
-        findsOneWidget,
-      );
-      // The exception was handled, not left dangling.
+      expect(find.textContaining('Could not open camera'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -684,4 +522,10 @@ void main() {
       expect(completers, hasLength(1));
     },
   );
+}
+
+/// Mutable holder for a pushed route's pop result + whether the push resolved.
+class _PopHandle {
+  bool? result;
+  bool resolved = false;
 }

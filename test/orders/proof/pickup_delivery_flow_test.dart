@@ -1,26 +1,31 @@
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
-import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
-import 'package:amuwak_staff/src/sync/outbox_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 
+/// Online-only mode: end-to-end pickup → ready → delivery flow driven through
+/// OrderDetailsScreen, which passes its (Supabase-backed) repos down to the
+/// capture screens. The repos are mocked here — the flow's contract is verified
+/// by what the screens call on the repos (two proof inserts + the status
+/// transitions) plus the final completed UI state and the persisted photos.
+class _MockOrdersRepository extends Mock implements OrdersRepository {}
+
+class _MockProofEventsRepository extends Mock
+    implements ProofEventsRepository {}
+
 /// Invokes the `onPressed` of the `ElevatedButton` that contains [label].
-///
-/// Used by this integration test instead of `tester.tap` because the
-/// `OrderDetailsScreen`'s primary action lives at the bottom of the viewport
-/// and competes for hit-testing with overlay artifacts (SnackBars and route
-/// transition snapshots) that linger after each Navigator push/pop in a long
-/// multi-phase flow. Tappability of the same buttons is already verified by
-/// the per-screen widget tests in Tasks 9–12.
+/// Used instead of `tester.tap` because OrderDetailsScreen's primary action
+/// sits at the bottom of the viewport and competes for hit-testing with
+/// overlay artifacts that linger across the multi-phase flow.
 Future<void> _pressButton(WidgetTester tester, String label) async {
   final finder = find.widgetWithText(ElevatedButton, label);
   final button = tester.widget<ElevatedButton>(finder);
@@ -28,52 +33,36 @@ Future<void> _pressButton(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
-class _FlowFixture {
-  _FlowFixture._(this.db, this.outbox, this.ordersRepo, this.proofEventsRepo);
-
-  final AppDatabase db;
-  final OutboxRepository outbox;
-  final OrdersRepository ordersRepo;
-  final ProofEventsRepository proofEventsRepo;
-
-  static _FlowFixture create() {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    final outbox = OutboxRepository(db);
-    final ordersRepo = OrdersRepository(
-      db,
-      outbox: outbox,
-      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-    );
-    final proofEventsRepo = ProofEventsRepository(
-      db,
-      outbox: outbox,
-      clock: () => DateTime.utc(2026, 5, 21, 12, 0),
-    );
-    return _FlowFixture._(db, outbox, ordersRepo, proofEventsRepo);
-  }
-}
-
 void main() {
-  testWidgets(
-      'full pickup -> ready -> delivery flow writes two ProofEvents and five outbox rows',
-      (tester) async {
-    final fixture = _FlowFixture.create();
-    addTearDown(() async => fixture.db.close());
+  setUpAll(() {
+    registerFallbackValue(ProofEvent(
+      id: 'fb',
+      type: ProofEventType.pickup,
+      capturedAt: DateTime(2026, 1, 1),
+      count: 1,
+      photoPaths: const [],
+    ));
+    registerFallbackValue(OrderStatus.pendingPickup);
+    registerFallbackValue(DateTime(2026, 1, 1));
+  });
 
-    await fixture.db.into(fixture.db.orders).insert(OrdersCompanion.insert(
-          id: 'AMW-0421',
-          orderCode: 'AMW-0421',
-          customerName: 'Jane',
-          phone: 'p',
-          address: 'a',
-          serviceType: ServiceType.washOnly.toDbString(),
-          status: 'pending_pickup',
-          intakeMethod: 'driver_pickup',
-          fulfillmentMethod: 'delivery',
-          itemCount: 3,
-          intakeRecordedBy: 's-test',
-          createdBy: 's-test',
-        ));
+  testWidgets(
+      'full pickup -> ready -> delivery flow inserts two proof events and '
+      'walks the order through to completed', (tester) async {
+    final ordersRepo = _MockOrdersRepository();
+    final proofEventsRepo = _MockProofEventsRepository();
+    // updateStatus is called with updatedAt (capture screens) and without
+    // (the direct advance button) — stub both forms.
+    when(() => ordersRepo.updateStatus(any(), any(),
+            actorStaffId: any(named: 'actorStaffId'),
+            updatedAt: any(named: 'updatedAt')))
+        .thenAnswer((_) async {});
+    when(() => ordersRepo.updateStatus(any(), any(),
+        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(() => proofEventsRepo.insertEvent(any(),
+            orderId: any(named: 'orderId'),
+            actorStaffId: any(named: 'actorStaffId')))
+        .thenAnswer((_) async {});
 
     final storage = InMemoryProofPhotoStorage();
 
@@ -100,8 +89,8 @@ void main() {
             );
           },
           clock: () => DateTime(2026, 5, 12, 9, 42),
-          ordersRepo: fixture.ordersRepo,
-          proofEventsRepo: fixture.proofEventsRepo,
+          ordersRepo: ordersRepo,
+          proofEventsRepo: proofEventsRepo,
           actorStaffId: 's-test',
         ),
       ),
@@ -109,7 +98,6 @@ void main() {
 
     // Phase 1: Pickup — open capture, enter count + photo, confirm, done.
     await _pressButton(tester, 'Confirm pickup');
-
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.byKey(const Key('count_increment')));
       await tester.pump();
@@ -117,9 +105,6 @@ void main() {
     await tester.tap(find.byKey(const Key('add_photo')));
     await tester.pumpAndSettle();
     await _pressButton(tester, 'Confirm with customer');
-    // The pickup capture screen's default proofEventIdGenerator uses Uuid().v4().
-    // The DB assertions below don't pin the id, they pin the type
-    // ('pickup' vs 'delivery').
     await _pressButton(tester, 'Done');
 
     // OrderDetailsScreen optimistically reflects inProgress.
@@ -130,11 +115,7 @@ void main() {
 
     // Phase 2: inProgress -> readyForDelivery via the direct button.
     await _pressButton(tester, 'Move to Ready for delivery');
-
-    expect(
-      find.widgetWithText(ElevatedButton, 'Deliver'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(ElevatedButton, 'Deliver'), findsOneWidget);
 
     // Phase 3: Delivery — scan, add handover photo, mark delivered.
     await _pressButton(tester, 'Deliver');
@@ -150,38 +131,26 @@ void main() {
       findsOneWidget,
     );
 
-    // ---- DB assertions (the contract of the new architecture) ----
-    final orderRow = await (fixture.db.select(fixture.db.orders)
-          ..where((t) => t.id.equals('AMW-0421')))
-        .getSingle();
-    expect(orderRow.status, 'completed');
+    // ---- Repo contract: two proof inserts (pickup + delivery) ----
+    final events = verify(() => proofEventsRepo.insertEvent(
+          captureAny(),
+          orderId: 'AMW-0421',
+          actorStaffId: 's-test',
+        )).captured.cast<ProofEvent>();
+    expect(events, hasLength(2));
+    expect(events.map((e) => e.type).toSet(),
+        {ProofEventType.pickup, ProofEventType.delivery});
 
-    final proofRows = await fixture.db.select(fixture.db.proofEvents).get();
-    expect(proofRows, hasLength(2));
-    expect(
-      proofRows.map((r) => r.type).toSet(),
-      {'pickup', 'delivery'},
-    );
+    // ---- Status transitions walked through to completed ----
+    verify(() => ordersRepo.updateStatus('AMW-0421', OrderStatus.inProgress,
+        actorStaffId: 's-test', updatedAt: any(named: 'updatedAt'))).called(1);
+    verify(() => ordersRepo.updateStatus(
+        'AMW-0421', OrderStatus.readyForDelivery,
+        actorStaffId: 's-test')).called(1);
+    verify(() => ordersRepo.updateStatus('AMW-0421', OrderStatus.completed,
+        actorStaffId: 's-test', updatedAt: any(named: 'updatedAt'))).called(1);
 
-    final outboxRows = await fixture.db.select(fixture.db.outbox).get();
-    // 5 rows: 2 proof_events inserts (pickup + delivery) + 3 orders updates
-    // (pending→in_progress from pickup, in_progress→ready from advance,
-    // ready→completed from delivery).
-    expect(outboxRows, hasLength(5));
-    expect(
-      outboxRows.map((r) => '${r.forTable}:${r.op}').toSet(),
-      {'proof_events:insert', 'orders:update'},
-    );
-    expect(
-      outboxRows.where((r) => r.forTable == 'proof_events').length,
-      2,
-    );
-    expect(
-      outboxRows.where((r) => r.forTable == 'orders').length,
-      3,
-    );
-
-    // ---- Photo storage (separate concern; pre-Plan-3b coverage retained) ----
+    // ---- Photo storage: one pickup + one delivery ----
     expect(storage.savedPhotos, hasLength(2));
     expect(
       storage.savedPhotos.where((p) => p.path.contains('pickup')).toList(),
@@ -191,10 +160,5 @@ void main() {
       storage.savedPhotos.where((p) => p.path.contains('delivery')).toList(),
       hasLength(1),
     );
-
-    // History panel: NOT asserted. Under Plan 3b, capture screens write to the
-    // DB and pop bool; OrderDetailsScreen does not reconcile proof events into
-    // local `_order.proofEvents`. The History panel would only appear after a
-    // re-fetch (e.g. via a watchById stream), which is deferred.
   });
 }

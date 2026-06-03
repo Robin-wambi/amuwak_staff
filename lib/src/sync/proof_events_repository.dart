@@ -1,103 +1,115 @@
-import 'package:drift/drift.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_database.dart' as drift;
 import '../orders/proof_event.dart';
-import 'outbox_repository.dart';
+import 'supabase_mappers.dart';
+import 'supabase_payloads.dart';
 
-/// Read/write repository for proof events.
+/// Read/write repository for proof events — ONLINE-ONLY mode.
 ///
-/// Write methods ([insertEvent]) require an [OutboxRepository] to be supplied
-/// at construction time. Callers that only need the read API can omit it;
-/// attempting a write on a read-only-configured instance throws a [StateError].
+/// Reads stream live from Supabase; [insertEvent] upserts directly (upsert,
+/// not insert, so capture-screen retries with the same event id are
+/// idempotent rather than duplicate-PK crashes — the same retry safety the
+/// offline `insertOrIgnore` gave). The offline-first implementation is
+/// preserved in the commented `OFFLINE` block at the bottom of this file.
 class ProofEventsRepository {
   ProofEventsRepository(
-    this._db, {
-    OutboxRepository? outbox,
+    this._supabase, {
     DateTime Function()? clock,
-  })  : _outbox = outbox,
-        _clock = clock ?? DateTime.now;
+  }) : _clock = clock ?? DateTime.now;
 
-  final drift.AppDatabase _db;
-  final OutboxRepository? _outbox;
+  final SupabaseClient _supabase;
   final DateTime Function() _clock;
 
   // ----- READ -----
 
-  /// Non-deleted proof events for [orderId], ordered by [ProofEvents.capturedAt].
+  /// Non-deleted proof events for [orderId], ordered by `captured_at`.
   Stream<List<drift.ProofEvent>> watchByOrder(String orderId) {
-    return (_db.select(_db.proofEvents)
-          ..where((t) => t.orderId.equals(orderId) & t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.capturedAt)]))
-        .watch();
+    return _supabase
+        .from('proof_events')
+        .stream(primaryKey: ['id'])
+        .eq('order_id', orderId)
+        .order('captured_at')
+        .map((rows) => rows
+            .where((r) => r['deleted_at'] == null)
+            .map(proofEventRowFromSupabase)
+            .toList(growable: false));
   }
 
   // ----- WRITE -----
 
-  /// Inserts a proof event row + an outbox enqueue inside a single
-  /// transaction.
-  ///
-  /// Both inserts use `InsertMode.insertOrIgnore` so the operation is
-  /// idempotent on the proof-event PK. This is load-bearing for capture-screen
-  /// retries: if the inserts succeed but the caller's follow-up
-  /// `OrdersRepository.updateStatus` throws, the user taps "Done" again with
-  /// the SAME event id — the second insert here is a no-op rather than a
-  /// duplicate-PK crash. The outbox enqueue already uses insertOrIgnore on the
-  /// row's mutation id, so the retry's outbox write is idempotent too.
+  /// Upserts a proof event. Idempotent on the proof-event PK so a capture
+  /// screen that retries (e.g. after the follow-up status update throws) with
+  /// the SAME event id is a no-op rather than a duplicate-key error.
   Future<void> insertEvent(
     ProofEvent event, {
     required String orderId,
     required String actorStaffId,
   }) async {
-    final outbox = _requireOutbox();
     final now = _clock();
-    await _db.transaction(() async {
-      await _db.into(_db.proofEvents).insert(
-            drift.ProofEventsCompanion.insert(
-              id: event.id,
-              orderId: orderId,
-              type: event.type.name,
-              capturedAt: event.capturedAt,
-              itemCount: event.count,
-              notes: Value(event.notes),
-              capturedBy: actorStaffId,
-              createdAt: now,
-              updatedAt: now,
-            ),
-            mode: InsertMode.insertOrIgnore,
-          );
-      await outbox.enqueue(
-        id: OutboxRepository.dedupKeyFor(
-          forTable: 'proof_events',
-          op: 'insert',
-          rowId: event.id,
-        ),
-        forTable: 'proof_events',
-        op: 'insert',
-        rowId: event.id,
-        payload: <String, dynamic>{
-          'id': event.id,
-          'order_id': orderId,
-          'type': event.type.name,
-          'captured_at': event.capturedAt.toUtc().toIso8601String(),
-          'item_count': event.count,
-          'notes': event.notes,
-          'captured_by': actorStaffId,
-          'created_at': now.toUtc().toIso8601String(),
-          'updated_at': now.toUtc().toIso8601String(),
-        },
-      );
-    });
-  }
-
-  // ----- PRIVATE HELPERS -----
-
-  OutboxRepository _requireOutbox() {
-    final o = _outbox;
-    if (o == null) {
-      throw StateError(
-          'ProofEventsRepository was constructed without an OutboxRepository; '
-          'insertEvent is unavailable.');
-    }
-    return o;
+    await _supabase.from('proof_events').upsert(proofEventUpsertPayload(
+          event,
+          orderId: orderId,
+          actorStaffId: actorStaffId,
+          now: now,
+        ));
   }
 }
+
+/* ============================================================================
+ * OFFLINE (Drift local reads + outbox-queued writes) — PRESERVED FOR RE-ENABLE
+ * ----------------------------------------------------------------------------
+ * import 'package:drift/drift.dart';
+ * import '../data/app_database.dart' as drift;
+ * import '../orders/proof_event.dart';
+ * import 'outbox_repository.dart';
+ *
+ * class ProofEventsRepository {
+ *   ProofEventsRepository(this._db, {OutboxRepository? outbox, DateTime Function()? clock})
+ *       : _outbox = outbox, _clock = clock ?? DateTime.now;
+ *   final drift.AppDatabase _db;
+ *   final OutboxRepository? _outbox;
+ *   final DateTime Function() _clock;
+ *
+ *   Stream<List<drift.ProofEvent>> watchByOrder(String orderId) {
+ *     return (_db.select(_db.proofEvents)
+ *           ..where((t) => t.orderId.equals(orderId) & t.deletedAt.isNull())
+ *           ..orderBy([(t) => OrderingTerm(expression: t.capturedAt)])).watch();
+ *   }
+ *
+ *   Future<void> insertEvent(ProofEvent event,
+ *       {required String orderId, required String actorStaffId}) async {
+ *     final outbox = _requireOutbox();
+ *     final now = _clock();
+ *     await _db.transaction(() async {
+ *       await _db.into(_db.proofEvents).insert(
+ *             drift.ProofEventsCompanion.insert(
+ *               id: event.id, orderId: orderId, type: event.type.name,
+ *               capturedAt: event.capturedAt, itemCount: event.count,
+ *               notes: Value(event.notes), capturedBy: actorStaffId,
+ *               createdAt: now, updatedAt: now),
+ *             mode: InsertMode.insertOrIgnore);
+ *       await outbox.enqueue(
+ *         id: OutboxRepository.dedupKeyFor(
+ *           forTable: 'proof_events', op: 'insert', rowId: event.id),
+ *         forTable: 'proof_events', op: 'insert', rowId: event.id,
+ *         payload: <String, dynamic>{
+ *           'id': event.id, 'order_id': orderId, 'type': event.type.name,
+ *           'captured_at': event.capturedAt.toUtc().toIso8601String(),
+ *           'item_count': event.count, 'notes': event.notes,
+ *           'captured_by': actorStaffId,
+ *           'created_at': now.toUtc().toIso8601String(),
+ *           'updated_at': now.toUtc().toIso8601String()});
+ *     });
+ *   }
+ *
+ *   OutboxRepository _requireOutbox() {
+ *     final o = _outbox;
+ *     if (o == null) {
+ *       throw StateError('ProofEventsRepository was constructed without an '
+ *           'OutboxRepository; insertEvent is unavailable.');
+ *     }
+ *     return o;
+ *   }
+ * }
+ * ========================================================================== */

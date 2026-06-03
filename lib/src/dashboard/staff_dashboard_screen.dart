@@ -25,12 +25,15 @@ import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/order_code.dart';
 import '../shared/uuid.dart';
-import '../shared/widgets/sync_status_banner.dart';
 import '../sync/repository_providers.dart';
-import '../sync/sync_errors_provider.dart';
-import '../sync/sync_errors_screen.dart';
-import '../sync/sync_orchestrator_provider.dart';
-import '../sync/sync_status.dart';
+// ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
+// orchestrator, local DB) are disabled. Re-add these imports with the
+// commented code below to restore offline:
+// import '../shared/widgets/sync_status_banner.dart';
+// import '../sync/sync_errors_provider.dart';
+// import '../sync/sync_errors_screen.dart';
+// import '../sync/sync_orchestrator_provider.dart';
+// import '../sync/sync_status.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
@@ -118,8 +121,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: const Text(
-          'Sign out and clear local data on this device? Any '
-          'pending uploads will be discarded.',
+          'Sign out of this device? You will need to sign in again to '
+          'continue.',
         ),
         actions: [
           TextButton(
@@ -155,16 +158,11 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
   }
 
-  /// Production wiring: resolves the orchestrator, database, and auth service
-  /// from Riverpod and hands them to [signOutAndReset]. Kept as a static-ish
-  /// method (instance method that only touches `ref`) so the test override
-  /// path can replace this entirely.
+  /// Production wiring: resolves the auth service from Riverpod and hands it to
+  /// [signOutAndReset]. ONLINE-ONLY: the offline teardown (orchestrator.stop +
+  /// local-DB truncate) is disabled, so only the auth sign-out is wired here.
   Future<void> _defaultSignOut(WidgetRef ref) {
-    return signOutAndReset(
-      orchestrator: ref.read(syncOrchestratorProvider),
-      db: ref.read(appDatabaseProvider),
-      auth: ref.read(authServiceProvider),
-    );
+    return signOutAndReset(auth: ref.read(authServiceProvider));
   }
 
   Future<void> _handleNewPickup() async {
@@ -194,13 +192,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
-    // The order was just written to Drift; the stream emits asynchronously
-    // after the transaction settles. Poll the snapshot a few times before
-    // giving up — without this the first pickup after app start lands on
-    // the dashboard instead of PickupCaptureScreen because the stream
-    // hadn't pre-emitted the order yet.
+    // The order was just written to Supabase; the realtime stream re-emits
+    // asynchronously once the insert round-trips back over the WebSocket. Poll
+    // the snapshot before giving up — without this the new pickup lands on the
+    // dashboard instead of PickupCaptureScreen because the stream hadn't
+    // delivered the order yet. The window (20 × 100ms = 2s) allows for mobile
+    // realtime latency (~100-500ms, more on a slow link); beyond it we fall
+    // back to the "open from the list" hint below.
     LaundryOrder? newOrder;
-    for (var attempt = 0; attempt < 10; attempt++) {
+    for (var attempt = 0; attempt < 20; attempt++) {
       final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
       for (final o in orders) {
         if (o.orderId == result.orderId) {
@@ -209,7 +209,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         }
       }
       if (newOrder != null) break;
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
     }
     if (!mounted) return;
@@ -287,11 +287,13 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     });
   }
 
-  void _openSyncErrors() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
-    );
-  }
+  // ONLINE-ONLY: the SyncErrorsScreen is unreachable while offline is disabled.
+  // Restore by re-adding the import and this navigation helper:
+  //   void _openSyncErrors() {
+  //     Navigator.of(context).push<void>(
+  //       MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
+  //     );
+  //   }
 
   String get _title {
     switch (_selectedTabIndex) {
@@ -324,26 +326,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
             ),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
-          Consumer(
-            builder: (context, ref, _) {
-              final count = ref.watch(syncErrorCountProvider);
-              return IconButton(
-                tooltip: 'Sync errors',
-                onPressed: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const SyncErrorsScreen()),
-                ),
-                icon: Badge(
-                  label: count > 0 ? Text('$count') : null,
-                  isLabelVisible: count > 0,
-                  child: const Icon(Icons.error_outline_rounded),
-                ),
-              );
-            },
-          ),
+          // ONLINE-ONLY: sync-errors badge/button removed (no outbox/dead-letter
+          // queue in online mode). Restore the `Consumer` that watched
+          // `syncErrorCountProvider` and pushed `SyncErrorsScreen` to bring back.
         ],
       ),
       body: _DashboardTabShell(
-        onShowErrors: _openSyncErrors,
         child: switch (_selectedTabIndex) {
           1 => ordersAsync.when(
               data: (orders) => _OrdersBody(
@@ -417,21 +405,16 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
 // ---------------------------------------------------------------------------
 
 class _DashboardTabShell extends StatelessWidget {
-  const _DashboardTabShell({required this.child, this.onShowErrors});
+  const _DashboardTabShell({required this.child});
 
   final Widget child;
-  final VoidCallback? onShowErrors;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          SyncStatusBanner(onShowErrors: onShowErrors),
-          Expanded(child: child),
-        ],
-      ),
-    );
+    // ONLINE-ONLY: the SyncStatusBanner (offline/pending/sync-error indicator)
+    // is removed. Restore by wrapping `child` in a Column with
+    // `SyncStatusBanner(onShowErrors: ...)` above it.
+    return SafeArea(child: child);
   }
 }
 

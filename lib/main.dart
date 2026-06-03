@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'src/auth/login_screen.dart';
 import 'src/bootstrap/app_bootstrap.dart';
 import 'src/shared/widgets/app_theme.dart';
-import 'src/sync/sync_orchestrator_provider.dart';
+// ONLINE-ONLY: the sync orchestrator (offline engine) is disabled. Re-add this
+// import and the `ref.watch(syncLifecycleProvider)` below to restore offline.
+// import 'src/sync/sync_orchestrator_provider.dart';
 
 Future<void> main() async {
   await AppBootstrap.initialize();
@@ -15,10 +17,10 @@ class AmuwakStaffApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Eagerly resolve the sync lifecycle so its auth-state listener
-    // installs as soon as the app mounts. Without this watch, the
-    // listener never fires and the SyncOrchestrator never starts.
-    ref.watch(syncLifecycleProvider);
+    // ONLINE-ONLY: offline sync engine disabled. Previously this eagerly
+    // resolved `syncLifecycleProvider` so its auth-state listener started the
+    // SyncOrchestrator on sign-in. Re-enable to restore offline:
+    //   ref.watch(syncLifecycleProvider);
 
     return MaterialApp(
       title: 'Amuwak Staff',

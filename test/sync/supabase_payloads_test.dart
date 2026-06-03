@@ -1,0 +1,158 @@
+import 'package:amuwak_staff/src/data/app_database.dart' show Customer;
+import 'package:amuwak_staff/src/orders/order.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/sync/supabase_payloads.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// The online write path sends these snake_case row maps to Supabase. These
+/// pure builders are the counterparts to the read mappers; testing them pins
+/// the column names, enum→string folding, and UTC ISO timestamps without
+/// mocking the Supabase client.
+void main() {
+  group('orderUpsertPayload', () {
+    test('maps every column, folds enums, and stamps UTC ISO timestamps', () {
+      const order = LaundryOrder(
+        orderId: 'o1',
+        orderCode: 'AMW-1',
+        customerId: 'c1',
+        customerName: 'Ada',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 'Today',
+        itemCount: 5,
+        phone: '0700',
+        address: '12 Kira Rd',
+        notes: 'handle with care',
+        intakeMethod: 'driver_pickup',
+        fulfillmentMethod: 'delivery',
+      );
+      // A non-UTC local time must be serialised as UTC.
+      final now = DateTime(2026, 6, 2, 12, 0);
+
+      final p = orderUpsertPayload(order, actorStaffId: 's1', now: now);
+
+      expect(p['id'], 'o1');
+      expect(p['order_code'], 'AMW-1');
+      expect(p['customer_id'], 'c1');
+      expect(p['customer_name'], 'Ada');
+      expect(p['phone'], '0700');
+      expect(p['address'], '12 Kira Rd');
+      expect(p['service_type'], ServiceType.washAndIron.toDbString());
+      expect(p['status'], OrderStatus.pendingPickup.toDbString());
+      expect(p['intake_method'], 'driver_pickup');
+      expect(p['fulfillment_method'], 'delivery');
+      expect(p['item_count'], 5);
+      expect(p['notes'], 'handle with care');
+      expect(p['scheduled_for'], isNull);
+      expect(p['intake_recorded_by'], 's1');
+      expect(p['created_by'], 's1');
+      expect(p['created_at'], now.toUtc().toIso8601String());
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+    });
+
+    test('serialises scheduledFor as a UTC ISO string when present', () {
+      final order = LaundryOrder(
+        orderId: 'o2',
+        customerName: 'Bob',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+        scheduledFor: DateTime.utc(2026, 6, 3, 9),
+      );
+      final p = orderUpsertPayload(order, actorStaffId: 's1', now: DateTime(2026, 6, 2));
+      expect(p['scheduled_for'], DateTime.utc(2026, 6, 3, 9).toIso8601String());
+    });
+  });
+
+  group('orderStatusUpdatePayload', () {
+    test('carries the folded status and a UTC updated_at', () {
+      final now = DateTime(2026, 6, 2, 15, 30);
+      final p = orderStatusUpdatePayload(OrderStatus.readyForDelivery, now: now);
+      expect(p.keys, unorderedEquals(<String>['status', 'updated_at']));
+      expect(p['status'], OrderStatus.readyForDelivery.toDbString());
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+    });
+  });
+
+  group('customerUpsertPayload', () {
+    test('maps columns and keeps createdAt while refreshing updatedAt', () {
+      final customer = Customer(
+        id: 'c1',
+        name: 'Ada',
+        phone: '0700',
+        address: '12 Kira Rd',
+        notes: 'gate code 4',
+        createdAt: DateTime.utc(2026, 6, 1, 8),
+        updatedAt: DateTime.utc(2026, 6, 1, 8),
+        deletedAt: null,
+      );
+      final now = DateTime(2026, 6, 2, 9);
+
+      final p = customerUpsertPayload(customer, now: now);
+
+      expect(p['id'], 'c1');
+      expect(p['name'], 'Ada');
+      expect(p['phone'], '0700');
+      expect(p['address'], '12 Kira Rd');
+      expect(p['notes'], 'gate code 4');
+      expect(p['created_at'], DateTime.utc(2026, 6, 1, 8).toIso8601String());
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+    });
+
+    test('passes through null address/notes', () {
+      final customer = Customer(
+        id: 'c2',
+        name: 'Bob',
+        phone: '0701',
+        address: null,
+        notes: null,
+        createdAt: DateTime.utc(2026, 6, 1, 8),
+        updatedAt: DateTime.utc(2026, 6, 1, 8),
+        deletedAt: null,
+      );
+      final p = customerUpsertPayload(customer, now: DateTime(2026, 6, 2));
+      expect(p['address'], isNull);
+      expect(p['notes'], isNull);
+    });
+  });
+
+  group('proofEventUpsertPayload', () {
+    test('maps the domain ProofEvent to a proof_events row', () {
+      final event = ProofEvent(
+        id: 'pe1',
+        type: ProofEventType.delivery,
+        capturedAt: DateTime(2026, 6, 2, 16, 13),
+        count: 7,
+        photoPaths: const ['memory://x'],
+        notes: 'left at gate',
+      );
+      final now = DateTime(2026, 6, 2, 16, 14);
+
+      final p = proofEventUpsertPayload(
+        event,
+        orderId: 'o1',
+        actorStaffId: 's1',
+        now: now,
+      );
+
+      expect(p['id'], 'pe1');
+      expect(p['order_id'], 'o1');
+      expect(p['type'], 'delivery');
+      expect(p['captured_at'],
+          DateTime(2026, 6, 2, 16, 13).toUtc().toIso8601String());
+      expect(p['item_count'], 7);
+      expect(p['notes'], 'left at gate');
+      expect(p['captured_by'], 's1');
+      expect(p['created_at'], now.toUtc().toIso8601String());
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+      // Photo binaries live in Storage — never in the row payload.
+      expect(p.containsKey('photo_paths'), isFalse);
+    });
+  });
+}
