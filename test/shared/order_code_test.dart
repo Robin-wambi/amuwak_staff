@@ -23,6 +23,17 @@ void main() {
       );
     });
 
+    test('targets the next_order_code key when the row has other columns', () {
+      // The first column is NOT the code — a naive values.first would wrongly
+      // return 'x'. We must key on next_order_code.
+      expect(
+        parseOrderCodeRpcResult([
+          {'other_col': 'x', 'next_order_code': 'AMW-2026-0042'}
+        ]),
+        'AMW-2026-0042',
+      );
+    });
+
     test('throws a descriptive error on an unexpected shape', () {
       expect(() => parseOrderCodeRpcResult(42), throwsStateError);
       expect(() => parseOrderCodeRpcResult(null), throwsStateError);

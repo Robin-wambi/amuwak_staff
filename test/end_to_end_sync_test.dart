@@ -79,13 +79,15 @@ void main() {
       fetch: SyncPuller.supabaseFetcher(supabase),
     );
 
-    // customers.id is a Postgres uuid column — must be valid UUID v4 format
-    // (8-4-4-4-12 hex). We use a deterministic prefix + a millis-based tail
-    // so concurrent test runs don't collide and the row is identifiable.
+    // customers.id is a Postgres uuid column — must be a valid RFC-4122 UUID
+    // (8-4-4-4-12 hex). Postgres validates only the overall format, not the
+    // version nibble; we use a `7` nibble to match the app's UUID v7 ids. A
+    // deterministic prefix + a millis-based tail keeps concurrent test runs
+    // from colliding and makes the row identifiable.
     final tail = DateTime.now().millisecondsSinceEpoch
         .toRadixString(16)
         .padLeft(12, '0');
-    final newId = 'e2e00000-0000-4000-8000-${tail.substring(tail.length - 12)}';
+    final newId = 'e2e00000-0000-7000-8000-${tail.substring(tail.length - 12)}';
     final payload = {
       'id': newId,
       'name': 'E2E Sync Test',
