@@ -277,7 +277,6 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       status: OrderStatus.pendingPickup,
       timeLabel: LaundryOrder.computeTimeLabel(
         scheduledFor: scheduled,
-        createdAt: now,
         now: widget.clock,
       ),
       itemCount: _count,

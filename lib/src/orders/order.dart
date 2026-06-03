@@ -70,7 +70,6 @@ class LaundryOrder {
       status: OrderStatus.fromDbString(row.status),
       timeLabel: computeTimeLabel(
         scheduledFor: row.scheduledFor,
-        createdAt: row.createdAt,
       ),
       itemCount: row.itemCount,
       phone: row.phone,
@@ -139,7 +138,6 @@ class LaundryOrder {
   ///   creation timestamp which is shown elsewhere on the card).
   static String computeTimeLabel({
     required DateTime? scheduledFor,
-    required DateTime createdAt,
     DateTime Function()? now,
   }) {
     if (scheduledFor != null) return formatScheduled(scheduledFor, now: now);

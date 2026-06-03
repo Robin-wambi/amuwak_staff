@@ -256,7 +256,6 @@ void main() {
         expect(
           LaundryOrder.computeTimeLabel(
             scheduledFor: null,
-            createdAt: DateTime(2026, 5, 26, 8, 30),
             now: fixedNow,
           ),
           'Pickup: now',
@@ -267,7 +266,6 @@ void main() {
         expect(
           LaundryOrder.computeTimeLabel(
             scheduledFor: DateTime(2026, 5, 27, 9, 0),
-            createdAt: DateTime(2026, 5, 26, 8, 30),
             now: fixedNow,
           ),
           'Tomorrow, 9:00 AM',
