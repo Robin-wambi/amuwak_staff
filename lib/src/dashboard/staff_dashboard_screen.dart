@@ -270,6 +270,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // wire writes through the repositories).
   }
 
+  void _openOrderSearch() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => OrderSearchScreen(
+          onOrderTap: _openOrderDetails,
+          cameraViewBuilder: _cameraViewBuilder,
+        ),
+      ),
+    );
+  }
+
   void _selectTab(int index) {
     setState(() {
       _selectedTabIndex = index;
@@ -358,10 +369,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 onOrderTap: _openOrderDetails,
                 onNewPickup: _handleNewPickup,
                 onShowReport: () => _selectTab(2),
+                onCheckOrder: _openOrderSearch,
               ),
               loading: () => _DashboardLoadingBody(
                 onNewPickup: _handleNewPickup,
                 onShowReport: () => _selectTab(2),
+                onCheckOrder: _openOrderSearch,
               ),
               error: (_, __) => _ErrorRetry(
                 onRetry: () => ref.invalidate(ordersStreamProvider),
@@ -428,12 +441,14 @@ class _DashboardBody extends StatelessWidget {
     required this.onOrderTap,
     required this.onNewPickup,
     required this.onShowReport,
+    required this.onCheckOrder,
   });
 
   final List<LaundryOrder> orders;
   final void Function(LaundryOrder) onOrderTap;
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
+  final VoidCallback onCheckOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +479,7 @@ class _DashboardBody extends StatelessWidget {
         _QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
+          onCheckOrder: onCheckOrder,
         ),
         const SizedBox(height: AppSpacing.xxl),
         Text(
@@ -484,10 +500,12 @@ class _DashboardLoadingBody extends StatelessWidget {
   const _DashboardLoadingBody({
     required this.onNewPickup,
     required this.onShowReport,
+    required this.onCheckOrder,
   });
 
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
+  final VoidCallback onCheckOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -509,6 +527,7 @@ class _DashboardLoadingBody extends StatelessWidget {
         _QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
+          onCheckOrder: onCheckOrder,
         ),
       ],
     );
@@ -881,10 +900,12 @@ class _QuickActions extends StatelessWidget {
   const _QuickActions({
     required this.onNewPickup,
     required this.onShowReport,
+    required this.onCheckOrder,
   });
 
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
+  final VoidCallback onCheckOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -910,9 +931,7 @@ class _QuickActions extends StatelessWidget {
               child: _ActionButton(
                 label: 'Check order',
                 icon: Icons.search_rounded,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const OrderSearchScreen()),
-                ),
+                onTap: onCheckOrder,
               ),
             ),
             const SizedBox(width: AppSpacing.sm + 2), // original was 10
