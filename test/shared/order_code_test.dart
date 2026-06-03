@@ -27,6 +27,18 @@ void main() {
       expect(() => parseOrderCodeRpcResult(42), throwsStateError);
       expect(() => parseOrderCodeRpcResult(null), throwsStateError);
       expect(() => parseOrderCodeRpcResult(const []), throwsStateError);
+      // A list/map carrying a non-string payload is still an unexpected shape.
+      expect(() => parseOrderCodeRpcResult(const [42]), throwsStateError);
+    });
+
+    test('throws on an empty or blank code rather than storing garbage', () {
+      expect(() => parseOrderCodeRpcResult(''), throwsStateError);
+      expect(() => parseOrderCodeRpcResult('   '), throwsStateError);
+      expect(
+          () => parseOrderCodeRpcResult([
+                {'next_order_code': ''}
+              ]),
+          throwsStateError);
     });
   });
 }

@@ -9,9 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// tests inject a deterministic stand-in instead. Requires connectivity at
 /// order-creation time: the RPC throws when offline, which the form surfaces as
 /// a retryable error.
-Future<String> defaultOrderCode([SupabaseClient? client]) async {
-  final c = client ?? Supabase.instance.client;
-  final result = await c.rpc('next_order_code');
+Future<String> defaultOrderCode() async {
+  final result = await Supabase.instance.client.rpc('next_order_code');
   return parseOrderCodeRpcResult(result);
 }
 
@@ -22,14 +21,24 @@ Future<String> defaultOrderCode([SupabaseClient? client]) async {
 /// (`[{next_order_code: ...}]`) and the single-object shape in case the SDK or
 /// PostgREST serialisation differs by version — turning an otherwise cryptic
 /// `TypeError` at this network boundary into a clear, diagnosable failure.
+///
+/// An empty/blank result is rejected too: it can't be a real code, would render
+/// as a blank order reference, and is almost certainly a server-side fault we'd
+/// rather surface loudly than silently persist. We deliberately do NOT enforce
+/// the full `AMW-YYYY-NNNN` shape here — that would brittly couple this boundary
+/// to the server's format and reject a legitimately-evolved code.
 String parseOrderCodeRpcResult(Object? result) {
-  if (result is String) return result;
+  if (result is String) {
+    if (result.trim().isEmpty) {
+      throw StateError('next_order_code RPC returned an empty code');
+    }
+    return result;
+  }
   if (result is List && result.isNotEmpty) {
     return parseOrderCodeRpcResult(result.first);
   }
   if (result is Map && result.values.isNotEmpty) {
-    final value = result.values.first;
-    if (value is String) return value;
+    return parseOrderCodeRpcResult(result.values.first);
   }
   throw StateError('next_order_code RPC returned an unexpected shape: $result');
 }

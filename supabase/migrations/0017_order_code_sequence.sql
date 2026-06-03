@@ -11,6 +11,11 @@
 -- the result in orders.order_code (still text UNIQUE NOT NULL — see 0003).
 -- Atomicity comes from the INSERT ... ON CONFLICT ... RETURNING, so concurrent
 -- callers can never receive the same number. Numbers reset per calendar year.
+--
+-- Gaps are expected and acceptable: a code is consumed the moment it is
+-- reserved, so an abandoned New Pickup form (or a committed bump whose HTTP
+-- response was lost, prompting a client retry) leaves a hole in the sequence.
+-- The codes stay unique and monotonic; they are not a gapless audit counter.
 
 CREATE TABLE order_code_counters (
   year       int PRIMARY KEY,

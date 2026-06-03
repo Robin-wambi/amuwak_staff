@@ -91,6 +91,10 @@ Get-ChildItem supabase/tests/*.sql | Sort-Object Name | ForEach-Object {
 
 ## Layout
 
+Selected highlights below — see `migrations/` for the complete, authoritative
+list (e.g. `0010`–`0016` cover RLS tightening, trigger security, and the
+PowerSync exploration/rollback).
+
 | Path                    | Purpose                                                   |
 |-------------------------|-----------------------------------------------------------|
 | `migrations/0001_…`     | Enable pgcrypto + pgtap                                   |
