@@ -518,6 +518,31 @@ void main() {
     expect(orders.single.itemCount, 4);
     expect(orders.single.notes, 'Gate locked after 6');
   });
+
+  testWidgets('Optional details: item-count stepper caps at 99', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+
+    // Tap well past the cap; the count must not exceed 99 (no four-digit counts).
+    for (var i = 0; i < 105; i++) {
+      await tester.tap(find.byKey(const Key('np_count_inc')));
+      await tester.pump();
+    }
+
+    expect(find.text('99'), findsOneWidget);
+    expect(find.text('100'), findsNothing);
+    final incButton =
+        tester.widget<IconButton>(find.byKey(const Key('np_count_inc')));
+    expect(incButton.onPressed, isNull,
+        reason: 'increment is disabled once the cap is reached');
+  });
 }
 
 /// Mutable holder so tests can read the value the form pops with AFTER the

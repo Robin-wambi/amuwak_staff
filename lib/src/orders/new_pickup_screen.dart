@@ -68,6 +68,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   _ScheduleChip? _selectedChip;
   bool _optionalExpanded = false;
   int _count = 0;
+  // Guards against fat-fingering a four-digit item count on the stepper.
+  static const _maxItemCount = 99;
   final _notesController = TextEditingController();
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
@@ -479,7 +481,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   IconButton(
                     key: const Key('np_count_inc'),
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => setState(() => _count++),
+                    onPressed: _count < _maxItemCount
+                        ? () => setState(() => _count++)
+                        : null,
                   ),
                 ],
               ),
