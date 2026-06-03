@@ -3,8 +3,8 @@
 -- and that the backing counter table is reachable only via the function
 -- (authenticated may EXECUTE the function but not read the table directly).
 --
--- The whole file runs inside BEGIN ... ROLLBACK, so the DELETE + the codes it
--- issues never touch the real production counter.
+-- The whole file runs inside BEGIN ... ROLLBACK, so the DELETEs + the codes it
+-- issues never touch real production data.
 
 BEGIN;
 SET search_path TO extensions, public;
@@ -16,8 +16,14 @@ SELECT plan(8);
 SELECT has_function('next_order_code');
 SELECT has_table('order_code_counters');
 
--- Deterministic slate for this transaction (rolled back at the end).
+-- Deterministic slate for this transaction (rolled back at the end). Since 0018
+-- made next_order_code() reconcile against orders, the orders table must be
+-- cleared too for the sequence to start at 0001. replica role disables
+-- triggers + FK checks so the wipe doesn't trip dependent-table FKs.
+SET LOCAL session_replication_role = replica;
+DELETE FROM public.orders;
 DELETE FROM public.order_code_counters;
+SET LOCAL session_replication_role = origin;
 
 SELECT is(
   public.next_order_code(),

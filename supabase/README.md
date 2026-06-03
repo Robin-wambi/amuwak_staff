@@ -107,6 +107,7 @@ PowerSync exploration/rollback).
 | `migrations/0008_…`     | `proof-photos` storage bucket + RLS                       |
 | `migrations/0009_…`     | `custom_access_token_hook` for staff role claim           |
 | `migrations/0017_…`     | `order_code_counters` + `next_order_code()` RPC (sequential `AMW-YYYY-NNNN` codes) |
+| `migrations/0018_…`     | `next_order_code()` reconciles the counter against the max existing `order_code` (self-heals a stale counter) |
 | `tests/`                | Sibling pgTAP test per migration                          |
 | `seed.sql`              | (Empty placeholder — seeds embedded in migrations.)       |
 
