@@ -88,6 +88,15 @@ void main() {
       expect(orders.searchBy('0700'), [_searchBase]);
     });
 
+    test('matches phone ignoring formatting (spaces, +, country code)', () {
+      // Orders created via the pickup form store the raw, formatted phone the
+      // rider typed. A rider searching types digits without the spacing, so the
+      // match must compare digit-only forms, not raw substrings.
+      final formatted = _searchBase.copyWith(phone: '+256 700 123 456');
+      expect([formatted].searchBy('700123456'), [formatted]);
+      expect([formatted].searchBy('256 700 123'), [formatted]);
+    });
+
     test('matches on address (partial, case-insensitive)', () {
       expect(orders.searchBy('kololo'), [_searchBase]);
       expect(orders.searchBy('entebbe'), [other]);

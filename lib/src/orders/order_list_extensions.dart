@@ -1,3 +1,4 @@
+import '../shared/phone.dart';
 import 'order.dart';
 import 'order_status.dart';
 
@@ -15,14 +16,20 @@ extension OrderListSearch on List<LaundryOrder> {
   /// order code, customer name, phone, and address. An empty (or whitespace)
   /// query returns the list unchanged so callers can use this for the
   /// zero-state list as well.
+  ///
+  /// Phone is matched on digits only ([normalizePhone]) so a query typed
+  /// without spacing (`700123456`) still matches a formatted stored number
+  /// (`+256 700 123 456`).
   List<LaundryOrder> searchBy(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return this;
+    final queryDigits = normalizePhone(q);
     return where((o) =>
             o.orderCode.toLowerCase().contains(q) ||
             o.customerName.toLowerCase().contains(q) ||
-            o.phone.toLowerCase().contains(q) ||
-            o.address.toLowerCase().contains(q))
+            o.address.toLowerCase().contains(q) ||
+            (queryDigits.isNotEmpty &&
+                normalizePhone(o.phone).contains(queryDigits)))
         .toList(growable: false);
   }
 }

@@ -39,10 +39,14 @@ String parseOrderCodeRpcResult(Object? result) {
   }
   if (result is Map && result.values.isNotEmpty) {
     // Prefer the named column so a multi-column row can't return the wrong
-    // value off whichever key happens to come first; fall back to the sole
-    // value for the canonical single-column shape.
-    final keyed = result['next_order_code'];
-    return parseOrderCodeRpcResult(keyed ?? result.values.first);
+    // value off whichever key happens to come first. Only fall back to the
+    // sole value for the canonical single-column shape — if the key is present
+    // but null, recurse on that null so it fails loudly rather than silently
+    // grabbing another column.
+    if (result.containsKey('next_order_code')) {
+      return parseOrderCodeRpcResult(result['next_order_code']);
+    }
+    return parseOrderCodeRpcResult(result.values.first);
   }
   throw StateError('next_order_code RPC returned an unexpected shape: $result');
 }

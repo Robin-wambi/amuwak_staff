@@ -42,6 +42,18 @@ void main() {
       expect(() => parseOrderCodeRpcResult(const [42]), throwsStateError);
     });
 
+    test(
+        'throws when next_order_code is present but null, instead of falling '
+        'back to another column', () {
+      // A present-but-null code key must fail loudly, not silently return some
+      // other column's value (here 'x') as if it were the order code.
+      expect(
+          () => parseOrderCodeRpcResult([
+                {'other_col': 'x', 'next_order_code': null}
+              ]),
+          throwsStateError);
+    });
+
     test('throws on an empty or blank code rather than storing garbage', () {
       expect(() => parseOrderCodeRpcResult(''), throwsStateError);
       expect(() => parseOrderCodeRpcResult('   '), throwsStateError);

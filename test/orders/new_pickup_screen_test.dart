@@ -143,6 +143,25 @@ void main() {
     expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
   });
 
+  testWidgets(
+      'Create stays disabled when the phone has fewer than 9 digits even '
+      'though the formatted text is 9+ characters', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    // '+256 1234' is 9 raw characters but only 7 digits — a raw-length check
+    // would wrongly enable Create; a digit-count check must keep it disabled.
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 1234');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    final create = find.widgetWithText(ElevatedButton, 'Create pickup');
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+  });
+
   testWidgets('Submit happy path writes customer + order, pops with '
       'startPickupNow=true (default schedule)', (tester) async {
     final handle = await pumpFormAndOpen(tester);

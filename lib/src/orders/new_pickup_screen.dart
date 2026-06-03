@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart' show Customer;
+import '../shared/phone.dart';
 import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
@@ -113,13 +114,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   bool get _canSubmit =>
       _nameController.text.trim().isNotEmpty &&
-      _phoneController.text.trim().length >= 9 &&
+      normalizePhone(_phoneController.text).length >= 9 &&
       _addressController.text.trim().isNotEmpty &&
       _serviceType != null &&
       !_saving;
-
-  String _normalizePhone(String s) =>
-      s.replaceAll(RegExp(r'\s+'), '').replaceAll('+', '');
 
   Future<void> _useMyLocation() async {
     setState(() => _locating = true);
@@ -145,7 +143,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   Future<void> _onPhoneFocusChange() async {
     if (_phoneFocus.hasFocus) return;
-    final typed = _normalizePhone(_phoneController.text);
+    final typed = normalizePhone(_phoneController.text);
     if (typed.length < 9) return;
     // FocusNode.addListener takes a VoidCallback and discards the Future
     // this async listener returns, so a thrown error becomes an unhandled
@@ -154,7 +152,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       final all = await widget.customersRepo.getAll();
       Customer? matched;
       for (final c in all) {
-        if (_normalizePhone(c.phone) == typed) {
+        if (normalizePhone(c.phone) == typed) {
           matched = c;
           break;
         }
