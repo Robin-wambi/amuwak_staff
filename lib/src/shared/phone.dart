@@ -7,3 +7,21 @@
 /// leading-zero form with an international country-code form — that needs full
 /// phone canonicalisation, tracked separately.
 String normalizePhone(String input) => input.replaceAll(RegExp(r'[^0-9]'), '');
+
+/// Canonicalises a Ugandan mobile number to its 9-digit national significant
+/// number (e.g. `700123456`), so the local trunk form (`0700123456`), the
+/// international form (`+256 700 123 456` / `256700123456`), and the bare
+/// national form all reduce to the same value for matching and validation.
+///
+/// Uganda-specific: it drops a leading `256` country code or a single leading
+/// `0`. UG mobile national numbers start with `7`, never `0`/`2`, so this is
+/// unambiguous. A complete number yields exactly 9 digits.
+String ugandaNationalDigits(String input) {
+  var digits = normalizePhone(input);
+  if (digits.startsWith('256')) {
+    digits = digits.substring(3);
+  } else if (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  return digits;
+}

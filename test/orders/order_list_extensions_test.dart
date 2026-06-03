@@ -97,6 +97,15 @@ void main() {
       expect([formatted].searchBy('256 700 123'), [formatted]);
     });
 
+    test('cross-matches a local-format query against an international number',
+        () {
+      // Stored international (+256), rider searches with the local 0-prefixed
+      // form a customer would read out — must still match.
+      final intl = _searchBase.copyWith(phone: '+256 700 123 456');
+      expect([intl].searchBy('0700123456'), [intl]);
+      expect([intl].searchBy('0700 123 456'), [intl]);
+    });
+
     test('matches on address (partial, case-insensitive)', () {
       expect(orders.searchBy('kololo'), [_searchBase]);
       expect(orders.searchBy('entebbe'), [other]);

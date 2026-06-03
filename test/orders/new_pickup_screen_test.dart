@@ -11,6 +11,7 @@ import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/shared/phone.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
@@ -160,6 +161,30 @@ void main() {
 
     final create = find.widgetWithText(ElevatedButton, 'Create pickup');
     expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+  });
+
+  testWidgets('phone field caps the national number at 9 digits (blocks the '
+      '10th)', (tester) async {
+    await pumpFormAndOpen(tester);
+    final phone = find.byKey(const Key('np_phone'));
+
+    // A full 9-digit national number is accepted.
+    await tester.enterText(phone, '+256 700123456');
+    await tester.pump();
+    expect(
+      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
+          .length,
+      9,
+    );
+
+    // Attempting a 10th national digit is rejected — the field stays at 9.
+    await tester.enterText(phone, '+256 7001234567');
+    await tester.pump();
+    expect(
+      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
+          .length,
+      9,
+    );
   });
 
   testWidgets('Submit happy path writes customer + order, pops with '

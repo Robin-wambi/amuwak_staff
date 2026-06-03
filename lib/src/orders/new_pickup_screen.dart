@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/app_database.dart' show Customer;
 import '../shared/phone.dart';
@@ -114,7 +115,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   bool get _canSubmit =>
       _nameController.text.trim().isNotEmpty &&
-      normalizePhone(_phoneController.text).length >= 9 &&
+      ugandaNationalDigits(_phoneController.text).length == 9 &&
       _addressController.text.trim().isNotEmpty &&
       _serviceType != null &&
       !_saving;
@@ -143,8 +144,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   Future<void> _onPhoneFocusChange() async {
     if (_phoneFocus.hasFocus) return;
-    final typed = normalizePhone(_phoneController.text);
-    if (typed.length < 9) return;
+    final typed = ugandaNationalDigits(_phoneController.text);
+    if (typed.length != 9) return;
     // FocusNode.addListener takes a VoidCallback and discards the Future
     // this async listener returns, so a thrown error becomes an unhandled
     // zone error. Catch and surface via SnackBar instead.
@@ -152,7 +153,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       final all = await widget.customersRepo.getAll();
       Customer? matched;
       for (final c in all) {
-        if (normalizePhone(c.phone) == typed) {
+        if (ugandaNationalDigits(c.phone) == typed) {
           matched = c;
           break;
         }
@@ -344,6 +345,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _phoneController,
               focusNode: _phoneFocus,
               keyboardType: TextInputType.phone,
+              inputFormatters: const [_UgandaNationalDigitsLimiter()],
               decoration: const InputDecoration(labelText: 'Phone'),
               onChanged: (_) => setState(() {
                 _matchedCustomerId = null;
@@ -524,5 +526,22 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Blocks edits that would push the phone field past 9 national digits, so a
+/// rider can't type more than a complete Ugandan mobile number. Tolerates the
+/// `+256 ` prefix and any spacing — the cap is on [ugandaNationalDigits], not
+/// raw characters.
+class _UgandaNationalDigitsLimiter extends TextInputFormatter {
+  const _UgandaNationalDigitsLimiter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (ugandaNationalDigits(newValue.text).length > 9) return oldValue;
+    return newValue;
   }
 }

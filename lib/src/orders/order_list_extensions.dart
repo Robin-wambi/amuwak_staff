@@ -17,19 +17,20 @@ extension OrderListSearch on List<LaundryOrder> {
   /// query returns the list unchanged so callers can use this for the
   /// zero-state list as well.
   ///
-  /// Phone is matched on digits only ([normalizePhone]) so a query typed
-  /// without spacing (`700123456`) still matches a formatted stored number
-  /// (`+256 700 123 456`).
+  /// Phone is matched on the Ugandan national significant number
+  /// ([ugandaNationalDigits]) so a local query (`0700123456`) still matches an
+  /// internationally-stored number (`+256 700 123 456`) and vice versa,
+  /// regardless of spacing.
   List<LaundryOrder> searchBy(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return this;
-    final queryDigits = normalizePhone(q);
+    final queryDigits = ugandaNationalDigits(q);
     return where((o) =>
             o.orderCode.toLowerCase().contains(q) ||
             o.customerName.toLowerCase().contains(q) ||
             o.address.toLowerCase().contains(q) ||
             (queryDigits.isNotEmpty &&
-                normalizePhone(o.phone).contains(queryDigits)))
+                ugandaNationalDigits(o.phone).contains(queryDigits)))
         .toList(growable: false);
   }
 }
