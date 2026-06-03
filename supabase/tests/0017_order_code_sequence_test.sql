@@ -11,8 +11,10 @@ SET search_path TO extensions, public;
 
 SELECT plan(8);
 
-SELECT has_function('public', 'next_order_code');
-SELECT has_table('public', 'order_code_counters');
+-- Single-arg form resolves via search_path (set to public above). The 2-arg
+-- text form is (name, description) in pgTAP, NOT (schema, name) — don't use it.
+SELECT has_function('next_order_code');
+SELECT has_table('order_code_counters');
 
 -- Deterministic slate for this transaction (rolled back at the end).
 DELETE FROM public.order_code_counters;
