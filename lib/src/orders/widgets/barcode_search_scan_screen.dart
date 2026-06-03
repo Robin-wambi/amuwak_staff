@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../proof/barcode_reader.dart';
+import '../proof/barcode_scanner_scaffold.dart';
 
 /// A minimal barcode scanner for order search: renders the camera and pops
 /// the first raw scanned value back to the caller (or `null` if dismissed).
@@ -33,21 +34,9 @@ class _BarcodeSearchScanScreenState extends State<BarcodeSearchScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-        title: const Text('Scan order tag'),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.pop<String>(context, null),
-        ),
-      ),
-      body: SafeArea(
-        child: widget.cameraViewBuilder(context, _handleDetected),
-      ),
+    return BarcodeScannerScaffold(
+      onClose: () => Navigator.pop<String>(context, null),
+      child: widget.cameraViewBuilder(context, _handleDetected),
     );
   }
 }
