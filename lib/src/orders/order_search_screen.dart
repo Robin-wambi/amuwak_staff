@@ -9,7 +9,7 @@ import 'order_list_extensions.dart';
 import 'order_status.dart';
 import 'proof/barcode_reader.dart';
 import 'widgets/barcode_search_scan_screen.dart';
-import 'widgets/order_card.dart';
+import 'widgets/order_card_list.dart';
 
 /// Lets a rider find one known order fast: live text filtering over the
 /// orders stream (by code, customer name, phone, or address), with a
@@ -127,10 +127,24 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
           subtitle: 'Search to find any order by code, name, phone, or address.',
         );
       }
-      return _ResultsList(
-        header: 'Active orders',
-        orders: active,
-        onOrderTap: widget.onOrderTap,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xs),
+            child: Text('Active orders',
+                style: Theme.of(context).textTheme.titleMedium),
+          ),
+          Expanded(
+            child: OrderCardList(
+              orders: active,
+              onOrderTap: widget.onOrderTap,
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg),
+            ),
+          ),
+        ],
       );
     }
 
@@ -142,37 +156,6 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
         subtitle: 'Nothing matches "$query".',
       );
     }
-    return _ResultsList(orders: matches, onOrderTap: widget.onOrderTap);
-  }
-}
-
-class _ResultsList extends StatelessWidget {
-  const _ResultsList({
-    required this.orders,
-    required this.onOrderTap,
-    this.header,
-  });
-
-  final List<LaundryOrder> orders;
-  final void Function(LaundryOrder order) onOrderTap;
-  final String? header;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      itemCount: orders.length + (header == null ? 0 : 1),
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) {
-        if (header != null && index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-            child: Text(header!, style: Theme.of(context).textTheme.titleMedium),
-          );
-        }
-        final order = orders[header == null ? index : index - 1];
-        return OrderCard(order: order, onTap: () => onOrderTap(order));
-      },
-    );
+    return OrderCardList(orders: matches, onOrderTap: widget.onOrderTap);
   }
 }

@@ -15,6 +15,7 @@ import '../orders/order_list_extensions.dart';
 import '../orders/order_search_screen.dart';
 import '../orders/order_status.dart';
 import '../orders/widgets/order_card.dart';
+import '../orders/widgets/order_card_list.dart';
 import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
@@ -528,23 +529,33 @@ class _OrdersBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.xxl,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Assigned orders',
-          style: Theme.of(context).textTheme.titleLarge,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.md,
+          ),
+          child: Text(
+            'Assigned orders',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        for (final order in orders) ...[
-          OrderCard(order: order, onTap: () => onOrderTap(order)),
-          const SizedBox(height: AppSpacing.md),
-        ],
+        Expanded(
+          child: OrderCardList(
+            orders: orders,
+            onOrderTap: onOrderTap,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.xxl,
+            ),
+          ),
+        ),
       ],
     );
   }
