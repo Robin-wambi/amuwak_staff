@@ -78,6 +78,27 @@ void main() {
     expect(find.textContaining('AMW-1'), findsOneWidget);
   });
 
+  testWidgets(
+      'a new-format code is recognised as an order tag, not a generic value',
+      (tester) async {
+    await _pumpAndPushScanner(
+      tester,
+      expectedOrderId: 'AMW-2026-0099',
+      scannedValue: 'AMW-2026-0042',
+    );
+
+    await tester.tap(find.text('Simulate scan'));
+    await tester.pump();
+
+    expect(find.byType(ScannerScreen), findsOneWidget);
+    // The year-dash-counter form must trip the "belongs to order #..."
+    // wording, not the generic "does not match" fallback.
+    expect(
+      find.textContaining('belongs to order #AMW-2026-0042'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('manual entry path: matching id pops with true', (tester) async {
     await _pumpAndPushScanner(
       tester,

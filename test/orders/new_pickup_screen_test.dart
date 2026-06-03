@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +11,7 @@ import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/shared/phone.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
@@ -65,6 +68,8 @@ void main() {
     // writes succeed.
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
     when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
+    when(() => ordersRepo.reserveOrderCode())
+        .thenAnswer((_) async => 'AMW-2026-0001');
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
   });
@@ -138,6 +143,49 @@ void main() {
     expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
   });
 
+  testWidgets(
+      'Create stays disabled when the phone has fewer than 9 digits even '
+      'though the formatted text is 9+ characters', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    // '+256 1234' is 9 raw characters but only 7 digits — a raw-length check
+    // would wrongly enable Create; a digit-count check must keep it disabled.
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 1234');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    final create = find.widgetWithText(ElevatedButton, 'Create pickup');
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+  });
+
+  testWidgets('phone field caps the national number at 9 digits (blocks the '
+      '10th)', (tester) async {
+    await pumpFormAndOpen(tester);
+    final phone = find.byKey(const Key('np_phone'));
+
+    // A full 9-digit national number is accepted.
+    await tester.enterText(phone, '+256 700123456');
+    await tester.pump();
+    expect(
+      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
+          .length,
+      9,
+    );
+
+    // Attempting a 10th national digit is rejected — the field stays at 9.
+    await tester.enterText(phone, '+256 7001234567');
+    await tester.pump();
+    expect(
+      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
+          .length,
+      9,
+    );
+  });
+
   testWidgets('Submit happy path writes customer + order, pops with '
       'startPickupNow=true (default schedule)', (tester) async {
     final handle = await pumpFormAndOpen(tester);
@@ -168,7 +216,68 @@ void main() {
     expect(order.serviceType, ServiceType.washAndIron);
     expect(order.status, OrderStatus.pendingPickup);
     expect(order.scheduledFor, isNull);
-    expect(order.orderCode, startsWith('AMW-'));
+    // order_code is whatever the server-backed generator returns, not a
+    // locally-derived value.
+    expect(order.orderCode, 'AMW-2026-0001');
+  });
+
+  testWidgets('order_code comes from the repository (server) reservation',
+      (tester) async {
+    when(() => ordersRepo.reserveOrderCode())
+        .thenAnswer((_) async => 'AMW-2026-0042');
+    final handle = await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    expect(handle.popped, isNotNull);
+    expect(capturedOrder().orderCode, 'AMW-2026-0042');
+  });
+
+  testWidgets(
+      'a failed order-code reservation surfaces an error and writes no order; '
+      'a retry then succeeds', (tester) async {
+    var calls = 0;
+    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return 'AMW-2026-0042';
+    });
+
+    final handle = await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // First attempt: the RPC throws. The form stays open with an error and the
+    // order is never written (the reservation throws before the order write).
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pump();
+    expect(find.textContaining('Could not reserve an order number'),
+        findsOneWidget);
+    expect(handle.popped, isNull);
+    verifyNever(() => ordersRepo.upsertOrder(any(),
+        actorStaffId: any(named: 'actorStaffId')));
+
+    // Second attempt: the RPC succeeds and the order is written with its code.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+    expect(handle.popped, isNotNull);
+    expect(capturedOrder().orderCode, 'AMW-2026-0042');
+    expect(calls, 2);
   });
 
   testWidgets('Cancel returns null and writes nothing', (tester) async {
@@ -398,6 +507,59 @@ void main() {
     final order = capturedOrder();
     expect(order.itemCount, 4);
     expect(order.notes, 'Gate locked after 6');
+  });
+
+  testWidgets('Optional details: item-count stepper caps at 99', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+
+    // Tap well past the cap; the count must not exceed 99 (no four-digit counts).
+    for (var i = 0; i < 105; i++) {
+      await tester.tap(find.byKey(const Key('np_count_inc')));
+      await tester.pump();
+    }
+
+    expect(find.text('99'), findsOneWidget);
+    expect(find.text('100'), findsNothing);
+    final incButton =
+        tester.widget<IconButton>(find.byKey(const Key('np_count_inc')));
+    expect(incButton.onPressed, isNull,
+        reason: 'increment is disabled once the cap is reached');
+  });
+
+  testWidgets('Create pickup shows a spinner while the submit is in flight',
+      (tester) async {
+    // Gate the order-code reservation so the submit stays in flight while we
+    // assert, then release it to let the form finish.
+    final gate = Completer<String>();
+    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) => gate.future);
+    final handle = await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pump(); // kick off the async submit; _saving is now true
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Create pickup'), findsNothing);
+
+    // Let the submit complete so the widget isn't torn down mid-flight.
+    gate.complete('AMW-2026-0001');
+    await tester.pumpAndSettle();
+    expect(handle.popped, isNotNull);
   });
 }
 

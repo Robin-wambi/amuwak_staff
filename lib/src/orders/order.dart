@@ -70,7 +70,6 @@ class LaundryOrder {
       status: OrderStatus.fromDbString(row.status),
       timeLabel: computeTimeLabel(
         scheduledFor: row.scheduledFor,
-        createdAt: row.createdAt,
       ),
       itemCount: row.itemCount,
       phone: row.phone,
@@ -102,7 +101,6 @@ class LaundryOrder {
     Map<String, dynamic> row,
     List<Map<String, dynamic>> proofRows,
   ) {
-    final createdAt = DateTime.parse(row['created_at'] as String);
     final scheduledFor = row['scheduled_for'] == null
         ? null
         : DateTime.parse(row['scheduled_for'] as String);
@@ -115,7 +113,6 @@ class LaundryOrder {
       status: OrderStatus.fromDbString(row['status'] as String),
       timeLabel: computeTimeLabel(
         scheduledFor: scheduledFor,
-        createdAt: createdAt,
       ),
       itemCount: row['item_count'] as int,
       phone: row['phone'] as String,
@@ -185,7 +182,6 @@ class LaundryOrder {
   ///   creation timestamp which is shown elsewhere on the card).
   static String computeTimeLabel({
     required DateTime? scheduledFor,
-    required DateTime createdAt,
     DateTime Function()? now,
   }) {
     if (scheduledFor != null) return formatScheduled(scheduledFor, now: now);

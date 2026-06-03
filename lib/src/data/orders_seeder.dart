@@ -35,7 +35,7 @@ class OrdersSeeder {
   // lib/src/dashboard/staff_dashboard_screen.dart:34-78.
   List<OrdersCompanion> _fixtureOrders(DateTime now) => [
     OrdersCompanion.insert(
-      id: '00000000-0000-4000-8000-0000aaa01024',
+      id: '00000000-0000-7000-8000-0000aaa01024',
       orderCode: 'AMW-1024',
       customerName: 'Sarah N.',
       phone: '+256 700 123 456',
@@ -52,7 +52,7 @@ class OrdersSeeder {
       updatedAt: Value(now),
     ),
     OrdersCompanion.insert(
-      id: '00000000-0000-4000-8000-0000aaa01025',
+      id: '00000000-0000-7000-8000-0000aaa01025',
       orderCode: 'AMW-1025',
       customerName: 'Brian K.',
       phone: '+256 701 456 789',
@@ -69,7 +69,7 @@ class OrdersSeeder {
       updatedAt: Value(now),
     ),
     OrdersCompanion.insert(
-      id: '00000000-0000-4000-8000-0000aaa01026',
+      id: '00000000-0000-7000-8000-0000aaa01026',
       orderCode: 'AMW-1026',
       customerName: 'Grace A.',
       phone: '+256 702 222 111',
@@ -86,7 +86,7 @@ class OrdersSeeder {
       updatedAt: Value(now),
     ),
     OrdersCompanion.insert(
-      id: '00000000-0000-4000-8000-0000aaa01027',
+      id: '00000000-0000-7000-8000-0000aaa01027',
       orderCode: 'AMW-1027',
       customerName: 'Daniel M.',
       phone: '+256 703 333 222',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/app_database.dart' show Customer;
+import '../shared/phone.dart';
 import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
@@ -53,6 +55,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // create a duplicate customer row by tapping "Create pickup" again.
   String? _pendingCustomerId;
   String? _pendingOrderId;
+  String? _pendingOrderCode;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
   // Which quick-chip preset is currently selected, if any. Cleared when
@@ -60,6 +63,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   _ScheduleChip? _selectedChip;
   bool _optionalExpanded = false;
   int _count = 0;
+  // Guards against fat-fingering a four-digit item count on the stepper.
+  static const _maxItemCount = 99;
   final _notesController = TextEditingController();
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
@@ -103,13 +108,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   bool get _canSubmit =>
       _nameController.text.trim().isNotEmpty &&
-      _phoneController.text.trim().length >= 9 &&
+      ugandaNationalDigits(_phoneController.text).length == 9 &&
       _addressController.text.trim().isNotEmpty &&
       _serviceType != null &&
       !_saving;
-
-  String _normalizePhone(String s) =>
-      s.replaceAll(RegExp(r'\s+'), '').replaceAll('+', '');
 
   Future<void> _useMyLocation() async {
     setState(() => _locating = true);
@@ -135,8 +137,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   Future<void> _onPhoneFocusChange() async {
     if (_phoneFocus.hasFocus) return;
-    final typed = _normalizePhone(_phoneController.text);
-    if (typed.length < 9) return;
+    final typed = ugandaNationalDigits(_phoneController.text);
+    if (typed.length != 9) return;
     // FocusNode.addListener takes a VoidCallback and discards the Future
     // this async listener returns, so a thrown error becomes an unhandled
     // zone error. Catch and surface via SnackBar instead.
@@ -144,7 +146,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       final all = await widget.customersRepo.getAll();
       Customer? matched;
       for (final c in all) {
-        if (_normalizePhone(c.phone) == typed) {
+        if (ugandaNationalDigits(c.phone) == typed) {
           matched = c;
           break;
         }
@@ -242,10 +244,25 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       return;
     }
     final orderId = _pendingOrderId ??= widget.orderIdGenerator();
+    // `??=` so a retried submit reuses the first code instead of burning a
+    // second value off the server-side counter.
+    final String orderCode;
+    try {
+      orderCode = _pendingOrderCode ??= await widget.ordersRepo.reserveOrderCode();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not reserve an order number. '
+                'Check your connection and tap Create pickup again.')),
+      );
+      return;
+    }
     final scheduled = _scheduledFor;
     final order = LaundryOrder(
       orderId: orderId,
-      orderCode: 'AMW-${now.millisecondsSinceEpoch}',
+      orderCode: orderCode,
       customerId: customer.id,
       customerName: customer.name,
       phone: customer.phone,
@@ -254,7 +271,6 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       status: OrderStatus.pendingPickup,
       timeLabel: LaundryOrder.computeTimeLabel(
         scheduledFor: scheduled,
-        createdAt: now,
         now: widget.clock,
       ),
       itemCount: _count,
@@ -322,6 +338,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _phoneController,
               focusNode: _phoneFocus,
               keyboardType: TextInputType.phone,
+              inputFormatters: const [_UgandaNationalDigitsLimiter()],
               decoration: const InputDecoration(labelText: 'Phone'),
               onChanged: (_) => setState(() {
                 _matchedCustomerId = null;
@@ -457,7 +474,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   IconButton(
                     key: const Key('np_count_inc'),
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => setState(() => _count++),
+                    onPressed: _count < _maxItemCount
+                        ? () => setState(() => _count++)
+                        : null,
                   ),
                 ],
               ),
@@ -484,7 +503,14 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _canSubmit ? _onSubmit : null,
-                    child: const Text('Create pickup'),
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create pickup'),
                   ),
                 ),
               ],
@@ -493,5 +519,22 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Blocks edits that would push the phone field past 9 national digits, so a
+/// rider can't type more than a complete Ugandan mobile number. Tolerates the
+/// `+256 ` prefix and any spacing — the cap is on [ugandaNationalDigits], not
+/// raw characters.
+class _UgandaNationalDigitsLimiter extends TextInputFormatter {
+  const _UgandaNationalDigitsLimiter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (ugandaNationalDigits(newValue.text).length > 9) return oldValue;
+    return newValue;
   }
 }

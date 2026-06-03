@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../orders/order.dart';
 import '../orders/order_status.dart';
+import '../shared/order_code.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
@@ -101,6 +102,17 @@ class OrdersRepository {
   }
 
   // ----- WRITE -----
+
+  /// Reserves the next human-facing order code (e.g. `AMW-2026-0042`) from the
+  /// server via the `next_order_code()` RPC. Owning this here keeps "how an
+  /// order code is minted" in the repository layer rather than wired into the
+  /// UI — the New Pickup screen calls this, caches the result for retry, then
+  /// hands the coded order to [upsertOrder]. The RPC throws when offline, which
+  /// the form surfaces as a retryable error.
+  Future<String> reserveOrderCode() async {
+    final result = await _supabase.rpc('next_order_code');
+    return parseOrderCodeRpcResult(result);
+  }
 
   /// Creates an order. **Insert-only in practice:** the only caller is the New
   /// Pickup flow creating a brand-new order; subsequent changes go through
