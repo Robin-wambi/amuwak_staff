@@ -26,11 +26,14 @@ DECLARE
   n        int;
 BEGIN
   -- Highest counter suffix already minted for this year, parsed back out of the
-  -- AMW-<yr>-<digits> codes. 0 when there are none.
-  SELECT COALESCE(MAX(substring(order_code FROM '^AMW-' || yr || '-(\d+)$')::int), 0)
+  -- AMW-<yr>-<digits> codes. 0 when there are none. The suffix is bounded to
+  -- 1-9 digits so a malformed/imported code with an oversized suffix can't
+  -- overflow the ::int cast (which would abort the function and block all order
+  -- creation); such codes simply aren't considered.
+  SELECT COALESCE(MAX(substring(order_code FROM '^AMW-' || yr || '-(\d{1,9})$')::int), 0)
     INTO max_used
     FROM orders
-   WHERE order_code ~ ('^AMW-' || yr || '-\d+$');
+   WHERE order_code ~ ('^AMW-' || yr || '-\d{1,9}$');
 
   INSERT INTO order_code_counters (year, last_value)
   VALUES (yr, GREATEST(1, max_used + 1))
