@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -542,6 +544,34 @@ void main() {
         tester.widget<IconButton>(find.byKey(const Key('np_count_inc')));
     expect(incButton.onPressed, isNull,
         reason: 'increment is disabled once the cap is reached');
+  });
+
+  testWidgets('Create pickup shows a spinner while the submit is in flight',
+      (tester) async {
+    // Gate the order-code reservation so the submit stays in flight while we
+    // assert, then release it to let the form finish.
+    final gate = Completer<String>();
+    final handle =
+        await pumpFormAndOpen(tester, orderCodeGenerator: () => gate.future);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pump(); // kick off the async submit; _saving is now true
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Create pickup'), findsNothing);
+
+    // Let the submit complete so the widget isn't torn down mid-flight.
+    gate.complete('AMW-2026-0001');
+    await tester.pumpAndSettle();
+    expect(handle.popped, isNotNull);
   });
 }
 

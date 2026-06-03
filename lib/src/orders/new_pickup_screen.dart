@@ -510,7 +510,14 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _canSubmit ? _onSubmit : null,
-                    child: const Text('Create pickup'),
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create pickup'),
                   ),
                 ),
               ],
