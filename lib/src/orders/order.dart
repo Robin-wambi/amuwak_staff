@@ -63,7 +63,7 @@ class LaundryOrder {
   ) {
     return LaundryOrder(
       orderId: row.id,
-      orderCode: row.orderCode,
+      orderCode: _blankToNull(row.orderCode),
       customerId: row.customerId,
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
@@ -106,7 +106,7 @@ class LaundryOrder {
         : DateTime.parse(row['scheduled_for'] as String);
     return LaundryOrder(
       orderId: row['id'] as String,
-      orderCode: row['order_code'] as String?,
+      orderCode: _blankToNull(row['order_code'] as String?),
       customerId: row['customer_id'] as String?,
       customerName: row['customer_name'] as String,
       serviceType: ServiceType.fromDbString(row['service_type'] as String),
@@ -134,6 +134,14 @@ class LaundryOrder {
           .toList(growable: false),
     );
   }
+
+  /// Collapses an empty or whitespace-only `order_code` to `null` at the model
+  /// boundary so the constructor's `orderCode ?? orderId` fallback fires. A
+  /// legacy/backfilled row, manual DB edit, or server-side defect could leave
+  /// `order_code` as `''` — not null — which would otherwise leak a blank human
+  /// code into bag tags, QR payloads, and the order-details screen. See #42.
+  static String? _blankToNull(String? code) =>
+      (code == null || code.trim().isEmpty) ? null : code;
 
   static String _formatTime(DateTime t) {
     final hour12 = switch (t.hour) {

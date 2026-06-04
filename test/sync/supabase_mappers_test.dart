@@ -200,6 +200,50 @@ void main() {
       expect(order.scheduledFor, DateTime.parse('2026-06-03T14:00:00.000Z'));
       expect(order.proofEvents, isEmpty);
     });
+
+    test('collapses an empty-string order_code to the orderId fallback', () {
+      final order = LaundryOrder.fromSupabase(
+        <String, dynamic>{
+          'id': 'o3',
+          'order_code': '',
+          'customer_name': 'Carol',
+          'phone': '0702',
+          'address': 'x',
+          'service_type': 'Wash & Iron',
+          'status': 'received',
+          'intake_method': 'driver_pickup',
+          'fulfillment_method': 'delivery',
+          'item_count': 1,
+          'scheduled_for': null,
+          'created_at': '2026-06-02T09:00:00.000Z',
+          'updated_at': '2026-06-02T09:00:00.000Z',
+        },
+        const <Map<String, dynamic>>[],
+      );
+      expect(order.orderCode, 'o3'); // empty collapses to orderId fallback
+    });
+
+    test('collapses a whitespace-only order_code to the orderId fallback', () {
+      final order = LaundryOrder.fromSupabase(
+        <String, dynamic>{
+          'id': 'o4',
+          'order_code': '   ',
+          'customer_name': 'Dan',
+          'phone': '0703',
+          'address': 'x',
+          'service_type': 'Wash & Iron',
+          'status': 'received',
+          'intake_method': 'driver_pickup',
+          'fulfillment_method': 'delivery',
+          'item_count': 1,
+          'scheduled_for': null,
+          'created_at': '2026-06-02T09:00:00.000Z',
+          'updated_at': '2026-06-02T09:00:00.000Z',
+        },
+        const <Map<String, dynamic>>[],
+      );
+      expect(order.orderCode, 'o4'); // whitespace collapses to orderId fallback
+    });
   });
 
   group('hydrateOrders', () {
