@@ -225,5 +225,23 @@ void main() {
       expect(mapped.fulfillmentMethod, equals(row.fulfillmentMethod));
       expect(mapped.scheduledFor, equals(row.scheduledFor));
     });
+
+    test('collapses an empty-string orderCode to the orderId fallback', () {
+      final row = _orderRow(id: 'AMW-2048');
+      final mapped = LaundryOrder.fromDriftRow(
+        row.copyWith(orderCode: ''),
+        const [],
+      );
+      expect(mapped.orderCode, 'AMW-2048');
+    });
+
+    test('collapses a whitespace-only orderCode to the orderId fallback', () {
+      final row = _orderRow(id: 'AMW-2049');
+      final mapped = LaundryOrder.fromDriftRow(
+        row.copyWith(orderCode: '   '),
+        const [],
+      );
+      expect(mapped.orderCode, 'AMW-2049');
+    });
   });
 }

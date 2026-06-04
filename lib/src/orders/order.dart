@@ -63,7 +63,7 @@ class LaundryOrder {
   ) {
     return LaundryOrder(
       orderId: row.id,
-      orderCode: row.orderCode,
+      orderCode: _blankToNull(row.orderCode),
       customerId: row.customerId,
       customerName: row.customerName,
       serviceType: ServiceType.fromDbString(row.serviceType),
@@ -106,7 +106,7 @@ class LaundryOrder {
         : DateTime.parse(row['scheduled_for'] as String);
     return LaundryOrder(
       orderId: row['id'] as String,
-      orderCode: row['order_code'] as String?,
+      orderCode: _blankToNull(row['order_code'] as String?),
       customerId: row['customer_id'] as String?,
       customerName: row['customer_name'] as String,
       serviceType: ServiceType.fromDbString(row['service_type'] as String),
@@ -134,6 +134,13 @@ class LaundryOrder {
           .toList(growable: false),
     );
   }
+
+  /// Collapses an empty or whitespace-only `order_code` to `null` so the
+  /// `orderCode ?? orderId` fallback fires. A blank (not null) code from a
+  /// legacy row, manual DB edit, or server-side defect would otherwise leak
+  /// through as the human-facing code. See #42.
+  static String? _blankToNull(String? code) =>
+      (code == null || code.trim().isEmpty) ? null : code;
 
   static String _formatTime(DateTime t) {
     final hour12 = switch (t.hour) {
@@ -209,7 +216,7 @@ class LaundryOrder {
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
-      orderCode: orderCode ?? this.orderCode,
+      orderCode: _blankToNull(orderCode) ?? this.orderCode,
       customerId: clearCustomerId ? null : (customerId ?? this.customerId),
       customerName: customerName ?? this.customerName,
       serviceType: serviceType ?? this.serviceType,
