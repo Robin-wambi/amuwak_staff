@@ -234,5 +234,14 @@ void main() {
       );
       expect(mapped.orderCode, 'AMW-2048');
     });
+
+    test('collapses a whitespace-only orderCode to the orderId fallback', () {
+      final row = _orderRow(id: 'AMW-2049');
+      final mapped = LaundryOrder.fromDriftRow(
+        row.copyWith(orderCode: '   '),
+        const [],
+      );
+      expect(mapped.orderCode, 'AMW-2049');
+    });
   });
 }
