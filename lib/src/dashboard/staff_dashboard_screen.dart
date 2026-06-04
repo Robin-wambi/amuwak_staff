@@ -609,13 +609,13 @@ class _AccountTab extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.lg - 2), // original was 14
+        const SizedBox(height: AppSpacing.lg - 2),
         _AccountDetailRow(
           icon: Icons.badge_outlined,
           label: 'Role',
           value: 'Laundry operations staff',
         ),
-        const SizedBox(height: AppSpacing.sm + 2), // original was 10
+        const SizedBox(height: AppSpacing.sm + 2),
         _AccountDetailRow(
           icon: Icons.schedule_outlined,
           label: 'Shift',
@@ -865,7 +865,7 @@ class _SummaryCard extends StatelessWidget {
               ),
               child: Icon(icon, color: colorScheme.primary),
             ),
-            const SizedBox(width: AppSpacing.md + 1), // original was 13
+            const SizedBox(width: AppSpacing.md + 1),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,7 +918,7 @@ class _QuickActions extends StatelessWidget {
                 onTap: onNewPickup,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm + 2), // original was 10
+            const SizedBox(width: AppSpacing.sm + 2),
             Expanded(
               child: _ActionButton(
                 label: 'Check order',
@@ -926,7 +926,7 @@ class _QuickActions extends StatelessWidget {
                 onTap: onCheckOrder,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm + 2), // original was 10
+            const SizedBox(width: AppSpacing.sm + 2),
             Expanded(
               child: _ActionButton(
                 label: 'Report',

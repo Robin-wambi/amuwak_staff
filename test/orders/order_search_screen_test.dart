@@ -5,9 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
+
+import '../helpers/fake_camera_view.dart';
 
 const _jane = LaundryOrder(
   orderId: 'AMW-2026-0042',
