@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/orders/proof/barcode_reader.dart';
+import 'fake_camera_view.dart';
 
 void main() {
   testWidgets('FakeCameraView calls onDetected with scannedValue when tapped',

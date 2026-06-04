@@ -8,27 +8,6 @@ typedef CameraViewBuilder = Widget Function(
   OnBarcodeDetected onDetected,
 );
 
-class FakeCameraView extends StatelessWidget {
-  const FakeCameraView({
-    super.key,
-    required this.scannedValue,
-    required this.onDetected,
-  });
-
-  final String scannedValue;
-  final OnBarcodeDetected onDetected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ElevatedButton(
-        onPressed: () => onDetected(scannedValue),
-        child: const Text('Simulate scan'),
-      ),
-    );
-  }
-}
-
 /// Production factory: returns a `CameraViewBuilder` that uses `mobile_scanner`
 /// to scan QR codes via the device camera. The first detected barcode's raw
 /// value is forwarded to `onDetected`.
