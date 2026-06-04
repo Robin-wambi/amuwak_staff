@@ -135,11 +135,10 @@ class LaundryOrder {
     );
   }
 
-  /// Collapses an empty or whitespace-only `order_code` to `null` at the model
-  /// boundary so the constructor's `orderCode ?? orderId` fallback fires. A
-  /// legacy/backfilled row, manual DB edit, or server-side defect could leave
-  /// `order_code` as `''` — not null — which would otherwise leak a blank human
-  /// code into bag tags, QR payloads, and the order-details screen. See #42.
+  /// Collapses an empty or whitespace-only `order_code` to `null` so the
+  /// `orderCode ?? orderId` fallback fires. A blank (not null) code from a
+  /// legacy row, manual DB edit, or server-side defect would otherwise leak
+  /// through as the human-facing code. See #42.
   static String? _blankToNull(String? code) =>
       (code == null || code.trim().isEmpty) ? null : code;
 
@@ -217,7 +216,7 @@ class LaundryOrder {
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
-      orderCode: orderCode ?? this.orderCode,
+      orderCode: _blankToNull(orderCode) ?? this.orderCode,
       customerId: clearCustomerId ? null : (customerId ?? this.customerId),
       customerName: customerName ?? this.customerName,
       serviceType: serviceType ?? this.serviceType,

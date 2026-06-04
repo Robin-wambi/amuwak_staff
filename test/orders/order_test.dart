@@ -204,6 +204,23 @@ void main() {
       expect(copy.itemCount, 2);
     });
 
+    test('copyWith with a blank orderCode preserves the existing code', () {
+      const o = LaundryOrder(
+        orderId: 'uuid-1',
+        orderCode: 'AMW-123',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(o.copyWith(orderCode: '').orderCode, 'AMW-123');
+      expect(o.copyWith(orderCode: '   ').orderCode, 'AMW-123');
+    });
+
     test('copyWith with clearScheduledFor: true nulls out scheduledFor', () {
       final o = LaundryOrder(
         orderId: 'X',
