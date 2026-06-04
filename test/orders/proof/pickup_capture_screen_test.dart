@@ -9,6 +9,7 @@ import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
+import 'package:amuwak_staff/src/orders/proof/qr_display_widget.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
@@ -251,6 +252,57 @@ void main() {
     expect(storage.savedPhotos, hasLength(1));
     expect(storage.savedPhotos.single.bytes, equals(const [10, 20, 30]));
   });
+
+  testWidgets(
+    'Tie tag to the bag shows the human order code, never the UUID order id',
+    (tester) async {
+      // orderId is the internal UUID v7 key; orderCode is the short code a
+      // rider writes on the bag. They MUST differ here so the test can't pass
+      // by the two being accidentally equal (as in the shared _baseOrder).
+      const order = LaundryOrder(
+        orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+        orderCode: 'AMW-2026-0042',
+        customerName: 'Jane Doe',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 'Today, 09:00',
+        itemCount: 12,
+        phone: '+234000',
+        address: '5 Yaba',
+        notes: '',
+      );
+
+      await _pumpAndPushPickup(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: order,
+        pickPhoto: () async => const [10, 20, 30],
+      );
+
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+
+      // The bag instruction + displayed text both carry the short human code
+      // (exactly two places — findsNWidgets(2) locks in both, so dropping
+      // either one is caught).
+      expect(find.textContaining('AMW-2026-0042'), findsNWidgets(2));
+      // ...and the long UUID is never put in front of the rider.
+      expect(
+        find.textContaining('019e9147-608b-72b7-9e2c-0baa04e85094'),
+        findsNothing,
+      );
+      // The QR encodes the order code too (the camera reads it back at delivery).
+      final qr = tester.widget<QrDisplayWidget>(find.byType(QrDisplayWidget));
+      expect(qr.data, 'AMW-2026-0042');
+    },
+  );
 
   testWidgets(
     'Done re-enables itself, surfaces an error, and performs NO repo writes '

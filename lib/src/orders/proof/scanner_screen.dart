@@ -6,11 +6,14 @@ import 'barcode_scanner_scaffold.dart';
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({
     super.key,
-    required this.expectedOrderId,
+    required this.expectedOrderCode,
     required this.cameraViewBuilder,
   });
 
-  final String expectedOrderId;
+  /// The human-facing order code (e.g. `AMW-2026-0042`) printed on the bag tag —
+  /// NOT the internal UUID primary key. This is what the rider scans or types,
+  /// so verification compares the scanned value against this code.
+  final String expectedOrderCode;
   final CameraViewBuilder cameraViewBuilder;
 
   @override
@@ -28,22 +31,35 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   // Accepts both the current `AMW-2026-0042` (prefix-year-counter) form and the
   // legacy `AMW-1024` digits-only form, so older printed tags still validate.
-  static final RegExp _orderIdPattern =
+  static final RegExp _orderCodePattern =
       RegExp(r'^AMW-(\d{4}-)?\d+$', caseSensitive: false);
 
   void _handleDetected(String value) {
     if (_matched || !mounted) return;
     final trimmed = value.trim();
-    if (trimmed.toUpperCase() == widget.expectedOrderId.toUpperCase()) {
+    // An empty/blank scan must never count as a match. Without this, a
+    // malformed empty expectedOrderCode would satisfy `'' == ''` below and a
+    // blank/unreadable scan would silently pass verification.
+    if (trimmed.isEmpty) {
+      setState(() {
+        _errorMessage =
+            'This tag does not match order #${widget.expectedOrderCode}.';
+        if (_showManualEntry) {
+          _manualController.clear();
+        }
+      });
+      return;
+    }
+    if (trimmed.toUpperCase() == widget.expectedOrderCode.toUpperCase()) {
       _matched = true;
       Navigator.pop(context, true);
       return;
     }
-    final looksLikeOrderId = _orderIdPattern.hasMatch(trimmed);
+    final looksLikeOrderCode = _orderCodePattern.hasMatch(trimmed);
     setState(() {
-      _errorMessage = looksLikeOrderId
-          ? 'This tag belongs to order #$trimmed, not #${widget.expectedOrderId}.'
-          : 'This tag does not match order #${widget.expectedOrderId}.';
+      _errorMessage = looksLikeOrderCode
+          ? 'This tag belongs to order #$trimmed, not #${widget.expectedOrderCode}.'
+          : 'This tag does not match order #${widget.expectedOrderCode}.';
       if (_showManualEntry) {
         _manualController.clear();
       }
@@ -105,7 +121,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
               child: Text(
                 _showManualEntry
                     ? 'Use camera instead'
-                    : 'Enter order ID instead',
+                    : 'Enter order code instead',
               ),
             ),
           ),
@@ -134,7 +150,7 @@ class _ManualEntryView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Order ID written on the bag',
+            'Order code written on the bag',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).colorScheme.onSurface,

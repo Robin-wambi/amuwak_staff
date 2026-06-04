@@ -113,6 +113,67 @@ void main() {
   });
 
   testWidgets(
+      'order details shows the human order code, never the UUID order id',
+      (tester) async {
+    final storage = InMemoryProofPhotoStorage();
+    // Distinct orderId (UUID) and orderCode so the screen can't pass by the two
+    // being accidentally equal (as in the shared _pendingPickup fixture).
+    final coded = _pendingPickup.copyWith(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      orderCode: 'AMW-2026-0042',
+    );
+
+    await tester.pumpWidget(_wrap(coded, storage: storage));
+
+    // The short code is shown (header + the "Order code" detail row)...
+    expect(find.textContaining('AMW-2026-0042'), findsWidgets);
+    // ...and the long UUID is never put in front of the rider.
+    expect(
+      find.textContaining('019e9147-608b-72b7-9e2c-0baa04e85094'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+      'Deliver verification matches the human order code, not the UUID order id',
+      (tester) async {
+    final storage = InMemoryProofPhotoStorage();
+    // orderId is the internal UUID; the bag tag the rider scans carries the
+    // short order CODE. These MUST differ so the scan can only succeed if the
+    // screen verifies against orderCode (not orderId).
+    final coded = _pendingPickup.copyWith(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      orderCode: 'AMW-2026-0042',
+      status: OrderStatus.readyForDelivery,
+      proofEvents: [
+        ProofEvent(
+          id: 'pe-test-1',
+          type: ProofEventType.pickup,
+          capturedAt: DateTime(2026, 5, 12, 9, 42),
+          count: 12,
+          photoPaths: const ['memory://AMW-2026-0042/pickup_0'],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_wrap(
+      coded,
+      storage: storage,
+      scannedValue: 'AMW-2026-0042',
+    ));
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Deliver'));
+    await tester.pumpAndSettle();
+    expect(find.text('Scan order tag'), findsOneWidget);
+
+    await tester.tap(find.text('Simulate scan'));
+    await tester.pumpAndSettle();
+
+    // Scanning the order code satisfied verification and advanced to delivery.
+    expect(find.text('Hand over'), findsOneWidget);
+  });
+
+  testWidgets(
       'inProgress advances status by writing through OrdersRepository.updateStatus',
       (tester) async {
     final ordersRepo = _MockOrdersRepository();
