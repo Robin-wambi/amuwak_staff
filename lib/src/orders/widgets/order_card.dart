@@ -43,7 +43,7 @@ class OrderCard extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md + 1), // original was 13
+              const SizedBox(width: AppSpacing.md + 1),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +52,7 @@ class OrderCard extends StatelessWidget {
                       order.customerName,
                       style: textTheme.titleMedium,
                     ),
-                    const SizedBox(height: AppSpacing.xs / 2), // original was 2
+                    const SizedBox(height: AppSpacing.xs / 2),
                     Text(
                       '${order.orderCode} - ${order.serviceType.label}',
                       style: textTheme.bodySmall,
@@ -66,15 +66,15 @@ class OrderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg - 2), // original was 14
+          const SizedBox(height: AppSpacing.lg - 2),
           Row(
             children: [
-              OrderInfoChip(
+              _OrderInfoChip(
                 icon: Icons.access_time_rounded,
                 label: order.timeLabel,
               ),
               const SizedBox(width: AppSpacing.sm),
-              OrderInfoChip(
+              _OrderInfoChip(
                 icon: Icons.inventory_2_outlined,
                 label: '${order.itemCount} items',
               ),
@@ -105,8 +105,8 @@ class OrderCard extends StatelessWidget {
   }
 }
 
-class OrderInfoChip extends StatelessWidget {
-  const OrderInfoChip({super.key, required this.icon, required this.label});
+class _OrderInfoChip extends StatelessWidget {
+  const _OrderInfoChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -116,7 +116,7 @@ class OrderInfoChip extends StatelessWidget {
     return Flexible(
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm + 2, // original was 10
+          horizontal: AppSpacing.sm + 2,
           vertical: 7,
         ),
         decoration: BoxDecoration(
