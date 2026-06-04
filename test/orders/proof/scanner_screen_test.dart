@@ -6,7 +6,7 @@ import 'package:amuwak_staff/src/orders/proof/scanner_screen.dart';
 
 Future<bool?> _pumpAndPushScanner(
   WidgetTester tester, {
-  required String expectedOrderId,
+  required String expectedOrderCode,
   required String scannedValue,
 }) async {
   bool? result;
@@ -22,7 +22,7 @@ Future<bool?> _pumpAndPushScanner(
                   result = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => ScannerScreen(
-                        expectedOrderId: expectedOrderId,
+                        expectedOrderCode: expectedOrderCode,
                         cameraViewBuilder: (ctx, onDetected) {
                           return FakeCameraView(
                             scannedValue: scannedValue,
@@ -52,7 +52,7 @@ void main() {
       (tester) async {
     await _pumpAndPushScanner(
       tester,
-      expectedOrderId: 'AMW-1',
+      expectedOrderCode: 'AMW-1',
       scannedValue: 'AMW-1',
     );
 
@@ -66,7 +66,7 @@ void main() {
       (tester) async {
     await _pumpAndPushScanner(
       tester,
-      expectedOrderId: 'AMW-1',
+      expectedOrderCode: 'AMW-1',
       scannedValue: 'AMW-9',
     );
 
@@ -83,7 +83,7 @@ void main() {
       (tester) async {
     await _pumpAndPushScanner(
       tester,
-      expectedOrderId: 'AMW-2026-0099',
+      expectedOrderCode: 'AMW-2026-0099',
       scannedValue: 'AMW-2026-0042',
     );
 
@@ -102,11 +102,11 @@ void main() {
   testWidgets('manual entry path: matching id pops with true', (tester) async {
     await _pumpAndPushScanner(
       tester,
-      expectedOrderId: 'AMW-1',
+      expectedOrderCode: 'AMW-1',
       scannedValue: 'unused',
     );
 
-    await tester.tap(find.text('Enter order ID instead'));
+    await tester.tap(find.text('Enter order code instead'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField), 'AMW-1');
@@ -119,11 +119,11 @@ void main() {
   testWidgets('manual entry path: wrong id shows error', (tester) async {
     await _pumpAndPushScanner(
       tester,
-      expectedOrderId: 'AMW-1',
+      expectedOrderCode: 'AMW-1',
       scannedValue: 'unused',
     );
 
-    await tester.tap(find.text('Enter order ID instead'));
+    await tester.tap(find.text('Enter order code instead'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField), 'AMW-9');
@@ -139,7 +139,7 @@ void main() {
     (tester) async {
       await _pumpAndPushScanner(
         tester,
-        expectedOrderId: 'AMW-1',
+        expectedOrderCode: 'AMW-1',
         scannedValue: 'https://example.com',
       );
 
@@ -163,11 +163,11 @@ void main() {
     (tester) async {
       await _pumpAndPushScanner(
         tester,
-        expectedOrderId: 'AMW-1',
+        expectedOrderCode: 'AMW-1',
         scannedValue: 'unused',
       );
 
-      await tester.tap(find.text('Enter order ID instead'));
+      await tester.tap(find.text('Enter order code instead'));
       await tester.pumpAndSettle();
 
       // Submit with the field still empty.
@@ -188,11 +188,11 @@ void main() {
     (tester) async {
       await _pumpAndPushScanner(
         tester,
-        expectedOrderId: 'AMW-1024',
+        expectedOrderCode: 'AMW-1024',
         scannedValue: 'unused',
       );
 
-      await tester.tap(find.text('Enter order ID instead'));
+      await tester.tap(find.text('Enter order code instead'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField), 'amw-1024');
@@ -200,6 +200,49 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ScannerScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'manual-entry affordances are labelled "order code", not "order ID"',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-2026-0042',
+        scannedValue: 'unused',
+      );
+
+      // The toggle names the order code — that is what is printed on the bag.
+      expect(find.text('Enter order code instead'), findsOneWidget);
+      await tester.tap(find.text('Enter order code instead'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Order code written on the bag'), findsOneWidget);
+      // The old "order ID" wording (which pointed riders at the UUID) is gone.
+      expect(find.textContaining('order ID'), findsNothing);
+      expect(find.textContaining('Order ID'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'an empty scan never matches, even when the expected code is empty',
+    (tester) async {
+      // Defensive: a blank/unreadable scan emits '' and must never be accepted
+      // as a match — not even against a (malformed) empty expected code, which
+      // would otherwise satisfy the `'' == ''` comparison and pop success.
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: '',
+        scannedValue: '',
+      );
+
+      await tester.tap(find.text('Simulate scan'));
+      await tester.pumpAndSettle();
+
+      // Stayed on the scanner — the empty scan was not treated as a match.
+      // (pumpAndSettle, not pump: a successful pop would otherwise still be
+      // mid-transition in the tree and falsely look "present".)
+      expect(find.byType(ScannerScreen), findsOneWidget);
     },
   );
 
@@ -222,7 +265,7 @@ void main() {
                       result = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (_) => ScannerScreen(
-                            expectedOrderId: 'AMW-1',
+                            expectedOrderCode: 'AMW-1',
                             cameraViewBuilder: (ctx, onDetected) {
                               captured = onDetected;
                               return const SizedBox.shrink();

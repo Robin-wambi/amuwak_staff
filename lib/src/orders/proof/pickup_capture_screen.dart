@@ -366,15 +366,15 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Write order #${widget.order.orderId} on the bag, or scan this QR.',
+            'Write order #${widget.order.orderCode} on the bag, or scan this QR.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppColors.secondaryText),
           ),
           const SizedBox(height: 24),
-          QrDisplayWidget(data: widget.order.orderId),
+          QrDisplayWidget(data: widget.order.orderCode),
           const SizedBox(height: 16),
           Text(
-            widget.order.orderId,
+            widget.order.orderCode,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const Spacer(),

@@ -112,7 +112,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final scanOk = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ScannerScreen(
-          expectedOrderId: _order.orderId,
+          expectedOrderCode: _order.orderCode,
           cameraViewBuilder: widget.cameraViewBuilder,
         ),
       ),
@@ -276,8 +276,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         children: [
                           _DetailRow(
                             icon: Icons.receipt_long_outlined,
-                            label: 'Order ID',
-                            value: _order.orderId,
+                            label: 'Order code',
+                            value: _order.orderCode,
                           ),
                           _DetailRow(
                             icon: Icons.checkroom_outlined,
@@ -377,7 +377,7 @@ class _OrderHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  order.orderId,
+                  order.orderCode,
                   style: TextStyle(
                     color: colorScheme.onPrimaryContainer,
                     fontSize: 14,
