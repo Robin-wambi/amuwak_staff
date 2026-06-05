@@ -66,6 +66,8 @@ Widget _wrap(
 }
 
 void main() {
+  setUpAll(() => registerFallbackValue(OrderStatus.pendingPickup));
+
   testWidgets(
       'pendingPickup shows "Confirm pickup" and routes to PickupCaptureScreen',
       (tester) async {
@@ -208,6 +210,36 @@ void main() {
           OrderStatus.readyForDelivery,
           actorStaffId: 's-test',
         )).called(1);
+  });
+
+  testWidgets(
+      'completed order shows a disabled action that cannot update status',
+      (tester) async {
+    final ordersRepo = _MockOrdersRepository();
+    final storage = InMemoryProofPhotoStorage();
+    final completed = _pendingPickup.copyWith(status: OrderStatus.completed);
+
+    await tester.pumpWidget(_wrap(
+      completed,
+      storage: storage,
+      ordersRepo: ordersRepo,
+    ));
+
+    final button = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, 'Order completed'),
+    );
+    // R4: a completed order's primary action is disabled (no onPressed).
+    expect(button.enabled, isFalse);
+
+    // Tapping the disabled action must not push the order any further.
+    await tester.tap(
+      find.widgetWithText(ElevatedButton, 'Order completed'),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    verifyNever(() => ordersRepo.updateStatus(any(), any(),
+        actorStaffId: any(named: 'actorStaffId')));
   });
 
   testWidgets('order with proofEvents renders a History panel', (tester) async {
