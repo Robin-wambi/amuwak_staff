@@ -25,5 +25,6 @@ void main() {
   test('days', () {
     expect(label(const Duration(hours: 24)), '1 day ago');
     expect(label(const Duration(hours: 47)), '1 day ago');
+    expect(label(const Duration(days: 3)), '3 days ago');
   });
 }
