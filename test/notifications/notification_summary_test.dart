@@ -73,6 +73,18 @@ void main() {
     expect(summary.delivered, isEmpty);
   });
 
+  test('delivered excludes an order delivered at exactly the 48h boundary', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'EXACT',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(kDeliveredWindow), // exactly 48h ago
+      ),
+    ], now: now);
+
+    expect(summary.delivered, isEmpty);
+  });
+
   test('delivered is sorted most-recent first', () {
     final summary = NotificationSummary.fromOrders([
       _order(
