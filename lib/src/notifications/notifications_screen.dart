@@ -6,6 +6,7 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
+import '../shared/theme/status_colors.dart';
 import '../shared/widgets/empty_state.dart';
 import '../sync/repository_providers.dart';
 import 'notification_summary.dart';
@@ -43,8 +44,8 @@ class NotificationsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(ordersStreamProvider),
         ),
         data: (orders) {
-          final summary =
-              NotificationSummary.fromOrders(orders, now: _clock());
+          final now = _clock();
+          final summary = NotificationSummary.fromOrders(orders, now: now);
           if (summary.isEmpty) {
             return const EmptyState(
               icon: Icons.notifications_off_outlined,
@@ -55,7 +56,7 @@ class NotificationsScreen extends ConsumerWidget {
           }
           return _SummaryBody(
             summary: summary,
-            now: _clock(),
+            now: now,
             onOrderTap: onOrderTap,
           );
         },
@@ -63,6 +64,14 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 }
+
+/// The "delivered/completed" accent, resolved from the theme's [StatusColors]
+/// extension so it stays in lockstep with the completed-status pill on order
+/// cards instead of a hardcoded hex.
+Color _deliveredColor(BuildContext context) =>
+    (Theme.of(context).extension<StatusColors>() ?? StatusColors.light)
+        .completed
+        .color;
 
 class _SummaryBody extends StatelessWidget {
   const _SummaryBody({
@@ -94,7 +103,7 @@ class _SummaryBody extends StatelessWidget {
               child: _CountChip(
                 count: summary.delivered.length,
                 label: 'Delivered · 48h',
-                color: const Color(0xFF2E7D32),
+                color: _deliveredColor(context),
               ),
             ),
           ],
@@ -169,7 +178,8 @@ class _NotificationRow extends StatelessWidget {
     final isPickup = item.kind == NotificationKind.newPickup;
     final order = item.order;
     final colorScheme = Theme.of(context).colorScheme;
-    final accent = isPickup ? colorScheme.primary : const Color(0xFF2E7D32);
+    final accent =
+        isPickup ? colorScheme.primary : _deliveredColor(context);
 
     final title = isPickup
         ? 'New pickup · ${order.orderCode}'
