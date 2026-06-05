@@ -21,4 +21,63 @@ void main() {
     final qr = tester.widget<QrImageView>(qrFinder);
     expect(qr.size, equals(200));
   });
+
+  testWidgets(
+      'configures medium error correction and a quiet-zone padding so printed '
+      'bag tags stay scannable when scuffed', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: 'AMW-2026-0042'),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+    expect(qr.errorCorrectionLevel, equals(QrErrorCorrectLevel.M));
+    expect(qr.padding, equals(const EdgeInsets.all(16)));
+    expect(qr.gapless, isTrue);
+  });
+
+  testWidgets('exposes a semantics label referencing the order code',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: 'AMW-2026-0042'),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+    expect(qr.semanticsLabel, contains('AMW-2026-0042'));
+  });
+
+  testWidgets(
+      'errorStateBuilder falls back to the raw code as text so staff can still '
+      'read it', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: 'AMW-2026-0042', size: 180),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+    expect(qr.errorStateBuilder, isNotNull);
+
+    // Render the fallback in isolation and confirm it surfaces the code.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: qr.errorStateBuilder!(
+            tester.element(find.byType(QrImageView)),
+            'boom',
+          ),
+        ),
+      ),
+    );
+    expect(find.text('AMW-2026-0042'), findsOneWidget);
+  });
 }

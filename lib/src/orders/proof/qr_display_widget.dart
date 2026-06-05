@@ -18,6 +18,20 @@ class QrDisplayWidget extends StatelessWidget {
       version: QrVersions.auto,
       size: size,
       backgroundColor: Colors.white,
+      errorCorrectionLevel: QrErrorCorrectLevel.M,
+      padding: const EdgeInsets.all(16),
+      gapless: true,
+      semanticsLabel: 'QR code for order $data',
+      errorStateBuilder: (context, error) => SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Text(
+            data,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        ),
+      ),
     );
   }
 }
