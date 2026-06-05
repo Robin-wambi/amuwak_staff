@@ -1,0 +1,129 @@
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:amuwak_staff/src/notifications/notification_summary.dart';
+import 'package:amuwak_staff/src/orders/order.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
+
+LaundryOrder _order({
+  required String code,
+  required OrderStatus status,
+  DateTime? scheduledFor,
+  DateTime? deliveredAt,
+}) {
+  return LaundryOrder(
+    orderId: 'id-$code',
+    orderCode: code,
+    customerName: 'Cust $code',
+    serviceType: ServiceType.washAndIron,
+    status: status,
+    timeLabel: 'Today',
+    itemCount: 1,
+    phone: '0700000000',
+    address: 'Somewhere',
+    notes: '',
+    scheduledFor: scheduledFor,
+    proofEvents: [
+      if (deliveredAt != null)
+        ProofEvent(
+          id: 'pe-$code',
+          type: ProofEventType.delivery,
+          capturedAt: deliveredAt,
+          count: 1,
+          photoPaths: const [],
+        ),
+    ],
+  );
+}
+
+void main() {
+  final now = DateTime.utc(2026, 6, 5, 12, 0);
+
+  test('new pickups are orders with pendingPickup status', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(code: 'P1', status: OrderStatus.pendingPickup),
+      _order(code: 'I1', status: OrderStatus.inProgress),
+    ], now: now);
+
+    expect(summary.newPickups.map((o) => o.orderCode), ['P1']);
+  });
+
+  test('delivered includes orders with a delivery proof inside the 48h window', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'D1',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 1)),
+      ),
+    ], now: now);
+
+    expect(summary.delivered.map((o) => o.orderCode), ['D1']);
+  });
+
+  test('delivered excludes a delivery proof older than the 48h window', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'OLD',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 49)),
+      ),
+    ], now: now);
+
+    expect(summary.delivered, isEmpty);
+  });
+
+  test('delivered is sorted most-recent first', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'OLDER',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 10)),
+      ),
+      _order(
+        code: 'NEWER',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 2)),
+      ),
+    ], now: now);
+
+    expect(summary.delivered.map((o) => o.orderCode), ['NEWER', 'OLDER']);
+  });
+
+  test('new pickups are sorted by scheduledFor ascending, nulls last', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(code: 'LATER', status: OrderStatus.pendingPickup,
+          scheduledFor: now.add(const Duration(hours: 3))),
+      _order(code: 'NONE', status: OrderStatus.pendingPickup),
+      _order(code: 'SOON', status: OrderStatus.pendingPickup,
+          scheduledFor: now.add(const Duration(hours: 1))),
+    ], now: now);
+
+    expect(summary.newPickups.map((o) => o.orderCode), ['SOON', 'LATER', 'NONE']);
+  });
+
+  test('recent feed is pickups first then delivered', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'D1',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 1)),
+      ),
+      _order(code: 'P1', status: OrderStatus.pendingPickup,
+          scheduledFor: now.add(const Duration(hours: 1))),
+    ], now: now);
+
+    expect(
+      summary.recent.map((i) => '${i.kind.name}:${i.order.orderCode}'),
+      ['newPickup:P1', 'delivered:D1'],
+    );
+  });
+
+  test('isEmpty is true when there are no pickups and nothing delivered', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(code: 'I1', status: OrderStatus.inProgress),
+    ], now: now);
+
+    expect(summary.isEmpty, isTrue);
+  });
+}
