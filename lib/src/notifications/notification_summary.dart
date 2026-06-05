@@ -38,6 +38,10 @@ class NotificationSummary {
 
     final cutoff = now.subtract(kDeliveredWindow);
     final delivered = orders.where((o) {
+      // A still-pending order can't be "delivered" — guard against anomalous
+      // data (a stray delivery proof on a pendingPickup order) listing the
+      // same order in both the pickups and delivered feeds.
+      if (o.status == OrderStatus.pendingPickup) return false;
       final proof = o.deliveryProof;
       return proof != null && proof.capturedAt.isAfter(cutoff);
     }).toList()

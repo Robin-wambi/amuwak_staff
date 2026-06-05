@@ -85,6 +85,20 @@ void main() {
     expect(summary.delivered, isEmpty);
   });
 
+  test('a pendingPickup order with a stray delivery proof is not delivered', () {
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'WEIRD',
+        status: OrderStatus.pendingPickup,
+        deliveredAt: now.subtract(const Duration(hours: 1)),
+      ),
+    ], now: now);
+
+    // Appears only as a new pickup, never double-listed under delivered.
+    expect(summary.delivered, isEmpty);
+    expect(summary.newPickups.map((o) => o.orderCode), ['WEIRD']);
+  });
+
   test('delivered is sorted most-recent first', () {
     final summary = NotificationSummary.fromOrders([
       _order(

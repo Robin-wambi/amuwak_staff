@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
-import '../notifications/notification_summary.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/geo_services.dart';
 import '../orders/new_pickup_result.dart';
@@ -311,10 +310,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersStreamProvider);
-    final newPickupCount = NotificationSummary.fromOrders(
-      ordersAsync.valueOrNull ?? const [],
-      now: DateTime.now(),
-    ).newPickups.length;
+    // Badge count only: a direct filter avoids building (and sorting) a whole
+    // NotificationSummary on every dashboard rebuild (e.g. tab switches).
+    final newPickupCount = ordersAsync.valueOrNull
+            ?.where((o) => o.status == OrderStatus.pendingPickup)
+            .length ??
+        0;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +119,28 @@ void main() {
     await tester.pump();
 
     expect(tapped?.orderCode, 'D1');
+  });
+
+  testWidgets('shows a spinner while the orders stream is loading',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          // A stream that never emits keeps the provider in the loading state.
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.fromFuture(
+              Completer<List<LaundryOrder>>().future,
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          home: NotificationsScreen(clock: () => _now),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
   testWidgets('shows a retry affordance when the orders stream errors',
