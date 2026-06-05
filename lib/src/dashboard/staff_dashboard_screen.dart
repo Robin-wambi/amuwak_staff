@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
+import '../notifications/notification_summary.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/geo_services.dart';
 import '../orders/new_pickup_result.dart';
@@ -310,6 +311,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersStreamProvider);
+    final newPickupCount = NotificationSummary.fromOrders(
+      ordersAsync.valueOrNull ?? const [],
+      now: DateTime.now(),
+    ).newPickups.length;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -318,12 +323,19 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          Badge.count(
+            count: newPickupCount,
+            isLabelVisible: newPickupCount > 0,
+            child: IconButton(
+              tooltip: 'Notifications',
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      NotificationsScreen(onOrderTap: _openOrderDetails),
+                ),
+              ),
+              icon: const Icon(Icons.notifications_none_rounded),
             ),
-            icon: const Icon(Icons.notifications_none_rounded),
           ),
           // ONLINE-ONLY: sync-errors badge/button removed (no outbox/dead-letter
           // queue in online mode). Restore the `Consumer` that watched
