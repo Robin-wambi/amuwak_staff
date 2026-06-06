@@ -323,7 +323,13 @@ void main() {
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
       ],
       child: MaterialApp(
-          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+          ),
+        ),
+      ),
     ));
     // `LinearProgressIndicator` animates indefinitely — `pumpAndSettle` would
     // never settle.  A single `pump` is enough to build the loading frame.
@@ -363,7 +369,13 @@ void main() {
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
       ],
       child: MaterialApp(
-          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+          ),
+        ),
+      ),
     ));
     await tester.pump();
     await tester.pump();
