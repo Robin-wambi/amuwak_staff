@@ -1,5 +1,6 @@
 import 'package:amuwak_staff/src/shared/theme/app_colors.dart';
 import 'package:amuwak_staff/src/shared/theme/app_radii.dart';
+import 'package:amuwak_staff/src/shared/theme/app_typography.dart';
 import 'package:amuwak_staff/src/shared/theme/status_colors.dart';
 import 'package:amuwak_staff/src/shared/widgets/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,11 @@ void main() {
     expect(theme.textTheme.titleLarge, isNotNull);
     expect(theme.textTheme.headlineMedium, isNotNull);
     expect(theme.textTheme.bodySmall, isNotNull);
+  });
+
+  test('applies the brand typeface across the theme', () {
+    expect(theme.textTheme.titleMedium?.fontFamily, AppTypography.fontFamily);
+    expect(theme.textTheme.bodyMedium?.fontFamily, AppTypography.fontFamily);
   });
 
   test('card theme uses the card radius', () {
