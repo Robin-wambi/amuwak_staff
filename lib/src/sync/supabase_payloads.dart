@@ -63,6 +63,7 @@ Map<String, dynamic> customerUpsertPayload(
       'phone': customer.phone,
       'address': customer.address,
       'notes': customer.notes,
+      'custom_rate_per_kg_ugx': customer.customRatePerKgUgx,
       'created_at': customer.createdAt.toUtc().toIso8601String(),
       'updated_at': now.toUtc().toIso8601String(),
     };

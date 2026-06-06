@@ -27,6 +27,8 @@ Customer customerFromSupabase(Map<String, dynamic> r) => Customer(
       phone: r['phone'] as String,
       address: r['address'] as String?,
       notes: r['notes'] as String?,
+      customRatePerKgUgx:
+          (r['custom_rate_per_kg_ugx'] as num?)?.toDouble(),
       createdAt: _dt(r['created_at']),
       updatedAt: _dt(r['updated_at']),
       deletedAt: _dtNullable(r['deleted_at']),
