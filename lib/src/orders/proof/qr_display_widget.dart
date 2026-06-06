@@ -11,6 +11,10 @@ class QrDisplayWidget extends StatelessWidget {
   final String data;
   final double size;
 
+  /// Quiet-zone padding around the QR modules. Gives scanners a margin to lock
+  /// onto and keeps the text fallback clear of the tag edge.
+  static const double _padding = 16;
+
   @override
   Widget build(BuildContext context) {
     return QrImageView(
@@ -19,16 +23,25 @@ class QrDisplayWidget extends StatelessWidget {
       size: size,
       backgroundColor: Colors.white,
       errorCorrectionLevel: QrErrorCorrectLevel.M,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(_padding),
       gapless: true,
       semanticsLabel: 'QR code for order $data',
       errorStateBuilder: (context, error) => SizedBox(
         width: size,
         height: size,
-        child: Center(
-          child: Text(
-            data,
-            style: Theme.of(context).textTheme.headlineSmall,
+        child: Padding(
+          padding: const EdgeInsets.all(_padding),
+          child: Center(
+            // Scale the code down to fit so even a long order code stays inside
+            // the tag box instead of overflowing it.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                data,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ),
           ),
         ),
       ),

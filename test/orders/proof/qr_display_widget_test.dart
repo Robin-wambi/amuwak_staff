@@ -80,4 +80,36 @@ void main() {
     );
     expect(find.text('AMW-2026-0042'), findsOneWidget);
   });
+
+  testWidgets(
+      'fallback centers the code and scales it down so a long order code never '
+      'overflows the tag box', (tester) async {
+    const longCode = 'AMW-2026-0042-REPRINT-BATCH-7-OVERSIZED-CODE-1234567890';
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: longCode, size: 120),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: qr.errorStateBuilder!(
+            tester.element(find.byType(QrImageView)),
+            'boom',
+          ),
+        ),
+      ),
+    );
+
+    // No layout overflow should be reported for an oversized code.
+    expect(tester.takeException(), isNull);
+
+    final text = tester.widget<Text>(find.text(longCode));
+    expect(text.textAlign, equals(TextAlign.center));
+  });
 }
