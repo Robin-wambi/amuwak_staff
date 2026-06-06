@@ -671,6 +671,17 @@ class $CustomersTable extends Customers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _customRatePerKgUgxMeta =
+      const VerificationMeta('customRatePerKgUgx');
+  @override
+  late final GeneratedColumn<double> customRatePerKgUgx =
+      GeneratedColumn<double>(
+        'custom_rate_per_kg_ugx',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -711,6 +722,7 @@ class $CustomersTable extends Customers
     phone,
     address,
     notes,
+    customRatePerKgUgx,
     createdAt,
     updatedAt,
     deletedAt,
@@ -758,6 +770,15 @@ class $CustomersTable extends Customers
       context.handle(
         _notesMeta,
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('custom_rate_per_kg_ugx')) {
+      context.handle(
+        _customRatePerKgUgxMeta,
+        customRatePerKgUgx.isAcceptableOrUnknown(
+          data['custom_rate_per_kg_ugx']!,
+          _customRatePerKgUgxMeta,
+        ),
       );
     }
     if (data.containsKey('created_at')) {
@@ -811,6 +832,10 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      customRatePerKgUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}custom_rate_per_kg_ugx'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -838,6 +863,7 @@ class Customer extends DataClass implements Insertable<Customer> {
   final String phone;
   final String? address;
   final String? notes;
+  final double? customRatePerKgUgx;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -847,6 +873,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     required this.phone,
     this.address,
     this.notes,
+    this.customRatePerKgUgx,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -862,6 +889,9 @@ class Customer extends DataClass implements Insertable<Customer> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || customRatePerKgUgx != null) {
+      map['custom_rate_per_kg_ugx'] = Variable<double>(customRatePerKgUgx);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -882,6 +912,9 @@ class Customer extends DataClass implements Insertable<Customer> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      customRatePerKgUgx: customRatePerKgUgx == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customRatePerKgUgx),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -901,6 +934,9 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: serializer.fromJson<String>(json['phone']),
       address: serializer.fromJson<String?>(json['address']),
       notes: serializer.fromJson<String?>(json['notes']),
+      customRatePerKgUgx: serializer.fromJson<double?>(
+        json['customRatePerKgUgx'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -915,6 +951,7 @@ class Customer extends DataClass implements Insertable<Customer> {
       'phone': serializer.toJson<String>(phone),
       'address': serializer.toJson<String?>(address),
       'notes': serializer.toJson<String?>(notes),
+      'customRatePerKgUgx': serializer.toJson<double?>(customRatePerKgUgx),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -927,6 +964,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     String? phone,
     Value<String?> address = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<double?> customRatePerKgUgx = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -936,6 +974,9 @@ class Customer extends DataClass implements Insertable<Customer> {
     phone: phone ?? this.phone,
     address: address.present ? address.value : this.address,
     notes: notes.present ? notes.value : this.notes,
+    customRatePerKgUgx: customRatePerKgUgx.present
+        ? customRatePerKgUgx.value
+        : this.customRatePerKgUgx,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -947,6 +988,9 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: data.phone.present ? data.phone.value : this.phone,
       address: data.address.present ? data.address.value : this.address,
       notes: data.notes.present ? data.notes.value : this.notes,
+      customRatePerKgUgx: data.customRatePerKgUgx.present
+          ? data.customRatePerKgUgx.value
+          : this.customRatePerKgUgx,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -961,6 +1005,7 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('phone: $phone, ')
           ..write('address: $address, ')
           ..write('notes: $notes, ')
+          ..write('customRatePerKgUgx: $customRatePerKgUgx, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
@@ -975,6 +1020,7 @@ class Customer extends DataClass implements Insertable<Customer> {
     phone,
     address,
     notes,
+    customRatePerKgUgx,
     createdAt,
     updatedAt,
     deletedAt,
@@ -988,6 +1034,7 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.phone == this.phone &&
           other.address == this.address &&
           other.notes == this.notes &&
+          other.customRatePerKgUgx == this.customRatePerKgUgx &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
@@ -999,6 +1046,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String> phone;
   final Value<String?> address;
   final Value<String?> notes;
+  final Value<double?> customRatePerKgUgx;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -1009,6 +1057,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.phone = const Value.absent(),
     this.address = const Value.absent(),
     this.notes = const Value.absent(),
+    this.customRatePerKgUgx = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -1020,6 +1069,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     required String phone,
     this.address = const Value.absent(),
     this.notes = const Value.absent(),
+    this.customRatePerKgUgx = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -1035,6 +1085,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? phone,
     Expression<String>? address,
     Expression<String>? notes,
+    Expression<double>? customRatePerKgUgx,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -1046,6 +1097,8 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (phone != null) 'phone': phone,
       if (address != null) 'address': address,
       if (notes != null) 'notes': notes,
+      if (customRatePerKgUgx != null)
+        'custom_rate_per_kg_ugx': customRatePerKgUgx,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -1059,6 +1112,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String>? phone,
     Value<String?>? address,
     Value<String?>? notes,
+    Value<double?>? customRatePerKgUgx,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -1070,6 +1124,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       notes: notes ?? this.notes,
+      customRatePerKgUgx: customRatePerKgUgx ?? this.customRatePerKgUgx,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -1095,6 +1150,11 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (customRatePerKgUgx.present) {
+      map['custom_rate_per_kg_ugx'] = Variable<double>(
+        customRatePerKgUgx.value,
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1118,6 +1178,7 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('phone: $phone, ')
           ..write('address: $address, ')
           ..write('notes: $notes, ')
+          ..write('customRatePerKgUgx: $customRatePerKgUgx, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -1337,6 +1398,76 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _ratePerKgSnapshotUgxMeta =
+      const VerificationMeta('ratePerKgSnapshotUgx');
+  @override
+  late final GeneratedColumn<double> ratePerKgSnapshotUgx =
+      GeneratedColumn<double>(
+        'rate_per_kg_snapshot_ugx',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  static const VerificationMeta _estimatedWeightKgMeta = const VerificationMeta(
+    'estimatedWeightKg',
+  );
+  @override
+  late final GeneratedColumn<double> estimatedWeightKg =
+      GeneratedColumn<double>(
+        'estimated_weight_kg',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _finalWeightKgMeta = const VerificationMeta(
+    'finalWeightKg',
+  );
+  @override
+  late final GeneratedColumn<double> finalWeightKg = GeneratedColumn<double>(
+    'final_weight_kg',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lineItemsMeta = const VerificationMeta(
+    'lineItems',
+  );
+  @override
+  late final GeneratedColumn<String> lineItems = GeneratedColumn<String>(
+    'line_items',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _manualAdjustmentUgxMeta =
+      const VerificationMeta('manualAdjustmentUgx');
+  @override
+  late final GeneratedColumn<int> manualAdjustmentUgx = GeneratedColumn<int>(
+    'manual_adjustment_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _totalUgxMeta = const VerificationMeta(
+    'totalUgx',
+  );
+  @override
+  late final GeneratedColumn<int> totalUgx = GeneratedColumn<int>(
+    'total_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1358,6 +1489,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     createdAt,
     updatedAt,
     deletedAt,
+    ratePerKgSnapshotUgx,
+    estimatedWeightKg,
+    finalWeightKg,
+    lineItems,
+    manualAdjustmentUgx,
+    totalUgx,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1527,6 +1664,54 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('rate_per_kg_snapshot_ugx')) {
+      context.handle(
+        _ratePerKgSnapshotUgxMeta,
+        ratePerKgSnapshotUgx.isAcceptableOrUnknown(
+          data['rate_per_kg_snapshot_ugx']!,
+          _ratePerKgSnapshotUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('estimated_weight_kg')) {
+      context.handle(
+        _estimatedWeightKgMeta,
+        estimatedWeightKg.isAcceptableOrUnknown(
+          data['estimated_weight_kg']!,
+          _estimatedWeightKgMeta,
+        ),
+      );
+    }
+    if (data.containsKey('final_weight_kg')) {
+      context.handle(
+        _finalWeightKgMeta,
+        finalWeightKg.isAcceptableOrUnknown(
+          data['final_weight_kg']!,
+          _finalWeightKgMeta,
+        ),
+      );
+    }
+    if (data.containsKey('line_items')) {
+      context.handle(
+        _lineItemsMeta,
+        lineItems.isAcceptableOrUnknown(data['line_items']!, _lineItemsMeta),
+      );
+    }
+    if (data.containsKey('manual_adjustment_ugx')) {
+      context.handle(
+        _manualAdjustmentUgxMeta,
+        manualAdjustmentUgx.isAcceptableOrUnknown(
+          data['manual_adjustment_ugx']!,
+          _manualAdjustmentUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_ugx')) {
+      context.handle(
+        _totalUgxMeta,
+        totalUgx.isAcceptableOrUnknown(data['total_ugx']!, _totalUgxMeta),
+      );
+    }
     return context;
   }
 
@@ -1612,6 +1797,30 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      ratePerKgSnapshotUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}rate_per_kg_snapshot_ugx'],
+      )!,
+      estimatedWeightKg: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}estimated_weight_kg'],
+      ),
+      finalWeightKg: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}final_weight_kg'],
+      ),
+      lineItems: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_items'],
+      )!,
+      manualAdjustmentUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}manual_adjustment_ugx'],
+      )!,
+      totalUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_ugx'],
+      )!,
     );
   }
 
@@ -1641,6 +1850,12 @@ class Order extends DataClass implements Insertable<Order> {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+  final double ratePerKgSnapshotUgx;
+  final double? estimatedWeightKg;
+  final double? finalWeightKg;
+  final String lineItems;
+  final int manualAdjustmentUgx;
+  final int totalUgx;
   const Order({
     required this.id,
     required this.orderCode,
@@ -1661,6 +1876,12 @@ class Order extends DataClass implements Insertable<Order> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    required this.ratePerKgSnapshotUgx,
+    this.estimatedWeightKg,
+    this.finalWeightKg,
+    required this.lineItems,
+    required this.manualAdjustmentUgx,
+    required this.totalUgx,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1692,6 +1913,16 @@ class Order extends DataClass implements Insertable<Order> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['rate_per_kg_snapshot_ugx'] = Variable<double>(ratePerKgSnapshotUgx);
+    if (!nullToAbsent || estimatedWeightKg != null) {
+      map['estimated_weight_kg'] = Variable<double>(estimatedWeightKg);
+    }
+    if (!nullToAbsent || finalWeightKg != null) {
+      map['final_weight_kg'] = Variable<double>(finalWeightKg);
+    }
+    map['line_items'] = Variable<String>(lineItems);
+    map['manual_adjustment_ugx'] = Variable<int>(manualAdjustmentUgx);
+    map['total_ugx'] = Variable<int>(totalUgx);
     return map;
   }
 
@@ -1724,6 +1955,16 @@ class Order extends DataClass implements Insertable<Order> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      ratePerKgSnapshotUgx: Value(ratePerKgSnapshotUgx),
+      estimatedWeightKg: estimatedWeightKg == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedWeightKg),
+      finalWeightKg: finalWeightKg == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finalWeightKg),
+      lineItems: Value(lineItems),
+      manualAdjustmentUgx: Value(manualAdjustmentUgx),
+      totalUgx: Value(totalUgx),
     );
   }
 
@@ -1752,6 +1993,18 @@ class Order extends DataClass implements Insertable<Order> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      ratePerKgSnapshotUgx: serializer.fromJson<double>(
+        json['ratePerKgSnapshotUgx'],
+      ),
+      estimatedWeightKg: serializer.fromJson<double?>(
+        json['estimatedWeightKg'],
+      ),
+      finalWeightKg: serializer.fromJson<double?>(json['finalWeightKg']),
+      lineItems: serializer.fromJson<String>(json['lineItems']),
+      manualAdjustmentUgx: serializer.fromJson<int>(
+        json['manualAdjustmentUgx'],
+      ),
+      totalUgx: serializer.fromJson<int>(json['totalUgx']),
     );
   }
   @override
@@ -1777,6 +2030,12 @@ class Order extends DataClass implements Insertable<Order> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'ratePerKgSnapshotUgx': serializer.toJson<double>(ratePerKgSnapshotUgx),
+      'estimatedWeightKg': serializer.toJson<double?>(estimatedWeightKg),
+      'finalWeightKg': serializer.toJson<double?>(finalWeightKg),
+      'lineItems': serializer.toJson<String>(lineItems),
+      'manualAdjustmentUgx': serializer.toJson<int>(manualAdjustmentUgx),
+      'totalUgx': serializer.toJson<int>(totalUgx),
     };
   }
 
@@ -1800,6 +2059,12 @@ class Order extends DataClass implements Insertable<Order> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
+    double? ratePerKgSnapshotUgx,
+    Value<double?> estimatedWeightKg = const Value.absent(),
+    Value<double?> finalWeightKg = const Value.absent(),
+    String? lineItems,
+    int? manualAdjustmentUgx,
+    int? totalUgx,
   }) => Order(
     id: id ?? this.id,
     orderCode: orderCode ?? this.orderCode,
@@ -1822,6 +2087,16 @@ class Order extends DataClass implements Insertable<Order> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    ratePerKgSnapshotUgx: ratePerKgSnapshotUgx ?? this.ratePerKgSnapshotUgx,
+    estimatedWeightKg: estimatedWeightKg.present
+        ? estimatedWeightKg.value
+        : this.estimatedWeightKg,
+    finalWeightKg: finalWeightKg.present
+        ? finalWeightKg.value
+        : this.finalWeightKg,
+    lineItems: lineItems ?? this.lineItems,
+    manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
+    totalUgx: totalUgx ?? this.totalUgx,
   );
   Order copyWithCompanion(OrdersCompanion data) {
     return Order(
@@ -1860,6 +2135,20 @@ class Order extends DataClass implements Insertable<Order> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      ratePerKgSnapshotUgx: data.ratePerKgSnapshotUgx.present
+          ? data.ratePerKgSnapshotUgx.value
+          : this.ratePerKgSnapshotUgx,
+      estimatedWeightKg: data.estimatedWeightKg.present
+          ? data.estimatedWeightKg.value
+          : this.estimatedWeightKg,
+      finalWeightKg: data.finalWeightKg.present
+          ? data.finalWeightKg.value
+          : this.finalWeightKg,
+      lineItems: data.lineItems.present ? data.lineItems.value : this.lineItems,
+      manualAdjustmentUgx: data.manualAdjustmentUgx.present
+          ? data.manualAdjustmentUgx.value
+          : this.manualAdjustmentUgx,
+      totalUgx: data.totalUgx.present ? data.totalUgx.value : this.totalUgx,
     );
   }
 
@@ -1884,13 +2173,19 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('ratePerKgSnapshotUgx: $ratePerKgSnapshotUgx, ')
+          ..write('estimatedWeightKg: $estimatedWeightKg, ')
+          ..write('finalWeightKg: $finalWeightKg, ')
+          ..write('lineItems: $lineItems, ')
+          ..write('manualAdjustmentUgx: $manualAdjustmentUgx, ')
+          ..write('totalUgx: $totalUgx')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     orderCode,
     customerId,
@@ -1910,7 +2205,13 @@ class Order extends DataClass implements Insertable<Order> {
     createdAt,
     updatedAt,
     deletedAt,
-  );
+    ratePerKgSnapshotUgx,
+    estimatedWeightKg,
+    finalWeightKg,
+    lineItems,
+    manualAdjustmentUgx,
+    totalUgx,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1933,7 +2234,13 @@ class Order extends DataClass implements Insertable<Order> {
           other.createdBy == this.createdBy &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.ratePerKgSnapshotUgx == this.ratePerKgSnapshotUgx &&
+          other.estimatedWeightKg == this.estimatedWeightKg &&
+          other.finalWeightKg == this.finalWeightKg &&
+          other.lineItems == this.lineItems &&
+          other.manualAdjustmentUgx == this.manualAdjustmentUgx &&
+          other.totalUgx == this.totalUgx);
 }
 
 class OrdersCompanion extends UpdateCompanion<Order> {
@@ -1956,6 +2263,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<double> ratePerKgSnapshotUgx;
+  final Value<double?> estimatedWeightKg;
+  final Value<double?> finalWeightKg;
+  final Value<String> lineItems;
+  final Value<int> manualAdjustmentUgx;
+  final Value<int> totalUgx;
   final Value<int> rowid;
   const OrdersCompanion({
     this.id = const Value.absent(),
@@ -1977,6 +2290,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.ratePerKgSnapshotUgx = const Value.absent(),
+    this.estimatedWeightKg = const Value.absent(),
+    this.finalWeightKg = const Value.absent(),
+    this.lineItems = const Value.absent(),
+    this.manualAdjustmentUgx = const Value.absent(),
+    this.totalUgx = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OrdersCompanion.insert({
@@ -1999,6 +2318,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.ratePerKgSnapshotUgx = const Value.absent(),
+    this.estimatedWeightKg = const Value.absent(),
+    this.finalWeightKg = const Value.absent(),
+    this.lineItems = const Value.absent(),
+    this.manualAdjustmentUgx = const Value.absent(),
+    this.totalUgx = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        orderCode = Value(orderCode),
@@ -2032,6 +2357,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<double>? ratePerKgSnapshotUgx,
+    Expression<double>? estimatedWeightKg,
+    Expression<double>? finalWeightKg,
+    Expression<String>? lineItems,
+    Expression<int>? manualAdjustmentUgx,
+    Expression<int>? totalUgx,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2054,6 +2385,14 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (ratePerKgSnapshotUgx != null)
+        'rate_per_kg_snapshot_ugx': ratePerKgSnapshotUgx,
+      if (estimatedWeightKg != null) 'estimated_weight_kg': estimatedWeightKg,
+      if (finalWeightKg != null) 'final_weight_kg': finalWeightKg,
+      if (lineItems != null) 'line_items': lineItems,
+      if (manualAdjustmentUgx != null)
+        'manual_adjustment_ugx': manualAdjustmentUgx,
+      if (totalUgx != null) 'total_ugx': totalUgx,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2078,6 +2417,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<double>? ratePerKgSnapshotUgx,
+    Value<double?>? estimatedWeightKg,
+    Value<double?>? finalWeightKg,
+    Value<String>? lineItems,
+    Value<int>? manualAdjustmentUgx,
+    Value<int>? totalUgx,
     Value<int>? rowid,
   }) {
     return OrdersCompanion(
@@ -2100,6 +2445,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      ratePerKgSnapshotUgx: ratePerKgSnapshotUgx ?? this.ratePerKgSnapshotUgx,
+      estimatedWeightKg: estimatedWeightKg ?? this.estimatedWeightKg,
+      finalWeightKg: finalWeightKg ?? this.finalWeightKg,
+      lineItems: lineItems ?? this.lineItems,
+      manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
+      totalUgx: totalUgx ?? this.totalUgx,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2164,6 +2515,26 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (ratePerKgSnapshotUgx.present) {
+      map['rate_per_kg_snapshot_ugx'] = Variable<double>(
+        ratePerKgSnapshotUgx.value,
+      );
+    }
+    if (estimatedWeightKg.present) {
+      map['estimated_weight_kg'] = Variable<double>(estimatedWeightKg.value);
+    }
+    if (finalWeightKg.present) {
+      map['final_weight_kg'] = Variable<double>(finalWeightKg.value);
+    }
+    if (lineItems.present) {
+      map['line_items'] = Variable<String>(lineItems.value);
+    }
+    if (manualAdjustmentUgx.present) {
+      map['manual_adjustment_ugx'] = Variable<int>(manualAdjustmentUgx.value);
+    }
+    if (totalUgx.present) {
+      map['total_ugx'] = Variable<int>(totalUgx.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2192,6 +2563,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('ratePerKgSnapshotUgx: $ratePerKgSnapshotUgx, ')
+          ..write('estimatedWeightKg: $estimatedWeightKg, ')
+          ..write('finalWeightKg: $finalWeightKg, ')
+          ..write('lineItems: $lineItems, ')
+          ..write('manualAdjustmentUgx: $manualAdjustmentUgx, ')
+          ..write('totalUgx: $totalUgx, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6475,6 +6852,333 @@ class PullDeadLetterCompanion extends UpdateCompanion<PullDeadLetterData> {
   }
 }
 
+class $PricingSettingsTable extends PricingSettings
+    with TableInfo<$PricingSettingsTable, PricingSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PricingSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _defaultRatePerKgUgxMeta =
+      const VerificationMeta('defaultRatePerKgUgx');
+  @override
+  late final GeneratedColumn<double> defaultRatePerKgUgx =
+      GeneratedColumn<double>(
+        'default_rate_per_kg_ugx',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedByMeta = const VerificationMeta(
+    'updatedBy',
+  );
+  @override
+  late final GeneratedColumn<String> updatedBy = GeneratedColumn<String>(
+    'updated_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    defaultRatePerKgUgx,
+    updatedAt,
+    updatedBy,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pricing_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PricingSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('default_rate_per_kg_ugx')) {
+      context.handle(
+        _defaultRatePerKgUgxMeta,
+        defaultRatePerKgUgx.isAcceptableOrUnknown(
+          data['default_rate_per_kg_ugx']!,
+          _defaultRatePerKgUgxMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_defaultRatePerKgUgxMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('updated_by')) {
+      context.handle(
+        _updatedByMeta,
+        updatedBy.isAcceptableOrUnknown(data['updated_by']!, _updatedByMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PricingSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PricingSetting(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      defaultRatePerKgUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}default_rate_per_kg_ugx'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      updatedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by'],
+      ),
+    );
+  }
+
+  @override
+  $PricingSettingsTable createAlias(String alias) {
+    return $PricingSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class PricingSetting extends DataClass implements Insertable<PricingSetting> {
+  final String id;
+  final double defaultRatePerKgUgx;
+  final DateTime updatedAt;
+  final String? updatedBy;
+  const PricingSetting({
+    required this.id,
+    required this.defaultRatePerKgUgx,
+    required this.updatedAt,
+    this.updatedBy,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['default_rate_per_kg_ugx'] = Variable<double>(defaultRatePerKgUgx);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || updatedBy != null) {
+      map['updated_by'] = Variable<String>(updatedBy);
+    }
+    return map;
+  }
+
+  PricingSettingsCompanion toCompanion(bool nullToAbsent) {
+    return PricingSettingsCompanion(
+      id: Value(id),
+      defaultRatePerKgUgx: Value(defaultRatePerKgUgx),
+      updatedAt: Value(updatedAt),
+      updatedBy: updatedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedBy),
+    );
+  }
+
+  factory PricingSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PricingSetting(
+      id: serializer.fromJson<String>(json['id']),
+      defaultRatePerKgUgx: serializer.fromJson<double>(
+        json['defaultRatePerKgUgx'],
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      updatedBy: serializer.fromJson<String?>(json['updatedBy']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'defaultRatePerKgUgx': serializer.toJson<double>(defaultRatePerKgUgx),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'updatedBy': serializer.toJson<String?>(updatedBy),
+    };
+  }
+
+  PricingSetting copyWith({
+    String? id,
+    double? defaultRatePerKgUgx,
+    DateTime? updatedAt,
+    Value<String?> updatedBy = const Value.absent(),
+  }) => PricingSetting(
+    id: id ?? this.id,
+    defaultRatePerKgUgx: defaultRatePerKgUgx ?? this.defaultRatePerKgUgx,
+    updatedAt: updatedAt ?? this.updatedAt,
+    updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
+  );
+  PricingSetting copyWithCompanion(PricingSettingsCompanion data) {
+    return PricingSetting(
+      id: data.id.present ? data.id.value : this.id,
+      defaultRatePerKgUgx: data.defaultRatePerKgUgx.present
+          ? data.defaultRatePerKgUgx.value
+          : this.defaultRatePerKgUgx,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PricingSetting(')
+          ..write('id: $id, ')
+          ..write('defaultRatePerKgUgx: $defaultRatePerKgUgx, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, defaultRatePerKgUgx, updatedAt, updatedBy);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PricingSetting &&
+          other.id == this.id &&
+          other.defaultRatePerKgUgx == this.defaultRatePerKgUgx &&
+          other.updatedAt == this.updatedAt &&
+          other.updatedBy == this.updatedBy);
+}
+
+class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
+  final Value<String> id;
+  final Value<double> defaultRatePerKgUgx;
+  final Value<DateTime> updatedAt;
+  final Value<String?> updatedBy;
+  final Value<int> rowid;
+  const PricingSettingsCompanion({
+    this.id = const Value.absent(),
+    this.defaultRatePerKgUgx = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.updatedBy = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PricingSettingsCompanion.insert({
+    required String id,
+    required double defaultRatePerKgUgx,
+    required DateTime updatedAt,
+    this.updatedBy = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       defaultRatePerKgUgx = Value(defaultRatePerKgUgx),
+       updatedAt = Value(updatedAt);
+  static Insertable<PricingSetting> custom({
+    Expression<String>? id,
+    Expression<double>? defaultRatePerKgUgx,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? updatedBy,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (defaultRatePerKgUgx != null)
+        'default_rate_per_kg_ugx': defaultRatePerKgUgx,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (updatedBy != null) 'updated_by': updatedBy,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PricingSettingsCompanion copyWith({
+    Value<String>? id,
+    Value<double>? defaultRatePerKgUgx,
+    Value<DateTime>? updatedAt,
+    Value<String?>? updatedBy,
+    Value<int>? rowid,
+  }) {
+    return PricingSettingsCompanion(
+      id: id ?? this.id,
+      defaultRatePerKgUgx: defaultRatePerKgUgx ?? this.defaultRatePerKgUgx,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (defaultRatePerKgUgx.present) {
+      map['default_rate_per_kg_ugx'] = Variable<double>(
+        defaultRatePerKgUgx.value,
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (updatedBy.present) {
+      map['updated_by'] = Variable<String>(updatedBy.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PricingSettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('defaultRatePerKgUgx: $defaultRatePerKgUgx, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6493,6 +7197,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncWatermarksTable syncWatermarks = $SyncWatermarksTable(this);
   late final $PullDeadLetterTable pullDeadLetter = $PullDeadLetterTable(this);
+  late final $PricingSettingsTable pricingSettings = $PricingSettingsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6510,6 +7217,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     outbox,
     syncWatermarks,
     pullDeadLetter,
+    pricingSettings,
   ];
   @override
   DriftDatabaseOptions get options =>
@@ -6815,6 +7523,7 @@ typedef $$CustomersTableCreateCompanionBuilder =
       required String phone,
       Value<String?> address,
       Value<String?> notes,
+      Value<double?> customRatePerKgUgx,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -6827,6 +7536,7 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String> phone,
       Value<String?> address,
       Value<String?> notes,
+      Value<double?> customRatePerKgUgx,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -6864,6 +7574,11 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get customRatePerKgUgx => $composableBuilder(
+    column: $table.customRatePerKgUgx,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6917,6 +7632,11 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get customRatePerKgUgx => $composableBuilder(
+    column: $table.customRatePerKgUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6956,6 +7676,11 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<double> get customRatePerKgUgx => $composableBuilder(
+    column: $table.customRatePerKgUgx,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7000,6 +7725,7 @@ class $$CustomersTableTableManager
                 Value<String> phone = const Value.absent(),
                 Value<String?> address = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<double?> customRatePerKgUgx = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -7010,6 +7736,7 @@ class $$CustomersTableTableManager
                 phone: phone,
                 address: address,
                 notes: notes,
+                customRatePerKgUgx: customRatePerKgUgx,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -7022,6 +7749,7 @@ class $$CustomersTableTableManager
                 required String phone,
                 Value<String?> address = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<double?> customRatePerKgUgx = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -7032,6 +7760,7 @@ class $$CustomersTableTableManager
                 phone: phone,
                 address: address,
                 notes: notes,
+                customRatePerKgUgx: customRatePerKgUgx,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -7080,6 +7809,12 @@ typedef $$OrdersTableCreateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<double> ratePerKgSnapshotUgx,
+      Value<double?> estimatedWeightKg,
+      Value<double?> finalWeightKg,
+      Value<String> lineItems,
+      Value<int> manualAdjustmentUgx,
+      Value<int> totalUgx,
       Value<int> rowid,
     });
 typedef $$OrdersTableUpdateCompanionBuilder =
@@ -7103,6 +7838,12 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<double> ratePerKgSnapshotUgx,
+      Value<double?> estimatedWeightKg,
+      Value<double?> finalWeightKg,
+      Value<String> lineItems,
+      Value<int> manualAdjustmentUgx,
+      Value<int> totalUgx,
       Value<int> rowid,
     });
 
@@ -7207,6 +7948,36 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ratePerKgSnapshotUgx => $composableBuilder(
+    column: $table.ratePerKgSnapshotUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get estimatedWeightKg => $composableBuilder(
+    column: $table.estimatedWeightKg,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get finalWeightKg => $composableBuilder(
+    column: $table.finalWeightKg,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineItems => $composableBuilder(
+    column: $table.lineItems,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get manualAdjustmentUgx => $composableBuilder(
+    column: $table.manualAdjustmentUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalUgx => $composableBuilder(
+    column: $table.totalUgx,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7314,6 +8085,36 @@ class $$OrdersTableOrderingComposer
     column: $table.deletedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get ratePerKgSnapshotUgx => $composableBuilder(
+    column: $table.ratePerKgSnapshotUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get estimatedWeightKg => $composableBuilder(
+    column: $table.estimatedWeightKg,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get finalWeightKg => $composableBuilder(
+    column: $table.finalWeightKg,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineItems => $composableBuilder(
+    column: $table.lineItems,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get manualAdjustmentUgx => $composableBuilder(
+    column: $table.manualAdjustmentUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalUgx => $composableBuilder(
+    column: $table.totalUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$OrdersTableAnnotationComposer
@@ -7397,6 +8198,32 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get ratePerKgSnapshotUgx => $composableBuilder(
+    column: $table.ratePerKgSnapshotUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get estimatedWeightKg => $composableBuilder(
+    column: $table.estimatedWeightKg,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get finalWeightKg => $composableBuilder(
+    column: $table.finalWeightKg,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lineItems =>
+      $composableBuilder(column: $table.lineItems, builder: (column) => column);
+
+  GeneratedColumn<int> get manualAdjustmentUgx => $composableBuilder(
+    column: $table.manualAdjustmentUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalUgx =>
+      $composableBuilder(column: $table.totalUgx, builder: (column) => column);
 }
 
 class $$OrdersTableTableManager
@@ -7446,6 +8273,12 @@ class $$OrdersTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<double> ratePerKgSnapshotUgx = const Value.absent(),
+                Value<double?> estimatedWeightKg = const Value.absent(),
+                Value<double?> finalWeightKg = const Value.absent(),
+                Value<String> lineItems = const Value.absent(),
+                Value<int> manualAdjustmentUgx = const Value.absent(),
+                Value<int> totalUgx = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion(
                 id: id,
@@ -7467,6 +8300,12 @@ class $$OrdersTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                ratePerKgSnapshotUgx: ratePerKgSnapshotUgx,
+                estimatedWeightKg: estimatedWeightKg,
+                finalWeightKg: finalWeightKg,
+                lineItems: lineItems,
+                manualAdjustmentUgx: manualAdjustmentUgx,
+                totalUgx: totalUgx,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7490,6 +8329,12 @@ class $$OrdersTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<double> ratePerKgSnapshotUgx = const Value.absent(),
+                Value<double?> estimatedWeightKg = const Value.absent(),
+                Value<double?> finalWeightKg = const Value.absent(),
+                Value<String> lineItems = const Value.absent(),
+                Value<int> manualAdjustmentUgx = const Value.absent(),
+                Value<int> totalUgx = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion.insert(
                 id: id,
@@ -7511,6 +8356,12 @@ class $$OrdersTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                ratePerKgSnapshotUgx: ratePerKgSnapshotUgx,
+                estimatedWeightKg: estimatedWeightKg,
+                finalWeightKg: finalWeightKg,
+                lineItems: lineItems,
+                manualAdjustmentUgx: manualAdjustmentUgx,
+                totalUgx: totalUgx,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -9751,6 +10602,195 @@ typedef $$PullDeadLetterTableProcessedTableManager =
       PullDeadLetterData,
       PrefetchHooks Function()
     >;
+typedef $$PricingSettingsTableCreateCompanionBuilder =
+    PricingSettingsCompanion Function({
+      required String id,
+      required double defaultRatePerKgUgx,
+      required DateTime updatedAt,
+      Value<String?> updatedBy,
+      Value<int> rowid,
+    });
+typedef $$PricingSettingsTableUpdateCompanionBuilder =
+    PricingSettingsCompanion Function({
+      Value<String> id,
+      Value<double> defaultRatePerKgUgx,
+      Value<DateTime> updatedAt,
+      Value<String?> updatedBy,
+      Value<int> rowid,
+    });
+
+class $$PricingSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $PricingSettingsTable> {
+  $$PricingSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get defaultRatePerKgUgx => $composableBuilder(
+    column: $table.defaultRatePerKgUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PricingSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PricingSettingsTable> {
+  $$PricingSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get defaultRatePerKgUgx => $composableBuilder(
+    column: $table.defaultRatePerKgUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PricingSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PricingSettingsTable> {
+  $$PricingSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get defaultRatePerKgUgx => $composableBuilder(
+    column: $table.defaultRatePerKgUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedBy =>
+      $composableBuilder(column: $table.updatedBy, builder: (column) => column);
+}
+
+class $$PricingSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PricingSettingsTable,
+          PricingSetting,
+          $$PricingSettingsTableFilterComposer,
+          $$PricingSettingsTableOrderingComposer,
+          $$PricingSettingsTableAnnotationComposer,
+          $$PricingSettingsTableCreateCompanionBuilder,
+          $$PricingSettingsTableUpdateCompanionBuilder,
+          (
+            PricingSetting,
+            BaseReferences<
+              _$AppDatabase,
+              $PricingSettingsTable,
+              PricingSetting
+            >,
+          ),
+          PricingSetting,
+          PrefetchHooks Function()
+        > {
+  $$PricingSettingsTableTableManager(
+    _$AppDatabase db,
+    $PricingSettingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PricingSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PricingSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PricingSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<double> defaultRatePerKgUgx = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PricingSettingsCompanion(
+                id: id,
+                defaultRatePerKgUgx: defaultRatePerKgUgx,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required double defaultRatePerKgUgx,
+                required DateTime updatedAt,
+                Value<String?> updatedBy = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PricingSettingsCompanion.insert(
+                id: id,
+                defaultRatePerKgUgx: defaultRatePerKgUgx,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PricingSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PricingSettingsTable,
+      PricingSetting,
+      $$PricingSettingsTableFilterComposer,
+      $$PricingSettingsTableOrderingComposer,
+      $$PricingSettingsTableAnnotationComposer,
+      $$PricingSettingsTableCreateCompanionBuilder,
+      $$PricingSettingsTableUpdateCompanionBuilder,
+      (
+        PricingSetting,
+        BaseReferences<_$AppDatabase, $PricingSettingsTable, PricingSetting>,
+      ),
+      PricingSetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9779,4 +10819,6 @@ class $AppDatabaseManager {
       $$SyncWatermarksTableTableManager(_db, _db.syncWatermarks);
   $$PullDeadLetterTableTableManager get pullDeadLetter =>
       $$PullDeadLetterTableTableManager(_db, _db.pullDeadLetter);
+  $$PricingSettingsTableTableManager get pricingSettings =>
+      $$PricingSettingsTableTableManager(_db, _db.pricingSettings);
 }
