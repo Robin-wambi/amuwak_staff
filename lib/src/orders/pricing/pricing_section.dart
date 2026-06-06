@@ -1,0 +1,146 @@
+import 'package:flutter/material.dart';
+
+import '../../shared/format_ugx.dart';
+import '../../shared/theme/app_card.dart';
+import '../../shared/theme/app_colors.dart';
+import '../../shared/theme/app_spacing.dart';
+import 'line_item.dart';
+
+/// Editable list of free-form line items, with an "Add item" button. Stateless:
+/// the parent owns the list and re-renders on change.
+class LineItemsEditor extends StatelessWidget {
+  const LineItemsEditor({
+    super.key,
+    required this.items,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<LineItem> items;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Row(
+              children: [
+                Expanded(child: Text(items[i].name)),
+                Text(formatUgx(items[i].amountUgx)),
+                IconButton(
+                  key: Key('remove_line_item_$i'),
+                  icon: const Icon(Icons.remove_circle_outline),
+                  onPressed: () => onRemove(i),
+                ),
+              ],
+            ),
+          ),
+        TextButton.icon(
+          key: const Key('add_line_item'),
+          onPressed: onAdd,
+          icon: const Icon(Icons.add),
+          label: const Text('Add item'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Prominent total display with an optional "Provisional" badge (shown until a
+/// final weight is recorded).
+class TotalCard extends StatelessWidget {
+  const TotalCard({
+    super.key,
+    required this.totalUgx,
+    required this.isProvisional,
+  });
+
+  final int totalUgx;
+  final bool isProvisional;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total', style: textTheme.bodySmall),
+              Text(formatUgx(totalUgx), style: textTheme.headlineMedium),
+            ],
+          ),
+          if (isProvisional)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryText.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('Provisional'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows a bottom sheet collecting a line-item name + amount. Returns the
+/// validated [LineItem], or null if cancelled / invalid.
+Future<LineItem?> showAddLineItemSheet(BuildContext context) {
+  final nameController = TextEditingController();
+  final amountController = TextEditingController();
+  return showModalBottomSheet<LineItem>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xl,
+        AppSpacing.xl,
+        MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.xl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: const Key('line_item_name'),
+            controller: nameController,
+            decoration: const InputDecoration(labelText: 'Item (e.g. Blanket)'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            key: const Key('line_item_amount'),
+            controller: amountController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Amount (UGX)'),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          ElevatedButton(
+            key: const Key('line_item_save'),
+            onPressed: () {
+              final name = nameController.text.trim();
+              final amount = int.tryParse(amountController.text.trim());
+              if (name.isEmpty || amount == null || amount < 0) {
+                Navigator.pop(sheetContext); // invalid → cancel
+                return;
+              }
+              Navigator.pop(sheetContext, LineItem(name: name, amountUgx: amount));
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
