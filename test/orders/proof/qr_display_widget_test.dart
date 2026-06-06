@@ -23,8 +23,9 @@ void main() {
   });
 
   testWidgets(
-      'configures medium error correction and a quiet-zone padding so printed '
-      'bag tags stay scannable when scuffed', (tester) async {
+      'configures medium error correction, a quiet-zone padding, and gapless '
+      'rendering so printed bag tags stay scannable when scuffed',
+      (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -65,7 +66,6 @@ void main() {
     );
 
     final qr = tester.widget<QrImageView>(find.byType(QrImageView));
-    expect(qr.errorStateBuilder, isNotNull);
 
     // Render the fallback in isolation and confirm it surfaces the code.
     await tester.pumpWidget(
@@ -111,5 +111,41 @@ void main() {
 
     final text = tester.widget<Text>(find.text(longCode));
     expect(text.textAlign, equals(TextAlign.center));
+  });
+
+  testWidgets(
+      'fallback paints a white background so the code stays readable on any '
+      'scaffold', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: 'AMW-2026-0042'),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: qr.errorStateBuilder!(
+            tester.element(find.byType(QrImageView)),
+            'boom',
+          ),
+        ),
+      ),
+    );
+
+    final coloredBox = tester.widget<ColoredBox>(
+      find
+          .ancestor(
+            of: find.text('AMW-2026-0042'),
+            matching: find.byType(ColoredBox),
+          )
+          .first,
+    );
+    expect(coloredBox.color, equals(Colors.white));
   });
 }

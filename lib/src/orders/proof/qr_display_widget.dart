@@ -29,17 +29,22 @@ class QrDisplayWidget extends StatelessWidget {
       errorStateBuilder: (context, error) => SizedBox(
         width: size,
         height: size,
-        child: Padding(
-          padding: const EdgeInsets.all(_padding),
-          child: Center(
-            // Scale the code down to fit so even a long order code stays inside
-            // the tag box instead of overflowing it.
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                data,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
+        // Match the QR's white background so the fallback code stays readable
+        // on a dark scaffold.
+        child: ColoredBox(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(_padding),
+            child: Center(
+              // Scale the code down to fit so even a long order code stays
+              // inside the tag box instead of overflowing it.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  data,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
               ),
             ),
           ),
