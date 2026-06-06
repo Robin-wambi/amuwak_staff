@@ -110,6 +110,7 @@ void main() {
                         customerIdGenerator: () => 'uuid-cust-1',
                         geolocate: geolocate ?? () async => null,
                         reverseGeocode: reverseGeocode ?? (_) async => null,
+                        defaultRatePerKgUgx: 5000,
                       ),
                     ),
                   );

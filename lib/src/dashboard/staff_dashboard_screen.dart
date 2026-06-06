@@ -28,6 +28,7 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
+import '../pricing/pricing_providers.dart';
 import '../shared/uuid.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
@@ -179,6 +180,24 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    final double defaultRate;
+    try {
+      defaultRate =
+          ref.read(defaultRatePerKgUgxProvider).valueOrNull ??
+              await ref
+                  .read(pricingSettingsRepositoryProvider)
+                  .fetch()
+                  .then((s) => s.defaultRatePerKgUgx);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pricing settings missing — contact admin.'),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     final result = await Navigator.of(context).push<NewPickupResult>(
       MaterialPageRoute(
         builder: (_) => NewPickupScreen(
@@ -190,6 +209,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           customerIdGenerator: defaultUuidV7,
           geolocate: createDefaultGeolocate(),
           reverseGeocode: createDefaultReverseGeocode(),
+          defaultRatePerKgUgx: defaultRate,
         ),
       ),
     );

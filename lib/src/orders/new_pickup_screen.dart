@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_database.dart' show Customer;
+import '../shared/format_ugx.dart';
 import '../shared/phone.dart';
 import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
@@ -27,6 +28,7 @@ class NewPickupScreen extends StatefulWidget {
     required this.customerIdGenerator,
     required this.geolocate,
     required this.reverseGeocode,
+    required this.defaultRatePerKgUgx,
   });
 
   final CustomersRepository customersRepo;
@@ -37,6 +39,7 @@ class NewPickupScreen extends StatefulWidget {
   final String Function() customerIdGenerator;
   final GeolocateFn geolocate;
   final ReverseGeocodeFn reverseGeocode;
+  final double defaultRatePerKgUgx;
 
   @override
   State<NewPickupScreen> createState() => _NewPickupScreenState();
@@ -51,6 +54,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
+  double? _matchedCustomerRate;
   // Cached IDs survive an upsertOrder-fail retry so the rider doesn't
   // create a duplicate customer row by tapping "Create pickup" again.
   String? _pendingCustomerId;
@@ -66,6 +70,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
   final _notesController = TextEditingController();
+
+  double get _resolvedRate => _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
     setState(() {
@@ -210,6 +216,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (useIt == true && mounted) {
       setState(() {
         _matchedCustomerId = match.id;
+        _matchedCustomerRate = match.customRatePerKgUgx;
         _nameController.text = match.name;
         _addressController.text = match.address ?? '';
       });
@@ -276,6 +283,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       itemCount: _count,
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,
+      ratePerKgSnapshotUgx: _resolvedRate,
     );
     try {
       await widget.ordersRepo
@@ -342,6 +350,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               decoration: const InputDecoration(labelText: 'Phone'),
               onChanged: (_) => setState(() {
                 _matchedCustomerId = null;
+                _matchedCustomerRate = null;
               }),
             ),
             const SizedBox(height: 12),
@@ -359,6 +368,15 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _addressController,
               decoration: const InputDecoration(labelText: 'Address'),
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Rate: ${formatUgx(_resolvedRate.round())}/kg',
+                key: const Key('np_rate'),
+                style: const TextStyle(color: AppColors.secondaryText),
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ServiceType>(
