@@ -1,6 +1,7 @@
 import 'package:amuwak_staff/src/data/app_database.dart' show Customer;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/supabase_payloads.dart';
@@ -154,5 +155,35 @@ void main() {
       // Photo binaries live in Storage — never in the row payload.
       expect(p.containsKey('photo_paths'), isFalse);
     });
+  });
+
+  test('orderUpsertPayload serializes pricing fields', () {
+    final order = LaundryOrder(
+      orderId: 'o1',
+      orderCode: 'AMW-2026-0001',
+      customerName: 'Aisha',
+      serviceType: ServiceType.washAndIron,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 'Pickup: now',
+      itemCount: 0,
+      phone: '+256 700000000',
+      address: 'Kampala',
+      notes: '',
+      ratePerKgSnapshotUgx: 5000,
+      estimatedWeightKg: 2.5,
+      lineItems: [LineItem(name: 'Blanket', amountUgx: 8000)],
+      manualAdjustmentUgx: -1000,
+      totalUgx: 19500,
+    );
+    final p = orderUpsertPayload(order,
+        actorStaffId: 's1', now: DateTime.utc(2026, 6, 6));
+    expect(p['rate_per_kg_snapshot_ugx'], 5000);
+    expect(p['estimated_weight_kg'], 2.5);
+    expect(p['final_weight_kg'], isNull);
+    expect(p['line_items'], [
+      {'name': 'Blanket', 'amount_ugx': 8000}
+    ]);
+    expect(p['manual_adjustment_ugx'], -1000);
+    expect(p['total_ugx'], 19500);
   });
 }
