@@ -366,23 +366,21 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               ),
             ),
           3 => _AccountTab(onSignOut: _onSignOutPressed),
-          _ => ordersAsync.when(
-              data: (orders) => _DashboardBody(
-                orders: orders,
-                onOrderTap: _openOrderDetails,
-                onNewPickup: _handleNewPickup,
-                onShowReport: () => _selectTab(2),
-                onCheckOrder: _openOrderSearch,
-              ),
-              loading: () => _DashboardLoadingBody(
-                onNewPickup: _handleNewPickup,
-                onShowReport: () => _selectTab(2),
-                onCheckOrder: _openOrderSearch,
-              ),
-              error: (_, __) => _ErrorRetry(
-                onRetry: () => ref.invalidate(ordersStreamProvider),
-              ),
-            ),
+          // Home tab. Loading and data share one `_HomeTab` widget (orders ==
+          // null means loading) so the header and quick actions stay mounted
+          // across the loading→data transition instead of re-revealing. Errors
+          // still take over the whole tab.
+          _ => ordersAsync.hasError
+              ? _ErrorRetry(
+                  onRetry: () => ref.invalidate(ordersStreamProvider),
+                )
+              : _HomeTab(
+                  orders: ordersAsync.valueOrNull,
+                  onOrderTap: _openOrderDetails,
+                  onNewPickup: _handleNewPickup,
+                  onShowReport: () => _selectTab(2),
+                  onCheckOrder: _openOrderSearch,
+                ),
         },
       ),
       bottomNavigationBar: NavigationBar(
@@ -433,8 +431,15 @@ class _DashboardTabShell extends StatelessWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({
+/// The Home tab. The header and quick actions are persistent chrome: they
+/// mount once (during loading, so a rider can tap straight into a new pickup)
+/// and stay put when orders arrive, instead of re-revealing on the
+/// loading→data swap. Only the variable middle (progress bar → summary grid)
+/// and the orders list reveal as they appear.
+///
+/// [orders] is null while the stream is still loading.
+class _HomeTab extends StatelessWidget {
+  const _HomeTab({
     required this.orders,
     required this.onOrderTap,
     required this.onNewPickup,
@@ -442,7 +447,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onCheckOrder,
   });
 
-  final List<LaundryOrder> orders;
+  final List<LaundryOrder>? orders;
   final void Function(LaundryOrder) onOrderTap;
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
@@ -450,11 +455,8 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrders = orders.length;
-    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
-    final inProgress = orders.countByStatus(OrderStatus.inProgress);
-    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = orders.countByStatus(OrderStatus.completed);
+    final loading = orders == null;
+    final list = orders ?? const <LaundryOrder>[];
 
     // Stagger the entrance: each content block reveals shortly after the
     // previous. The delay index is capped so long lists still appear promptly.
@@ -468,6 +470,23 @@ class _DashboardBody extends StatelessWidget {
       );
     }
 
+    // The middle slot: a progress bar while loading, the summary grid once
+    // orders arrive. It occupies the same ListView position in both states so
+    // the header above it keeps its revealed state across the transition.
+    final Widget middle = loading
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: LinearProgressIndicator(),
+          )
+        : _SummaryGrid(
+            totalOrders: list.length,
+            pendingPickup: list.countByStatus(OrderStatus.pendingPickup),
+            inProgress: list.countByStatus(OrderStatus.inProgress),
+            readyForDelivery:
+                list.countByStatus(OrderStatus.readyForDelivery),
+            completed: list.countByStatus(OrderStatus.completed),
+          );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xl,
@@ -478,67 +497,27 @@ class _DashboardBody extends StatelessWidget {
       children: [
         reveal(const _DashboardHeader()),
         const SizedBox(height: AppSpacing.xl),
-        reveal(_SummaryGrid(
-          totalOrders: totalOrders,
-          pendingPickup: pendingPickup,
-          inProgress: inProgress,
-          readyForDelivery: readyForDelivery,
-          completed: completed,
-        )),
+        reveal(middle),
         const SizedBox(height: AppSpacing.xxl),
         reveal(_QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
           onCheckOrder: onCheckOrder,
         )),
-        const SizedBox(height: AppSpacing.xxl),
-        reveal(Text(
-          'Assigned orders',
-          style: Theme.of(context).textTheme.titleLarge,
-        )),
-        const SizedBox(height: AppSpacing.md),
-        for (final order in orders) ...[
-          reveal(OrderCard(order: order, onTap: () => onOrderTap(order))),
+        // Assigned-orders section only once orders have loaded — keeps the
+        // loading state free of a zero-count flicker.
+        if (!loading) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          reveal(Text(
+            'Assigned orders',
+            style: Theme.of(context).textTheme.titleLarge,
+          )),
           const SizedBox(height: AppSpacing.md),
+          for (final order in list) ...[
+            reveal(OrderCard(order: order, onTap: () => onOrderTap(order))),
+            const SizedBox(height: AppSpacing.md),
+          ],
         ],
-      ],
-    );
-  }
-}
-
-class _DashboardLoadingBody extends StatelessWidget {
-  const _DashboardLoadingBody({
-    required this.onNewPickup,
-    required this.onShowReport,
-    required this.onCheckOrder,
-  });
-
-  final VoidCallback onNewPickup;
-  final VoidCallback onShowReport;
-  final VoidCallback onCheckOrder;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.xxl,
-      ),
-      children: [
-        const _DashboardHeader(),
-        const SizedBox(height: AppSpacing.xl),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          child: LinearProgressIndicator(),
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        _QuickActions(
-          onNewPickup: onNewPickup,
-          onShowReport: onShowReport,
-          onCheckOrder: onCheckOrder,
-        ),
       ],
     );
   }

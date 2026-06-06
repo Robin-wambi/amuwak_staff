@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -524,6 +526,61 @@ void main() {
     expect(find.text('Staff Workspace'), findsOneWidget);
     expect(find.text('Quick actions'), findsOneWidget);
     expect(find.text('Assigned'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Home tab keeps header + quick-actions chrome across the loading→data '
+      'transition (progress swaps to summary, no re-mount)', (tester) async {
+    // Drive the stream manually so we can observe the loading frame and then
+    // the data frame. The header and quick actions must stay mounted across the
+    // swap; only the middle (progress → summary) and the orders list change.
+    final controller = StreamController<List<LaundryOrder>>();
+    addTearDown(controller.close);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        ordersStreamProvider.overrideWith((ref) => controller.stream),
+        pendingOutboxCountProvider
+            .overrideWith((ref) => const Stream<int>.empty()),
+        lastSyncedAtProvider
+            .overrideWith((ref) => const Stream<DateTime?>.empty()),
+        outboxDeadLetteredProvider
+            .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
+        pullDeadLetteredProvider.overrideWith(
+            (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+      ],
+      child: MaterialApp(
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+          ),
+        ),
+      ),
+    ));
+
+    // Loading frame: header chrome + quick actions are up, progress is shown,
+    // and there is no summary "Assigned" tile yet.
+    await tester.pump();
+    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.text('New pickup'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('Assigned'), findsNothing);
+
+    final headerElement = tester.element(find.text('Staff Workspace'));
+
+    // Data arrives.
+    controller.add(const []);
+    await tester.pump(); // deliver the stream event
+    await tester.pump(); // rebuild with data
+
+    // Chrome stayed mounted (same Element), progress was replaced by the
+    // summary grid.
+    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.text('New pickup'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('Assigned'), findsOneWidget);
+    expect(tester.element(find.text('Staff Workspace')), same(headerElement));
   });
 
   testWidgets(
