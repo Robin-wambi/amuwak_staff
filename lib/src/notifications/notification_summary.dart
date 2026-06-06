@@ -46,6 +46,8 @@ class NotificationSummary {
       final proof = o.deliveryProof;
       return proof != null && proof.capturedAt.isAfter(cutoff);
     }).toList()
+      // Safe to bang: the where() above admits only orders with a non-null
+      // deliveryProof, so every element here has one.
       ..sort((a, b) =>
           b.deliveryProof!.capturedAt.compareTo(a.deliveryProof!.capturedAt));
 
