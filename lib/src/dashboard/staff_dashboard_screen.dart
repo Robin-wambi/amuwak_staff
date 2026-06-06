@@ -327,18 +327,20 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          Badge.count(
-            count: newPickupCount,
-            isLabelVisible: newPickupCount > 0,
-            child: IconButton(
-              tooltip: 'Notifications',
-              onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      NotificationsScreen(onOrderTap: _openOrderDetails),
-                ),
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    NotificationsScreen(onOrderTap: _openOrderDetails),
               ),
-              icon: const Icon(Icons.notifications_none_rounded),
+            ),
+            // Badge hugs the icon (not the button's 48x48 hit-box) so the
+            // count sits on the bell instead of floating in the corner.
+            icon: Badge.count(
+              count: newPickupCount,
+              isLabelVisible: newPickupCount > 0,
+              child: const Icon(Icons.notifications_none_rounded),
             ),
           ),
           // ONLINE-ONLY: sync-errors badge/button removed (no outbox/dead-letter
