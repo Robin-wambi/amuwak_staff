@@ -148,4 +148,35 @@ void main() {
     );
     expect(coloredBox.color, equals(Colors.white));
   });
+
+  testWidgets(
+      'fallback logs the render error and order code so failures are not '
+      'silently swallowed', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(data: 'AMW-2026-0042'),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+
+    final logs = <String>[];
+    final originalDebugPrint = debugPrint;
+    debugPrint = (message, {int? wrapWidth}) => logs.add(message ?? '');
+    try {
+      qr.errorStateBuilder!(
+        tester.element(find.byType(QrImageView)),
+        'boom',
+      );
+    } finally {
+      debugPrint = originalDebugPrint;
+    }
+
+    expect(
+      logs.any((line) => line.contains('boom') && line.contains('AMW-2026-0042')),
+      isTrue,
+    );
+  });
 }
