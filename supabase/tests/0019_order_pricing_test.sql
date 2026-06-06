@@ -1,7 +1,6 @@
 -- 0019_order_pricing_test.sql
 -- Verifies the pricing schema: new columns exist, CHECK constraints reject bad
--- values, the pricing_settings singleton is enforced and seeded, and the
--- backfill set a non-zero snapshot on pre-existing orders.
+-- values, and the pricing_settings singleton is enforced and seeded.
 -- Runs inside BEGIN ... ROLLBACK so nothing touches real data.
 
 BEGIN;
@@ -24,7 +23,7 @@ INSERT INTO public.orders (
   intake_recorded_by, created_by
 ) VALUES (
   '00000000-0000-0000-0000-000000001902',
-  'AMW-PRICE-TEST-1',
+  'AMW-PRICE-TEST-1', -- test sentinel; order_code has no format CHECK constraint
   '00000000-0000-0000-0000-000000001901',
   'Pricing Test Customer', '+256700000001', 'Test Address',
   'wash_fold', 'received', 'walk_in', 'delivery', 1,
@@ -33,13 +32,13 @@ INSERT INTO public.orders (
 );
 
 -- Columns exist.
-SELECT has_column('customers', 'custom_rate_per_kg_ugx');
-SELECT has_column('orders', 'rate_per_kg_snapshot_ugx');
-SELECT has_column('orders', 'estimated_weight_kg');
-SELECT has_column('orders', 'final_weight_kg');
-SELECT has_column('orders', 'line_items');
-SELECT has_column('orders', 'total_ugx');
-SELECT has_table('pricing_settings');
+SELECT has_column('public', 'customers', 'custom_rate_per_kg_ugx', 'customers.custom_rate_per_kg_ugx exists');
+SELECT has_column('public', 'orders', 'rate_per_kg_snapshot_ugx', 'orders.rate_per_kg_snapshot_ugx exists');
+SELECT has_column('public', 'orders', 'estimated_weight_kg', 'orders.estimated_weight_kg exists');
+SELECT has_column('public', 'orders', 'final_weight_kg', 'orders.final_weight_kg exists');
+SELECT has_column('public', 'orders', 'line_items', 'orders.line_items exists');
+SELECT has_column('public', 'orders', 'total_ugx', 'orders.total_ugx exists');
+SELECT has_table('public', 'pricing_settings', 'pricing_settings table exists');
 
 -- Seeded default is present and positive.
 SELECT ok(
