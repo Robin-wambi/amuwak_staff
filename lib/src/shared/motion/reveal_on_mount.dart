@@ -32,6 +32,13 @@ class _RevealOnMountState extends State<RevealOnMount>
   /// Null when there is no delay (or when reduced motion is active).
   AnimationController? _delay;
 
+  /// Held as a field (not rebuilt in `build`) so the reveal doesn't allocate a
+  /// fresh CurvedAnimation on every animation frame.
+  late final CurvedAnimation _curved = CurvedAnimation(
+    parent: _reveal,
+    curve: AppMotion.standard,
+  );
+
   bool _started = false;
 
   @override
@@ -65,6 +72,7 @@ class _RevealOnMountState extends State<RevealOnMount>
   @override
   void dispose() {
     _delay?.dispose();
+    _curved.dispose();
     _reveal.dispose();
     super.dispose();
   }
@@ -76,17 +84,13 @@ class _RevealOnMountState extends State<RevealOnMount>
       return widget.child;
     }
 
-    final curved = CurvedAnimation(
-      parent: _reveal,
-      curve: AppMotion.standard,
-    );
     return AnimatedBuilder(
-      animation: curved,
+      animation: _curved,
       builder: (context, child) {
         return Opacity(
-          opacity: curved.value,
+          opacity: _curved.value,
           child: Transform.translate(
-            offset: Offset(0, AppMotion.revealOffset * (1 - curved.value)),
+            offset: Offset(0, AppMotion.revealOffset * (1 - _curved.value)),
             child: child,
           ),
         );

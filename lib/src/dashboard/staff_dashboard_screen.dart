@@ -757,12 +757,10 @@ class _DashboardHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Text(
+                Text(
                   'Staff Workspace',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: AppColors.white,
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 3),

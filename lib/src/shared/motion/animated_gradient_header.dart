@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_motion.dart';
 import '../theme/app_radii.dart';
+import '../theme/app_spacing.dart';
 
 /// A brand-coloured header surface with a slow, very subtle gradient sheen that
 /// travels diagonally — making the surface feel "alive" without drawing the eye
@@ -14,7 +15,7 @@ class AnimatedGradientHeader extends StatefulWidget {
   const AnimatedGradientHeader({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(AppSpacing.lg2),
   });
 
   final Widget child;
@@ -73,6 +74,9 @@ class _AnimatedGradientHeaderState extends State<AnimatedGradientHeader>
               end: Alignment.bottomRight,
               colors: [begin, end],
             ),
+            // A brand-tinted shadow (not AppElevation.resting's charcoal) so
+            // the coloured header casts a glow in its own hue rather than a
+            // neutral drop-shadow.
             boxShadow: [
               BoxShadow(
                 color: AppColors.surfaceBrand.withValues(alpha: 0.18),
