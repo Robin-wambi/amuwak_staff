@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../orders/order.dart';
 import '../orders/order_status.dart';
+import '../orders/pricing/pricing_calculator.dart';
+import '../orders/pricing/pricing_inputs.dart';
 import '../shared/order_code.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
@@ -103,6 +105,29 @@ class OrdersRepository {
 
   // ----- WRITE -----
 
+  /// Returns a copy of [order] with `totalUgx` recomputed from its pricing
+  /// inputs. The single chokepoint that keeps the stored total honest — a
+  /// caller can never persist a total that disagrees with the weights/rate/
+  /// line-items/adjustment.
+  static LaundryOrder recomputeOrderTotal(LaundryOrder order) {
+    final t = recomputeTotal(PricingInputs(
+      ratePerKgUgx: order.ratePerKgSnapshotUgx,
+      estimatedWeightKg: order.estimatedWeightKg,
+      finalWeightKg: order.finalWeightKg,
+      lineItems: order.lineItems,
+      manualAdjustmentUgx: order.manualAdjustmentUgx,
+    ));
+    return order.copyWith(totalUgx: t.total);
+  }
+
+  /// Resolves the rate to freeze into a new order: the customer's override if
+  /// set, otherwise the global default.
+  static double resolveRatePerKg({
+    required double? customRate,
+    required double defaultRate,
+  }) =>
+      customRate ?? defaultRate;
+
   /// Reserves the next human-facing order code (e.g. `AMW-2026-0042`) from the
   /// server via the `next_order_code()` RPC. Owning this here keeps "how an
   /// order code is minted" in the repository layer rather than wired into the
@@ -128,9 +153,10 @@ class OrdersRepository {
   Future<void> upsertOrder(LaundryOrder order,
       {required String actorStaffId}) async {
     final now = _clock();
+    final priced = recomputeOrderTotal(order);
     await _supabase
         .from('orders')
-        .upsert(orderUpsertPayload(order, actorStaffId: actorStaffId, now: now));
+        .upsert(orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
   }
 
   /// Updates an order's status. [updatedAt] is optional and kept for call-site
