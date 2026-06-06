@@ -99,6 +99,22 @@ void main() {
     expect(summary.newPickups.map((o) => o.orderCode), ['WEIRD']);
   });
 
+  test('a non-completed order with a delivery proof is not delivered', () {
+    // Reachable via the non-atomic proof-insert + status-update in
+    // delivery_capture_screen: if the status write fails, the order keeps a
+    // delivery proof while still readyForDelivery. It must not show as
+    // delivered until the status actually flips to completed.
+    final summary = NotificationSummary.fromOrders([
+      _order(
+        code: 'LAG',
+        status: OrderStatus.readyForDelivery,
+        deliveredAt: now.subtract(const Duration(hours: 1)),
+      ),
+    ], now: now);
+
+    expect(summary.delivered, isEmpty);
+  });
+
   test('delivered is sorted most-recent first', () {
     final summary = NotificationSummary.fromOrders([
       _order(

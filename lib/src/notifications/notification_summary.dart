@@ -36,10 +36,13 @@ class NotificationSummary {
 
     final cutoff = now.subtract(kDeliveredWindow);
     final delivered = orders.where((o) {
-      // A still-pending order can't be "delivered" — guard against anomalous
-      // data (a stray delivery proof on a pendingPickup order) listing the
-      // same order in both the pickups and delivered feeds.
-      if (_isNewPickup(o)) return false;
+      // "Delivered" requires the order to actually be completed, not merely to
+      // carry a delivery proof. The proof insert and the status→completed write
+      // are non-atomic (see delivery_capture_screen), so a failed status write
+      // can leave a readyForDelivery order holding a delivery proof. Gating on
+      // completed keeps this feed from contradicting the order's canonical
+      // status — and also excludes the anomalous pendingPickup+proof case.
+      if (o.status != OrderStatus.completed) return false;
       final proof = o.deliveryProof;
       return proof != null && proof.capturedAt.isAfter(cutoff);
     }).toList()
