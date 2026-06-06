@@ -177,6 +177,14 @@ class _NotificationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPickup = item.kind == NotificationKind.newPickup;
     final order = item.order;
+    // Invariant from NotificationSummary.fromOrders: every `delivered` item has
+    // a delivery proof. Assert it so a hand-built NotificationItem (or a future
+    // refactor) that breaks the invariant fails loudly in debug instead of a
+    // bare null-bang crash below.
+    assert(
+      isPickup || order.deliveryProof != null,
+      'delivered NotificationItem must carry a delivery proof',
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final accent =
         isPickup ? colorScheme.primary : _deliveredColor(context);

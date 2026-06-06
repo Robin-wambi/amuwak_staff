@@ -152,4 +152,23 @@ void main() {
 
     expect(summary.isEmpty, isTrue);
   });
+
+  test('pendingPickupCount matches the newPickups derived by fromOrders', () {
+    final orders = [
+      _order(code: 'P1', status: OrderStatus.pendingPickup),
+      _order(code: 'P2', status: OrderStatus.pendingPickup),
+      _order(code: 'I1', status: OrderStatus.inProgress),
+      _order(
+        code: 'D1',
+        status: OrderStatus.completed,
+        deliveredAt: now.subtract(const Duration(hours: 1)),
+      ),
+    ];
+
+    expect(NotificationSummary.pendingPickupCount(orders), 2);
+    expect(
+      NotificationSummary.pendingPickupCount(orders),
+      NotificationSummary.fromOrders(orders, now: now).newPickups.length,
+    );
+  });
 }

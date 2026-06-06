@@ -27,4 +27,9 @@ void main() {
     expect(label(const Duration(hours: 47)), '1 day ago');
     expect(label(const Duration(days: 3)), '3 days ago');
   });
+
+  test('a future timestamp collapses to "just now"', () {
+    expect(relativeTimeLabel(now.add(const Duration(hours: 2)), now: now),
+        'just now');
+  });
 }

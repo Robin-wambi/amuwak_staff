@@ -31,9 +31,7 @@ class NotificationSummary {
     List<LaundryOrder> orders, {
     required DateTime now,
   }) {
-    final pickups = orders
-        .where((o) => o.status == OrderStatus.pendingPickup)
-        .toList()
+    final pickups = orders.where(_isNewPickup).toList()
       ..sort(_byScheduledForAscNullsLast);
 
     final cutoff = now.subtract(kDeliveredWindow);
@@ -41,7 +39,7 @@ class NotificationSummary {
       // A still-pending order can't be "delivered" — guard against anomalous
       // data (a stray delivery proof on a pendingPickup order) listing the
       // same order in both the pickups and delivered feeds.
-      if (o.status == OrderStatus.pendingPickup) return false;
+      if (_isNewPickup(o)) return false;
       final proof = o.deliveryProof;
       return proof != null && proof.capturedAt.isAfter(cutoff);
     }).toList()
@@ -60,6 +58,17 @@ class NotificationSummary {
       ];
 
   bool get isEmpty => newPickups.isEmpty && delivered.isEmpty;
+
+  /// Single source of truth for "is this a new pickup" — shared by
+  /// [fromOrders] and [pendingPickupCount] so the badge and the summary can't
+  /// drift apart if the predicate ever changes.
+  static bool _isNewPickup(LaundryOrder order) =>
+      order.status == OrderStatus.pendingPickup;
+
+  /// New-pickup count without building (and sorting) a whole summary — for the
+  /// dashboard bell badge, which recomputes on every rebuild.
+  static int pendingPickupCount(List<LaundryOrder> orders) =>
+      orders.where(_isNewPickup).length;
 
   static int _byScheduledForAscNullsLast(LaundryOrder a, LaundryOrder b) {
     final sa = a.scheduledFor;

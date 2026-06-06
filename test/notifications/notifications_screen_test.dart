@@ -160,4 +160,38 @@ void main() {
 
     expect(find.text('Retry'), findsOneWidget);
   });
+
+  testWidgets('tapping Retry re-subscribes and renders content',
+      (tester) async {
+    var attempt = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          // First subscription errors; the invalidate behind Retry re-runs this
+          // override, which then yields data.
+          ordersStreamProvider.overrideWith((ref) {
+            attempt++;
+            if (attempt == 1) {
+              return Stream<List<LaundryOrder>>.error(Exception('boom'));
+            }
+            return Stream.value([
+              _order(code: 'P1', status: OrderStatus.pendingPickup),
+            ]);
+          }),
+        ],
+        child: MaterialApp(
+          home: NotificationsScreen(clock: () => _now),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump(); // invalidate → re-subscribe
+    await tester.pump(); // second stream emits data
+
+    expect(find.text('New pickup · P1'), findsOneWidget);
+    expect(attempt, 2);
+  });
 }
