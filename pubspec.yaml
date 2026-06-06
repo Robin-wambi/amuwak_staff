@@ -94,6 +94,23 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Brand typeface. Bundled (not fetched at runtime) so it renders offline
+  # for field staff with poor connectivity. Plus Jakarta Sans, OFL — see
+  # assets/fonts/OFL.txt.
+  fonts:
+    - family: Plus Jakarta Sans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
+          weight: 800
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

@@ -21,9 +21,12 @@ import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
+import '../shared/motion/animated_gradient_header.dart';
+import '../shared/motion/count_up_text.dart';
+import '../shared/motion/reveal_on_mount.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
+import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/uuid.dart';
 import '../sync/repository_providers.dart';
@@ -363,23 +366,21 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               ),
             ),
           3 => _AccountTab(onSignOut: _onSignOutPressed),
-          _ => ordersAsync.when(
-              data: (orders) => _DashboardBody(
-                orders: orders,
-                onOrderTap: _openOrderDetails,
-                onNewPickup: _handleNewPickup,
-                onShowReport: () => _selectTab(2),
-                onCheckOrder: _openOrderSearch,
-              ),
-              loading: () => _DashboardLoadingBody(
-                onNewPickup: _handleNewPickup,
-                onShowReport: () => _selectTab(2),
-                onCheckOrder: _openOrderSearch,
-              ),
-              error: (_, __) => _ErrorRetry(
-                onRetry: () => ref.invalidate(ordersStreamProvider),
-              ),
-            ),
+          // Home tab. Loading and data share one `_HomeTab` widget (orders ==
+          // null means loading) so the header and quick actions stay mounted
+          // across the loading→data transition instead of re-revealing. Errors
+          // still take over the whole tab.
+          _ => ordersAsync.hasError
+              ? _ErrorRetry(
+                  onRetry: () => ref.invalidate(ordersStreamProvider),
+                )
+              : _HomeTab(
+                  orders: ordersAsync.valueOrNull,
+                  onOrderTap: _openOrderDetails,
+                  onNewPickup: _handleNewPickup,
+                  onShowReport: () => _selectTab(2),
+                  onCheckOrder: _openOrderSearch,
+                ),
         },
       ),
       bottomNavigationBar: NavigationBar(
@@ -430,8 +431,15 @@ class _DashboardTabShell extends StatelessWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({
+/// The Home tab. The header and quick actions are persistent chrome: they
+/// mount once (during loading, so a rider can tap straight into a new pickup)
+/// and stay put when orders arrive, instead of re-revealing on the
+/// loading→data swap. Only the variable middle (progress bar → summary grid)
+/// and the orders list reveal as they appear.
+///
+/// [orders] is null while the stream is still loading.
+class _HomeTab extends StatelessWidget {
+  const _HomeTab({
     required this.orders,
     required this.onOrderTap,
     required this.onNewPickup,
@@ -439,7 +447,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onCheckOrder,
   });
 
-  final List<LaundryOrder> orders;
+  final List<LaundryOrder>? orders;
   final void Function(LaundryOrder) onOrderTap;
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
@@ -447,11 +455,37 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrders = orders.length;
-    final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
-    final inProgress = orders.countByStatus(OrderStatus.inProgress);
-    final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = orders.countByStatus(OrderStatus.completed);
+    final loading = orders == null;
+    final list = orders ?? const <LaundryOrder>[];
+
+    // Stagger the entrance: each content block reveals shortly after the
+    // previous. The delay index is capped so long lists still appear promptly.
+    var step = 0;
+    Widget reveal(Widget child) {
+      final cappedStep = step < 8 ? step : 8;
+      step++;
+      return RevealOnMount(
+        delay: AppMotion.stagger * cappedStep,
+        child: child,
+      );
+    }
+
+    // The middle slot: a progress bar while loading, the summary grid once
+    // orders arrive. It occupies the same ListView position in both states so
+    // the header above it keeps its revealed state across the transition.
+    final Widget middle = loading
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: LinearProgressIndicator(),
+          )
+        : _SummaryGrid(
+            totalOrders: list.length,
+            pendingPickup: list.countByStatus(OrderStatus.pendingPickup),
+            inProgress: list.countByStatus(OrderStatus.inProgress),
+            readyForDelivery:
+                list.countByStatus(OrderStatus.readyForDelivery),
+            completed: list.countByStatus(OrderStatus.completed),
+          );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -461,69 +495,29 @@ class _DashboardBody extends StatelessWidget {
         AppSpacing.xxl,
       ),
       children: [
-        const _DashboardHeader(),
+        reveal(const _DashboardHeader()),
         const SizedBox(height: AppSpacing.xl),
-        _SummaryGrid(
-          totalOrders: totalOrders,
-          pendingPickup: pendingPickup,
-          inProgress: inProgress,
-          readyForDelivery: readyForDelivery,
-          completed: completed,
-        ),
+        reveal(middle),
         const SizedBox(height: AppSpacing.xxl),
-        _QuickActions(
+        reveal(_QuickActions(
           onNewPickup: onNewPickup,
           onShowReport: onShowReport,
           onCheckOrder: onCheckOrder,
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        Text(
-          'Assigned orders',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        for (final order in orders) ...[
-          OrderCard(order: order, onTap: () => onOrderTap(order)),
+        )),
+        // Assigned-orders section only once orders have loaded — keeps the
+        // loading state free of a zero-count flicker.
+        if (!loading) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          reveal(Text(
+            'Assigned orders',
+            style: Theme.of(context).textTheme.titleLarge,
+          )),
           const SizedBox(height: AppSpacing.md),
+          for (final order in list) ...[
+            reveal(OrderCard(order: order, onTap: () => onOrderTap(order))),
+            const SizedBox(height: AppSpacing.md),
+          ],
         ],
-      ],
-    );
-  }
-}
-
-class _DashboardLoadingBody extends StatelessWidget {
-  const _DashboardLoadingBody({
-    required this.onNewPickup,
-    required this.onShowReport,
-    required this.onCheckOrder,
-  });
-
-  final VoidCallback onNewPickup;
-  final VoidCallback onShowReport;
-  final VoidCallback onCheckOrder;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.xxl,
-      ),
-      children: [
-        const _DashboardHeader(),
-        const SizedBox(height: AppSpacing.xl),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          child: LinearProgressIndicator(),
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        _QuickActions(
-          onNewPickup: onNewPickup,
-          onShowReport: onShowReport,
-          onCheckOrder: onCheckOrder,
-        ),
       ],
     );
   }
@@ -717,19 +711,8 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedGradientHeader(
       padding: const EdgeInsets.all(AppSpacing.lg2),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBrand,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.surfaceBrand.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           const CircleAvatar(
@@ -753,12 +736,10 @@ class _DashboardHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Text(
+                Text(
                   'Staff Workspace',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: AppColors.white,
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -801,7 +782,7 @@ class _SummaryGrid extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Assigned',
-                value: '$totalOrders',
+                value: totalOrders,
                 icon: Icons.assignment_outlined,
               ),
             ),
@@ -809,7 +790,7 @@ class _SummaryGrid extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.pendingPickup.label,
-                value: '$pendingPickup',
+                value: pendingPickup,
                 icon: Icons.local_shipping_outlined,
               ),
             ),
@@ -821,7 +802,7 @@ class _SummaryGrid extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.inProgress.label,
-                value: '$inProgress',
+                value: inProgress,
                 icon: Icons.timelapse_rounded,
               ),
             ),
@@ -829,7 +810,7 @@ class _SummaryGrid extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: OrderStatus.readyForDelivery.label,
-                value: '$readyForDelivery',
+                value: readyForDelivery,
                 icon: Icons.checkroom_outlined,
               ),
             ),
@@ -838,7 +819,7 @@ class _SummaryGrid extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _SummaryCard(
           title: 'Completed today',
-          value: '$completed',
+          value: completed,
           icon: Icons.check_circle_outline_rounded,
           wide: true,
         ),
@@ -856,7 +837,7 @@ class _SummaryCard extends StatelessWidget {
   });
 
   final String title;
-  final String value;
+  final int value;
   final IconData icon;
   final bool wide;
 
@@ -878,13 +859,15 @@ class _SummaryCard extends StatelessWidget {
               ),
               child: Icon(icon, color: colorScheme.primary),
             ),
+            // 1px past `md`: an optical nudge so the label sits balanced
+            // against the 44px icon tile rather than crowding it.
             const SizedBox(width: AppSpacing.md + 1),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    value,
+                  CountUpText(
+                    value: value,
                     style: textTheme.headlineMedium,
                   ),
                   Text(

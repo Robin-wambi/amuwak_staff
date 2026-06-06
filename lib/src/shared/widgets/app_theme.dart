@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_radii.dart';
+import '../theme/app_typography.dart';
 import '../theme/status_colors.dart';
 
 ThemeData buildAmuwakTheme() {
@@ -18,6 +19,7 @@ ThemeData buildAmuwakTheme() {
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
+    fontFamily: AppTypography.fontFamily,
     scaffoldBackgroundColor: AppColors.background,
     extensions: const <ThemeExtension<dynamic>>[StatusColors.light],
     appBarTheme: const AppBarTheme(
@@ -39,22 +41,14 @@ ThemeData buildAmuwakTheme() {
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
+          fontFamily: AppTypography.fontFamily,
           color: selected ? AppColors.dark : AppColors.secondaryText,
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
         );
       }),
     ),
-    textTheme: const TextTheme(
-      headlineLarge: TextStyle(color: AppColors.dark, fontWeight: FontWeight.bold),
-      headlineMedium: TextStyle(color: AppColors.dark, fontWeight: FontWeight.bold),
-      titleLarge: TextStyle(
-          color: AppColors.dark, fontSize: 21, fontWeight: FontWeight.bold),
-      titleMedium: TextStyle(
-          color: AppColors.dark, fontSize: 16, fontWeight: FontWeight.w700),
-      bodyMedium: TextStyle(color: AppColors.dark),
-      bodySmall: TextStyle(color: AppColors.secondaryText, fontSize: 13),
-    ),
+    textTheme: AppTypography.textTheme(),
     cardTheme: CardThemeData(
       elevation: 0,
       color: AppColors.white,
