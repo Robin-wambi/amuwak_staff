@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../shared/format_ugx.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
@@ -9,6 +10,10 @@ import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
 import 'order_status.dart';
+import 'pricing/line_item.dart';
+import 'pricing/pricing_calculator.dart';
+import 'pricing/pricing_inputs.dart';
+import 'pricing/pricing_section.dart';
 import 'proof_event.dart';
 import 'proof/barcode_reader.dart';
 import 'proof/delivery_capture_screen.dart';
@@ -46,11 +51,61 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late LaundryOrder _order;
+  late final TextEditingController _finalWeightController;
+  late final TextEditingController _manualAdjustmentController;
+  late List<LineItem> _lineItems;
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    _finalWeightController = TextEditingController(
+        text: _order.finalWeightKg?.toString() ?? '');
+    _manualAdjustmentController = TextEditingController(
+        text: _order.manualAdjustmentUgx == 0
+            ? ''
+            : _order.manualAdjustmentUgx.toString());
+    _lineItems = [..._order.lineItems];
+  }
+
+  @override
+  void dispose() {
+    _finalWeightController.dispose();
+    _manualAdjustmentController.dispose();
+    super.dispose();
+  }
+
+  OrderTotal get _pricingTotal => recomputeTotal(PricingInputs(
+        ratePerKgUgx: _order.ratePerKgSnapshotUgx,
+        estimatedWeightKg: _order.estimatedWeightKg,
+        finalWeightKg: double.tryParse(_finalWeightController.text.trim()),
+        lineItems: _lineItems,
+        manualAdjustmentUgx:
+            int.tryParse(_manualAdjustmentController.text.trim()) ?? 0,
+      ));
+
+  Future<void> _savePricing() async {
+    final updated = _order.copyWith(
+      finalWeightKg: double.tryParse(_finalWeightController.text.trim()),
+      clearFinalWeight: _finalWeightController.text.trim().isEmpty,
+      lineItems: _lineItems,
+      manualAdjustmentUgx:
+          int.tryParse(_manualAdjustmentController.text.trim()) ?? 0,
+    );
+    try {
+      await widget.ordersRepo
+          .updatePricing(updated, actorStaffId: widget.actorStaffId);
+      if (!mounted) return;
+      setState(() => _order = OrdersRepository.recomputeOrderTotal(updated));
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Pricing saved.')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save pricing — please retry.')),
+      );
+    }
   }
 
   Future<void> _advanceStatusDirectly() async {
@@ -296,6 +351,63 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           ),
                         ],
                       ),
+                      if (_order.status != OrderStatus.pendingPickup) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        _DetailsSection(
+                          title: 'Pricing',
+                          children: [
+                            _DetailRow(
+                              icon: Icons.scale_outlined,
+                              label: 'Rate',
+                              value:
+                                  '${formatUgx(_order.ratePerKgSnapshotUgx.round())}/kg',
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            TextFormField(
+                              key: const Key('details_final_weight'),
+                              controller: _finalWeightController,
+                              keyboardType: const TextInputType
+                                  .numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                  labelText: 'Final weight (kg)'),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            LineItemsEditor(
+                              items: _lineItems,
+                              onAdd: () async {
+                                final item = await showAddLineItemSheet(context);
+                                if (item != null) {
+                                  setState(() => _lineItems = [..._lineItems, item]);
+                                }
+                              },
+                              onRemove: (i) => setState(() {
+                                _lineItems = [..._lineItems]..removeAt(i);
+                              }),
+                            ),
+                            TextFormField(
+                              key: const Key('details_manual_adjustment'),
+                              controller: _manualAdjustmentController,
+                              keyboardType: const TextInputType
+                                  .numberWithOptions(signed: true),
+                              decoration: const InputDecoration(
+                                  labelText: 'Manual adjustment (UGX, +/-)'),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            TotalCard(
+                              totalUgx: _pricingTotal.total,
+                              isProvisional: _pricingTotal.isProvisional,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            ElevatedButton(
+                              key: const Key('details_save_pricing'),
+                              onPressed: _savePricing,
+                              child: const Text('Save pricing'),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.md),
                       _DetailsSection(
                         title: 'Notes',
