@@ -153,6 +153,10 @@ void main() {
     expect(summary.isEmpty, isTrue);
   });
 
+  test('isEmpty is true for an empty order list', () {
+    expect(NotificationSummary.fromOrders([], now: now).isEmpty, isTrue);
+  });
+
   test('pendingPickupCount matches the newPickups derived by fromOrders', () {
     final orders = [
       _order(code: 'P1', status: OrderStatus.pendingPickup),

@@ -111,6 +111,9 @@ class _SummaryBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Text('Recent', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: AppSpacing.sm),
+        // Built eagerly rather than via ListView.builder: the recent feed is
+        // intentionally short (single-digit counts), so the simpler children
+        // list is preferred. Revisit if the window ever grows large.
         for (final item in summary.recent)
           _NotificationRow(item: item, now: now, onOrderTap: onOrderTap),
       ],
