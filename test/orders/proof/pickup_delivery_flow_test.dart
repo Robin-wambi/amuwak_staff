@@ -34,6 +34,19 @@ Future<void> _pressButton(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+/// Scrolls the collecting ListView until the 'Confirm with customer' button is
+/// visible. Task 15 added an estimated-weight field, a line-items editor, and a
+/// total card, making the list tall enough for the button to be below the fold
+/// in the default test-viewport height.
+Future<void> _scrollToConfirm(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('pickup_confirm')),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(ProofEvent(
@@ -105,6 +118,7 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('add_photo')));
     await tester.pumpAndSettle();
+    await _scrollToConfirm(tester);
     await _pressButton(tester, 'Confirm with customer');
     await _pressButton(tester, 'Done');
 
