@@ -51,15 +51,11 @@ void main() {
   });
 
   test('schemaVersion is 3', () {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
     expect(db.schemaVersion, 3);
   });
 
   test('orders table exposes the pricing columns', () async {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    // createAll() runs onCreate; a select compiling proves the columns exist.
+    // A select compiling proves the columns exist.
     final rows = await db.select(db.orders).get();
     expect(rows, isEmpty);
   });
