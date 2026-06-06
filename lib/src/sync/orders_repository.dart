@@ -159,6 +159,24 @@ class OrdersRepository {
         .upsert(orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
   }
 
+  /// Updates only the pricing columns (+ updated_at), recomputing total_ugx.
+  /// Unlike [upsertOrder] this never touches created_at/created_by.
+  Future<void> updatePricing(LaundryOrder order,
+      {required String actorStaffId}) async {
+    final priced = recomputeOrderTotal(order);
+    final updated = await _supabase.from('orders').update({
+      'estimated_weight_kg': priced.estimatedWeightKg,
+      'final_weight_kg': priced.finalWeightKg,
+      'line_items': priced.lineItems.map((i) => i.toJson()).toList(),
+      'manual_adjustment_ugx': priced.manualAdjustmentUgx,
+      'total_ugx': priced.totalUgx,
+      'updated_at': _clock().toUtc().toIso8601String(),
+    }).eq('id', priced.orderId).select('id');
+    if (updated.isEmpty) {
+      throw StateError('updatePricing: no order with id "${priced.orderId}"');
+    }
+  }
+
   /// Updates an order's status. [updatedAt] is optional and kept for call-site
   /// compatibility with the offline path (where it stabilised the outbox dedup
   /// key); online it just sets the row's `updated_at`.
