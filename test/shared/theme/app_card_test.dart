@@ -1,3 +1,4 @@
+import 'package:amuwak_staff/src/shared/motion/pressable_scale.dart';
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
 import 'package:amuwak_staff/src/shared/theme/app_elevation.dart';
 import 'package:amuwak_staff/src/shared/theme/app_radii.dart';
@@ -78,5 +79,17 @@ void main() {
     );
 
     expect(shadowDecoration(tester), isNotNull);
+  });
+
+  testWidgets('tappable AppCard scales via PressableScale', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppCard(onTap: () {}, child: const Text('press')),
+        ),
+      ),
+    );
+
+    expect(find.byType(PressableScale), findsOneWidget);
   });
 }

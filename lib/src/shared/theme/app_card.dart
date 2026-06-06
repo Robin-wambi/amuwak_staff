@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/pressable_scale.dart';
 import 'app_colors.dart';
 import 'app_elevation.dart';
 import 'app_radii.dart';
@@ -30,7 +31,7 @@ class AppCard extends StatelessWidget {
     // The soft resting shadow lives on an outer DecoratedBox (the elevation:0
     // Card paints no shadow itself); its radius matches the card so the shadow
     // follows the rounded corners.
-    return DecoratedBox(
+    final card = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadii.card),
         boxShadow: AppElevation.resting,
@@ -41,10 +42,11 @@ class AppCard extends StatelessWidget {
         margin: EdgeInsets.zero,
         shape: shape,
         clipBehavior: Clip.antiAlias,
-        // Only wrap in an InkWell when the card is actually tappable — a
-        // null-tap InkWell is just an inert widget in the tree.
-        child: onTap == null ? padded : InkWell(onTap: onTap, child: padded),
+        child: padded,
       ),
     );
+    // Only attach press behaviour when the card is actually tappable;
+    // PressableScale both forwards the tap and scales the whole card.
+    return onTap == null ? card : PressableScale(onTap: onTap, child: card);
   }
 }
