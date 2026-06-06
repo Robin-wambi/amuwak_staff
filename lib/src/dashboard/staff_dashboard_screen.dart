@@ -859,6 +859,8 @@ class _SummaryCard extends StatelessWidget {
               ),
               child: Icon(icon, color: colorScheme.primary),
             ),
+            // 1px past `md`: an optical nudge so the label sits balanced
+            // against the 44px icon tile rather than crowding it.
             const SizedBox(width: AppSpacing.md + 1),
             Expanded(
               child: Column(
