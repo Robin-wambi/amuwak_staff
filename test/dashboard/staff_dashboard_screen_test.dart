@@ -62,7 +62,13 @@ Future<void> pumpDashboardWithDb(
         ...extraOverrides,
       ],
       child: MaterialApp(
-        home: StaffDashboardScreen(retrieveLostPhoto: () async => lostPhoto),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child:
+                StaffDashboardScreen(retrieveLostPhoto: () async => lostPhoto),
+          ),
+        ),
       ),
     ),
   );
@@ -278,7 +284,14 @@ void main() {
             .overrideWith((ref) => const Stream<DateTime?>.empty()),
       ],
       child: MaterialApp(
-          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child:
+                StaffDashboardScreen(retrieveLostPhoto: () async => false),
+          ),
+        ),
+      ),
     ));
     await tester.pumpAndSettle();
 
@@ -389,11 +402,16 @@ void main() {
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
-          home: StaffDashboardScreen(
-            retrieveLostPhoto: () async => false,
-            signOut: (ref) async {
-              signOutCalls += 1;
-            },
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(
+                retrieveLostPhoto: () async => false,
+                signOut: (ref) async {
+                  signOutCalls += 1;
+                },
+              ),
+            ),
           ),
         ),
       ));
@@ -455,11 +473,16 @@ void main() {
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
         ],
         child: MaterialApp(
-          home: StaffDashboardScreen(
-            retrieveLostPhoto: () async => false,
-            signOut: (ref) async {
-              throw Exception('orchestrator stuck');
-            },
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(
+                retrieveLostPhoto: () async => false,
+                signOut: (ref) async {
+                  throw Exception('orchestrator stuck');
+                },
+              ),
+            ),
           ),
         ),
       ));
@@ -481,6 +504,15 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('dashboard renders header, stats and quick actions after settle',
+      (tester) async {
+    await pumpDashboardWithDb(tester);
+
+    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.text('Quick actions'), findsOneWidget);
+    expect(find.text('Assigned'), findsOneWidget);
+  });
 
   testWidgets(
       'Tapping an order card without a current session refuses to open '
@@ -524,7 +556,14 @@ void main() {
         currentUserIdProvider.overrideWith((ref) => null),
       ],
       child: MaterialApp(
-          home: StaffDashboardScreen(retrieveLostPhoto: () async => false)),
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child:
+                StaffDashboardScreen(retrieveLostPhoto: () async => false),
+          ),
+        ),
+      ),
     ));
     await tester.pumpAndSettle();
 
