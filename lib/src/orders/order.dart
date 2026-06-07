@@ -341,6 +341,8 @@ class LaundryOrder {
         fulfillmentMethod,
         scheduledFor,
         Object.hashAll(proofEvents),
+        // Pricing fields grouped into a nested hash to stay within Object.hash's
+        // 20-argument limit.
         Object.hash(
           ratePerKgSnapshotUgx,
           estimatedWeightKg,

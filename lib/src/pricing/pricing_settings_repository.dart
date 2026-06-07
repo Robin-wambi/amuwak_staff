@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pricing_settings.dart';
 
-typedef _FetchRows = Future<List<Map<String, dynamic>>> Function();
+typedef FetchRows = Future<List<Map<String, dynamic>>> Function();
 
 /// Reads and updates the singleton `pricing_settings` row.
 ///
@@ -14,15 +14,14 @@ class PricingSettingsRepository {
         _fetchRowsOverride = null;
 
   /// Test seam: inject the raw row fetch so unit tests don't mock SupabaseClient.
-  // ignore: library_private_types_in_public_api
-  PricingSettingsRepository.forTest({required _FetchRows fetchRows})
+  PricingSettingsRepository.forTest({required FetchRows fetchRows})
       : _supabase = null,
         _clock = DateTime.now,
         _fetchRowsOverride = fetchRows;
 
   final SupabaseClient? _supabase;
   final DateTime Function() _clock;
-  final _FetchRows? _fetchRowsOverride;
+  final FetchRows? _fetchRowsOverride;
 
   Future<List<Map<String, dynamic>>> _fetchRows() {
     final override = _fetchRowsOverride;

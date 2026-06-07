@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -229,9 +231,14 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         ),
         actorStaffId: widget.actorStaffId,
       );
-    } catch (_) {
-      // Pricing persist is best-effort; status already advanced. Staff can
-      // correct totals later on the details screen.
+    } catch (e, st) {
+      developer.log(
+        'updatePricing best-effort failed at pickup; staff can correct on the '
+        'details screen.',
+        name: 'PickupCaptureScreen',
+        error: e,
+        stackTrace: st,
+      );
     }
 
     if (!mounted) return;
@@ -275,6 +282,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   }
 
   Widget _buildCollecting() {
+    final provisional = _provisionalTotal;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
@@ -407,8 +415,8 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         ),
         const SizedBox(height: 12),
         TotalCard(
-          totalUgx: _provisionalTotal.total,
-          isProvisional: _provisionalTotal.isProvisional,
+          totalUgx: provisional.total,
+          isProvisional: provisional.isProvisional,
         ),
         const SizedBox(height: 20),
         TextFormField(

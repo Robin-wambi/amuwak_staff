@@ -60,7 +60,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     super.initState();
     _order = widget.order;
     _finalWeightController = TextEditingController(
-        text: _order.finalWeightKg?.toString() ?? '');
+        text: _order.finalWeightKg == null
+            ? ''
+            : (_order.finalWeightKg! % 1 == 0
+                ? _order.finalWeightKg!.toInt().toString()
+                : _order.finalWeightKg!.toString()));
     _manualAdjustmentController = TextEditingController(
         text: _order.manualAdjustmentUgx == 0
             ? ''
