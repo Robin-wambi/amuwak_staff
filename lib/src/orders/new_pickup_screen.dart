@@ -70,6 +70,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
   final _notesController = TextEditingController();
+  final _customRateController = TextEditingController();
 
   double get _resolvedRate => _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
 
@@ -227,6 +228,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (!_canSubmit) return;
     setState(() => _saving = true);
     final now = widget.clock();
+    final customRateText = _customRateController.text.trim();
+    final customRate =
+        customRateText.isEmpty ? null : double.tryParse(customRateText);
+    if (customRateText.isNotEmpty && (customRate == null || customRate <= 0)) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Custom rate must be greater than 0.')),
+      );
+      return;
+    }
     final customerId = _matchedCustomerId ??
         (_pendingCustomerId ??= widget.customerIdGenerator());
     final customer = Customer(
@@ -238,6 +249,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
+      customRatePerKgUgx: customRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);
@@ -283,7 +295,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       itemCount: _count,
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,
-      ratePerKgSnapshotUgx: _resolvedRate,
+      ratePerKgSnapshotUgx: customRate ?? _resolvedRate,
     );
     try {
       await widget.ordersRepo
@@ -316,6 +328,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _notesController.dispose();
+    _customRateController.dispose();
     super.dispose();
   }
 
@@ -505,6 +518,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 decoration:
                     const InputDecoration(labelText: 'Notes (optional)'),
                 maxLines: 3,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const Key('np_custom_rate'),
+                controller: _customRateController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText:
+                      'Custom rate (USh/kg) — blank = default of ${formatUgx(widget.defaultRatePerKgUgx.round())}',
+                ),
               ),
             ],
             const SizedBox(height: 24),
