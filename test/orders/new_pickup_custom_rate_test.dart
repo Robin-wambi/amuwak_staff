@@ -21,6 +21,7 @@ Customer _customer({
   required String name,
   required String phone,
   String? address,
+  double? customRatePerKgUgx,
 }) =>
     Customer(
       id: id,
@@ -31,6 +32,7 @@ Customer _customer({
       createdAt: DateTime(2026, 5, 20, 9),
       updatedAt: DateTime(2026, 5, 20, 9),
       deletedAt: null,
+      customRatePerKgUgx: customRatePerKgUgx,
     );
 
 void main() {
@@ -132,6 +134,54 @@ void main() {
     final customer = capturedCustomer();
     expect(customer.customRatePerKgUgx, isNull,
         reason: 'blank custom rate field should save null override');
+  });
+
+  testWidgets(
+      'returning customer with stored rate: blank custom-rate field preserves '
+      'their existing rate (does not erase it with null)', (tester) async {
+    // Arrange: a returning customer with a negotiated custom rate of 4000.
+    when(() => customersRepo.getAll()).thenAnswer((_) async => [
+          _customer(
+            id: 'returning-cust-1',
+            name: 'VIP Returner',
+            phone: '+256 700 555 666',
+            address: 'Ntinda, Kampala',
+            customRatePerKgUgx: 4000,
+          ),
+        ]);
+    await pumpFormAndOpen(tester);
+
+    // Trigger the phone-blur match lookup.
+    await tester.enterText(
+        find.byKey(const Key('np_phone')), '+256 700 555 666');
+    await tester.tap(find.byKey(const Key('np_name')));
+    await tester.pumpAndSettle();
+
+    // Accept the matched customer ("Use this customer").
+    expect(find.text('Use this customer'), findsOneWidget);
+    await tester.tap(find.text('Use this customer'));
+    await tester.pumpAndSettle();
+
+    // Select service type to enable submit.
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // Leave the custom-rate field blank (do not expand optional details).
+    // Submit.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    // The customer's stored rate must be preserved — NOT erased to null.
+    final customer = capturedCustomer();
+    expect(
+      customer.customRatePerKgUgx,
+      4000.0,
+      reason:
+          'blank custom-rate field should fall back to the matched customer\'s '
+          'stored rate (4000), not erase it with null',
+    );
   });
 
   testWidgets('a positive custom rate is saved on the customer and order',

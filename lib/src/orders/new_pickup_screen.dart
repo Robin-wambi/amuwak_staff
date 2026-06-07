@@ -249,7 +249,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-      customRatePerKgUgx: customRate,
+      customRatePerKgUgx: customRate ?? _matchedCustomerRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);
