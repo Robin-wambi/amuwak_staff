@@ -75,7 +75,11 @@ void main() {
       '1234',
     );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
-    await tester.pumpAndSettle();
+    // The dashboard's animated header repeats forever, so pumpAndSettle would
+    // time out. Pump a couple of bounded frames to run the login future and let
+    // the navigation complete instead.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(StaffDashboardScreen), findsOneWidget);
   });
