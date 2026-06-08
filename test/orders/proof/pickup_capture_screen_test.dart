@@ -159,6 +159,19 @@ Future<bool?> _pumpAndPushPickup(
 /// flag after driving the screen.
 _PopHandle? _lastHandle;
 
+/// Scrolls the [_Stage.collecting] ListView until the 'Confirm with customer'
+/// button is visible. Adding pricing widgets (weight field, line-items editor,
+/// total card) made the list long enough that the button can be below the fold
+/// in the default test-viewport height.
+Future<void> _scrollToConfirm(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('pickup_confirm')),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(ProofEvent(
@@ -182,14 +195,27 @@ void main() {
       ElevatedButton,
       'Confirm with customer',
     );
+
+    // Scroll to confirm first to check it is initially disabled.
+    await _scrollToConfirm(tester);
     expect(tester.widget<ElevatedButton>(confirmButton).onPressed, isNull);
 
+    // Scroll back to top to interact with count_increment / add_photo.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 600));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('count_increment')));
     await tester.pump();
+
+    // Still disabled (photo missing) — check after scrolling to confirm.
+    await _scrollToConfirm(tester);
     expect(tester.widget<ElevatedButton>(confirmButton).onPressed, isNull);
 
+    // Scroll back to add photo, then re-check.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 600));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('add_photo')));
     await tester.pumpAndSettle();
+    await _scrollToConfirm(tester);
     expect(
       tester.widget<ElevatedButton>(confirmButton).onPressed,
       isNotNull,
@@ -219,6 +245,7 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('add_photo')));
     await tester.pumpAndSettle();
+    await _scrollToConfirm(tester);
     await tester.tap(
       find.widgetWithText(ElevatedButton, 'Confirm with customer'),
     );
@@ -283,6 +310,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('add_photo')));
       await tester.pumpAndSettle();
+      await _scrollToConfirm(tester);
       await tester.tap(
         find.widgetWithText(ElevatedButton, 'Confirm with customer'),
       );
@@ -324,6 +352,7 @@ void main() {
       await tester.tap(find.byKey(const Key('count_increment')));
       await tester.tap(find.byKey(const Key('add_photo')));
       await tester.pumpAndSettle();
+      await _scrollToConfirm(tester);
       await tester.tap(
         find.widgetWithText(ElevatedButton, 'Confirm with customer'),
       );
@@ -516,6 +545,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('add_photo')));
       await tester.pumpAndSettle();
+      await _scrollToConfirm(tester);
       await tester.tap(
         find.widgetWithText(ElevatedButton, 'Confirm with customer'),
       );
@@ -574,9 +604,15 @@ void main() {
       }
       await tester.tap(find.byKey(const Key('add_photo')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), 'fragile silk');
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('pickup_notes')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(find.byKey(const Key('pickup_notes')), 'fragile silk');
       await tester.pump();
 
+      await _scrollToConfirm(tester);
       await tester.tap(
         find.widgetWithText(ElevatedButton, 'Confirm with customer'),
       );
@@ -589,10 +625,23 @@ void main() {
       expect(_lastHandle!.resolved, isFalse);
       expect(_lastHandle!.result, isNull);
       expect(find.text('Tie tag to the bag'), findsNothing);
+
+      // Scroll to confirm button to verify it exists and state was preserved.
+      await _scrollToConfirm(tester);
       expect(find.text('Confirm with customer'), findsOneWidget);
 
+      // Scroll back to top to check count/photos.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 1000));
+      await tester.pump();
       expect(find.text('7'), findsOneWidget);
       expect(find.text('Photos (1/3)'), findsOneWidget);
+
+      // Scroll to notes field to verify it still has the entered text.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('pickup_notes')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('fragile silk'), findsOneWidget);
     },
   );

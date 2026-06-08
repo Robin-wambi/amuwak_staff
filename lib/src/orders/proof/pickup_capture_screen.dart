@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +12,10 @@ import '../../sync/proof_events_repository.dart';
 import '../order.dart';
 import '../order_status.dart';
 import '../proof_event.dart';
+import '../pricing/line_item.dart';
+import '../pricing/pricing_calculator.dart';
+import '../pricing/pricing_inputs.dart';
+import '../pricing/pricing_section.dart';
 import 'proof_photo_storage.dart';
 import 'qr_display_widget.dart';
 
@@ -48,6 +54,9 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   int _count = 0;
   final List<List<int>> _photoBytes = [];
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _estimatedWeightController =
+      TextEditingController();
+  List<LineItem> _lineItems = [];
   bool _saving = false;
   bool _pickingPhoto = false;
 
@@ -70,6 +79,13 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
 
   bool get _canConfirm =>
       _count > 0 && _photoBytes.isNotEmpty && !_saving;
+
+  OrderTotal get _provisionalTotal => recomputeTotal(PricingInputs(
+        ratePerKgUgx: widget.order.ratePerKgSnapshotUgx,
+        estimatedWeightKg:
+            double.tryParse(_estimatedWeightController.text.trim()),
+        lineItems: _lineItems,
+      ));
 
   String _pickPhotoErrorMessage(String code) {
     return switch (code) {
@@ -205,6 +221,39 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
       return;
     }
 
+    try {
+      await widget.ordersRepo.updatePricing(
+        widget.order.copyWith(
+          status: OrderStatus.inProgress,
+          estimatedWeightKg:
+              double.tryParse(_estimatedWeightController.text.trim()),
+          lineItems: _lineItems,
+        ),
+        actorStaffId: widget.actorStaffId,
+      );
+    } catch (e, st) {
+      developer.log(
+        'updatePricing best-effort failed at pickup; staff can correct on the '
+        'details screen.',
+        name: 'PickupCaptureScreen',
+        error: e,
+        stackTrace: st,
+      );
+      // Status already advanced, so we still close — but surface the gap. The
+      // snackbar uses the app-root ScaffoldMessenger, so it survives the pop
+      // and shows on the screen the rider lands on.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Pickup confirmed, but pricing wasn't saved — add the weight and "
+              'any line items on the order.',
+            ),
+          ),
+        );
+      }
+    }
+
     if (!mounted) return;
     Navigator.pop<bool>(context, true);
   }
@@ -212,6 +261,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    _estimatedWeightController.dispose();
     super.dispose();
   }
 
@@ -245,6 +295,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   }
 
   Widget _buildCollecting() {
+    final provisional = _provisionalTotal;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
@@ -338,7 +389,51 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
           ],
         ),
         const SizedBox(height: 20),
+        Text(
+          'Estimated weight (kg)',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
         TextFormField(
+          key: const Key('pickup_estimated_weight'),
+          controller: _estimatedWeightController,
+          decoration: const InputDecoration(
+            labelText: 'Estimated weight (kg)',
+            border: OutlineInputBorder(),
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Special items',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        LineItemsEditor(
+          items: _lineItems,
+          onAdd: () async {
+            final item = await showAddLineItemSheet(context);
+            if (item != null) {
+              setState(() => _lineItems = [..._lineItems, item]);
+            }
+          },
+          onRemove: (index) {
+            setState(() {
+              final updated = List<LineItem>.from(_lineItems);
+              updated.removeAt(index);
+              _lineItems = updated;
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        TotalCard(
+          totalUgx: provisional.total,
+          isProvisional: provisional.isProvisional,
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          key: const Key('pickup_notes'),
           controller: _notesController,
           decoration: const InputDecoration(
             labelText: 'Notes (optional)',
@@ -348,6 +443,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         ),
         const SizedBox(height: 24),
         ElevatedButton(
+          key: const Key('pickup_confirm'),
           onPressed: _canConfirm ? _onConfirm : null,
           child: const Text('Confirm with customer'),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_database.dart' show Customer;
+import '../shared/format_ugx.dart';
 import '../shared/phone.dart';
 import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
@@ -27,6 +28,7 @@ class NewPickupScreen extends StatefulWidget {
     required this.customerIdGenerator,
     required this.geolocate,
     required this.reverseGeocode,
+    required this.defaultRatePerKgUgx,
   });
 
   final CustomersRepository customersRepo;
@@ -37,6 +39,7 @@ class NewPickupScreen extends StatefulWidget {
   final String Function() customerIdGenerator;
   final GeolocateFn geolocate;
   final ReverseGeocodeFn reverseGeocode;
+  final double defaultRatePerKgUgx;
 
   @override
   State<NewPickupScreen> createState() => _NewPickupScreenState();
@@ -51,6 +54,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
+  double? _matchedCustomerRate;
   // Cached IDs survive an upsertOrder-fail retry so the rider doesn't
   // create a duplicate customer row by tapping "Create pickup" again.
   String? _pendingCustomerId;
@@ -66,6 +70,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
   final _notesController = TextEditingController();
+  final _customRateController = TextEditingController();
+
+  /// The rate the order will be billed at: a valid typed custom rate wins, then
+  /// a matched customer's stored rate, then the global default. Drives the
+  /// "Rate:" label so it confirms what will actually be frozen on the order.
+  double get _resolvedRate {
+    final typed = double.tryParse(_customRateController.text.trim());
+    if (typed != null && typed > 0) return typed;
+    return _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
+  }
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
     setState(() {
@@ -210,6 +224,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (useIt == true && mounted) {
       setState(() {
         _matchedCustomerId = match.id;
+        _matchedCustomerRate = match.customRatePerKgUgx;
         _nameController.text = match.name;
         _addressController.text = match.address ?? '';
       });
@@ -220,6 +235,20 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (!_canSubmit) return;
     setState(() => _saving = true);
     final now = widget.clock();
+    final customRateText = _customRateController.text.trim();
+    // Round before validating so the persisted rate matches the displayed whole
+    // UGX (consistent with the settings screen) and a sub-0.5 input can't slip
+    // past the ">0" guard as zero.
+    final customRate = customRateText.isEmpty
+        ? null
+        : double.tryParse(customRateText)?.roundToDouble();
+    if (customRateText.isNotEmpty && (customRate == null || customRate <= 0)) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Custom rate must be greater than 0.')),
+      );
+      return;
+    }
     final customerId = _matchedCustomerId ??
         (_pendingCustomerId ??= widget.customerIdGenerator());
     final customer = Customer(
@@ -231,6 +260,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
+      customRatePerKgUgx: customRate ?? _matchedCustomerRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);
@@ -276,6 +306,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       itemCount: _count,
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,
+      ratePerKgSnapshotUgx: customRate ?? _resolvedRate,
     );
     try {
       await widget.ordersRepo
@@ -308,6 +339,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _notesController.dispose();
+    _customRateController.dispose();
     super.dispose();
   }
 
@@ -342,6 +374,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               decoration: const InputDecoration(labelText: 'Phone'),
               onChanged: (_) => setState(() {
                 _matchedCustomerId = null;
+                _matchedCustomerRate = null;
               }),
             ),
             const SizedBox(height: 12),
@@ -359,6 +392,15 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _addressController,
               decoration: const InputDecoration(labelText: 'Address'),
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Rate: ${formatUgx(_resolvedRate.round())}/kg',
+                key: const Key('np_rate'),
+                style: const TextStyle(color: AppColors.secondaryText),
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ServiceType>(
@@ -487,6 +529,17 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 decoration:
                     const InputDecoration(labelText: 'Notes (optional)'),
                 maxLines: 3,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const Key('np_custom_rate'),
+                controller: _customRateController,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText:
+                      'Custom rate (USh/kg) — blank = default of ${formatUgx(widget.defaultRatePerKgUgx.round())}',
+                ),
               ),
             ],
             const SizedBox(height: 24),

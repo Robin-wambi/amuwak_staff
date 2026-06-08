@@ -37,6 +37,10 @@ drift.Order _orderRow({
     createdAt: created,
     updatedAt: created,
     deletedAt: null,
+    ratePerKgSnapshotUgx: 0,
+    lineItems: '[]',
+    manualAdjustmentUgx: 0,
+    totalUgx: 0,
   );
 }
 

@@ -49,4 +49,14 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.first.orderCode, 'AMW-1');
   });
+
+  test('schemaVersion is 3', () {
+    expect(db.schemaVersion, 3);
+  });
+
+  test('orders table exposes the pricing columns', () async {
+    // A select compiling proves the columns exist.
+    final rows = await db.select(db.orders).get();
+    expect(rows, isEmpty);
+  });
 }

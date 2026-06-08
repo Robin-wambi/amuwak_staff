@@ -21,6 +21,13 @@ class Orders extends Table {
   DateTimeColumn get updatedAt          => dateTime().named('updated_at').withDefault(currentDateAndTime)();
   DateTimeColumn get deletedAt          => dateTime().named('deleted_at').nullable()();
 
+  RealColumn     get ratePerKgSnapshotUgx => real().named('rate_per_kg_snapshot_ugx').withDefault(const Constant(0))();
+  RealColumn     get estimatedWeightKg    => real().named('estimated_weight_kg').nullable()();
+  RealColumn     get finalWeightKg        => real().named('final_weight_kg').nullable()();
+  TextColumn     get lineItems            => text().named('line_items').withDefault(const Constant('[]'))();
+  IntColumn      get manualAdjustmentUgx  => integer().named('manual_adjustment_ugx').withDefault(const Constant(0))();
+  IntColumn      get totalUgx             => integer().named('total_ugx').withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

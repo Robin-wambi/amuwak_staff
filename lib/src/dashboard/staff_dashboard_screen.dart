@@ -28,6 +28,8 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
+import '../pricing/pricing_providers.dart';
+import '../pricing/pricing_settings_screen.dart';
 import '../shared/uuid.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
@@ -179,6 +181,24 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    final double defaultRate;
+    try {
+      defaultRate =
+          ref.read(defaultRatePerKgUgxProvider).valueOrNull ??
+              await ref
+                  .read(pricingSettingsRepositoryProvider)
+                  .fetch()
+                  .then((s) => s.defaultRatePerKgUgx);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pricing settings missing — contact admin.'),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     final result = await Navigator.of(context).push<NewPickupResult>(
       MaterialPageRoute(
         builder: (_) => NewPickupScreen(
@@ -190,6 +210,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           customerIdGenerator: defaultUuidV7,
           geolocate: createDefaultGeolocate(),
           reverseGeocode: createDefaultReverseGeocode(),
+          defaultRatePerKgUgx: defaultRate,
         ),
       ),
     );
@@ -271,6 +292,26 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
     // No-op on return — the stream picks up the write (after Task 10/11/12
     // wire writes through the repositories).
+  }
+
+  void _openPricingSettings() {
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired — please sign in again.')),
+      );
+      return;
+    }
+    final repo = ref.read(pricingSettingsRepositoryProvider);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PricingSettingsScreen(
+          load: repo.fetch,
+          save: (rate) =>
+              repo.updateDefaultRate(rate, actorStaffId: staffId),
+        ),
+      ),
+    ).then((_) => ref.invalidate(defaultRatePerKgUgxProvider));
   }
 
   void _openOrderSearch() {
@@ -367,7 +408,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 onRetry: () => ref.invalidate(ordersStreamProvider),
               ),
             ),
-          3 => _AccountTab(onSignOut: _onSignOutPressed),
+          3 => _AccountTab(
+              onSignOut: _onSignOutPressed,
+              onOpenPricingSettings: _openPricingSettings,
+            ),
           // Home tab. Loading and data share one `_HomeTab` widget (orders ==
           // null means loading) so the header and quick actions stay mounted
           // across the loading→data transition instead of re-revealing. Errors
@@ -569,9 +613,13 @@ class _OrdersBody extends StatelessWidget {
 }
 
 class _AccountTab extends StatelessWidget {
-  const _AccountTab({required this.onSignOut});
+  const _AccountTab({
+    required this.onSignOut,
+    required this.onOpenPricingSettings,
+  });
 
   final VoidCallback onSignOut;
+  final VoidCallback onOpenPricingSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -629,6 +677,18 @@ class _AccountTab extends StatelessWidget {
           icon: Icons.schedule_outlined,
           label: 'Shift',
           value: 'Today',
+        ),
+        const SizedBox(height: AppSpacing.lg2),
+        AppCard(
+          onTap: onOpenPricingSettings,
+          child: Row(
+            children: [
+              Icon(Icons.payments_outlined, color: colorScheme.primary),
+              const SizedBox(width: AppSpacing.md),
+              const Expanded(child: Text('Pricing settings')),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.lg2),
         OutlinedButton.icon(

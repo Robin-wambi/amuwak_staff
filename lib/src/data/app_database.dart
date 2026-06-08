@@ -13,6 +13,7 @@ import 'tables/valid_transitions_table.dart';
 import 'tables/outbox_table.dart';
 import 'tables/sync_watermarks_table.dart';
 import 'tables/pull_dead_letter_table.dart';
+import 'tables/pricing_settings_table.dart';
 
 part 'app_database.g.dart';
 
@@ -20,14 +21,14 @@ part 'app_database.g.dart';
   Staff, Customers, Orders, OrderStatusEvents,
   ProofEvents, ProofPhotos, Issues, Shifts,
   ValidTransitions, Outbox, SyncWatermarks,
-  PullDeadLetter,
+  PullDeadLetter, PricingSettings,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -35,6 +36,16 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(pullDeadLetter);
+          }
+          if (from < 3) {
+            await m.addColumn(orders, orders.ratePerKgSnapshotUgx);
+            await m.addColumn(orders, orders.estimatedWeightKg);
+            await m.addColumn(orders, orders.finalWeightKg);
+            await m.addColumn(orders, orders.lineItems);
+            await m.addColumn(orders, orders.manualAdjustmentUgx);
+            await m.addColumn(orders, orders.totalUgx);
+            await m.addColumn(customers, customers.customRatePerKgUgx);
+            await m.createTable(pricingSettings);
           }
         },
       );

@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import '../data/app_database.dart' as drift;
 import 'order_status.dart';
+import 'pricing/line_item.dart';
 import 'proof_event.dart';
 import 'service_type.dart';
 
@@ -20,6 +23,12 @@ class LaundryOrder {
     this.fulfillmentMethod = 'delivery',
     this.scheduledFor,
     this.proofEvents = const [],
+    this.ratePerKgSnapshotUgx = 0,
+    this.estimatedWeightKg,
+    this.finalWeightKg,
+    this.lineItems = const [],
+    this.manualAdjustmentUgx = 0,
+    this.totalUgx = 0,
   }) : orderCode = orderCode ?? orderId;
 
   final String orderId;
@@ -37,6 +46,12 @@ class LaundryOrder {
   final String fulfillmentMethod;
   final DateTime? scheduledFor;
   final List<ProofEvent> proofEvents;
+  final double ratePerKgSnapshotUgx;
+  final double? estimatedWeightKg;
+  final double? finalWeightKg;
+  final List<LineItem> lineItems;
+  final int manualAdjustmentUgx;
+  final int totalUgx;
 
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
   ProofEvent? get deliveryProof => _firstOfType(ProofEventType.delivery);
@@ -88,6 +103,12 @@ class LaundryOrder {
                 notes: e.notes,
               ))
           .toList(growable: false),
+      ratePerKgSnapshotUgx: row.ratePerKgSnapshotUgx,
+      estimatedWeightKg: row.estimatedWeightKg,
+      finalWeightKg: row.finalWeightKg,
+      lineItems: _parseLineItems(jsonDecode(row.lineItems)),
+      manualAdjustmentUgx: row.manualAdjustmentUgx,
+      totalUgx: row.totalUgx,
     );
   }
 
@@ -132,6 +153,12 @@ class LaundryOrder {
                 notes: e['notes'] as String?,
               ))
           .toList(growable: false),
+      ratePerKgSnapshotUgx: (row['rate_per_kg_snapshot_ugx'] as num).toDouble(),
+      estimatedWeightKg: (row['estimated_weight_kg'] as num?)?.toDouble(),
+      finalWeightKg: (row['final_weight_kg'] as num?)?.toDouble(),
+      lineItems: _parseLineItems(row['line_items']),
+      manualAdjustmentUgx: (row['manual_adjustment_ugx'] as num?)?.toInt() ?? 0,
+      totalUgx: (row['total_ugx'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -141,6 +168,16 @@ class LaundryOrder {
   /// through as the human-facing code. See #42.
   static String? _blankToNull(String? code) =>
       (code == null || code.trim().isEmpty) ? null : code;
+
+  /// Parses `orders.line_items` (a jsonb array from Supabase, already decoded to
+  /// `List`, or `null`) into typed [LineItem]s. Drops nothing — validation lives
+  /// in [LineItem]'s constructor.
+  static List<LineItem> _parseLineItems(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => LineItem.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(growable: false);
+  }
 
   static String _formatTime(DateTime t) {
     final hour12 = switch (t.hour) {
@@ -213,6 +250,14 @@ class LaundryOrder {
     bool clearCustomerId = false,
     bool clearScheduledFor = false,
     List<ProofEvent>? proofEvents,
+    double? ratePerKgSnapshotUgx,
+    double? estimatedWeightKg,
+    double? finalWeightKg,
+    List<LineItem>? lineItems,
+    int? manualAdjustmentUgx,
+    int? totalUgx,
+    bool clearEstimatedWeight = false,
+    bool clearFinalWeight = false,
   }) {
     return LaundryOrder(
       orderId: orderId ?? this.orderId,
@@ -231,6 +276,15 @@ class LaundryOrder {
       scheduledFor:
           clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
       proofEvents: proofEvents ?? this.proofEvents,
+      ratePerKgSnapshotUgx: ratePerKgSnapshotUgx ?? this.ratePerKgSnapshotUgx,
+      estimatedWeightKg: clearEstimatedWeight
+          ? null
+          : (estimatedWeightKg ?? this.estimatedWeightKg),
+      finalWeightKg:
+          clearFinalWeight ? null : (finalWeightKg ?? this.finalWeightKg),
+      lineItems: lineItems ?? this.lineItems,
+      manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
+      totalUgx: totalUgx ?? this.totalUgx,
     );
   }
 
@@ -251,8 +305,17 @@ class LaundryOrder {
         other.notes != notes ||
         other.intakeMethod != intakeMethod ||
         other.fulfillmentMethod != fulfillmentMethod ||
-        other.scheduledFor != scheduledFor) {
+        other.scheduledFor != scheduledFor ||
+        other.ratePerKgSnapshotUgx != ratePerKgSnapshotUgx ||
+        other.estimatedWeightKg != estimatedWeightKg ||
+        other.finalWeightKg != finalWeightKg ||
+        other.manualAdjustmentUgx != manualAdjustmentUgx ||
+        other.totalUgx != totalUgx) {
       return false;
+    }
+    if (lineItems.length != other.lineItems.length) return false;
+    for (var i = 0; i < lineItems.length; i++) {
+      if (lineItems[i] != other.lineItems[i]) return false;
     }
     if (proofEvents.length != other.proofEvents.length) return false;
     for (var i = 0; i < proofEvents.length; i++) {
@@ -278,5 +341,15 @@ class LaundryOrder {
         fulfillmentMethod,
         scheduledFor,
         Object.hashAll(proofEvents),
+        // Pricing fields grouped into a nested hash to stay within Object.hash's
+        // 20-argument limit.
+        Object.hash(
+          ratePerKgSnapshotUgx,
+          estimatedWeightKg,
+          finalWeightKg,
+          Object.hashAll(lineItems),
+          manualAdjustmentUgx,
+          totalUgx,
+        ),
       );
 }

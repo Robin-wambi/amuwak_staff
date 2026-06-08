@@ -18,6 +18,9 @@ import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
+import 'package:amuwak_staff/src/pricing/pricing_providers.dart';
+import 'package:amuwak_staff/src/pricing/pricing_settings.dart';
+import 'package:amuwak_staff/src/pricing/pricing_settings_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
@@ -40,6 +43,23 @@ import 'package:amuwak_staff/src/sync/sync_status.dart';
 /// calls), which is enough for navigation tests like "open New pickup".
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 
+/// Stub repository that always returns a settings row with [defaultRatePerKgUgx]
+/// so dashboard tests can open NewPickupScreen without hitting Supabase.
+class _FakePricingSettingsRepository extends PricingSettingsRepository {
+  _FakePricingSettingsRepository({double defaultRatePerKgUgx = 5000})
+      : _settings = PricingSettings(
+          id: 'settings-1',
+          defaultRatePerKgUgx: defaultRatePerKgUgx,
+          updatedAt: DateTime(2026, 5, 25),
+        ),
+        super.forTest(fetchRows: () async => []);
+
+  final PricingSettings _settings;
+
+  @override
+  Future<PricingSettings> fetch() async => _settings;
+}
+
 Future<void> pumpDashboardWithDb(
   WidgetTester tester, {
   bool lostPhoto = false,
@@ -61,6 +81,10 @@ Future<void> pumpDashboardWithDb(
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Provide a stub repo so _handleNewPickup can fetch the rate and open
+        // NewPickupScreen without hitting the real Supabase client.
+        pricingSettingsRepositoryProvider
+            .overrideWithValue(_FakePricingSettingsRepository()),
         ...extraOverrides,
       ],
       child: MaterialApp(

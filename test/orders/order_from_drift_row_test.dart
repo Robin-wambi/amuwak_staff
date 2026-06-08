@@ -39,6 +39,10 @@ drift.Order _orderRow({
     createdAt: created,
     updatedAt: created,
     deletedAt: null,
+    ratePerKgSnapshotUgx: 0,
+    lineItems: '[]',
+    manualAdjustmentUgx: 0,
+    totalUgx: 0,
   );
 }
 
@@ -217,6 +221,10 @@ void main() {
         createdAt: DateTime(2026, 5, 25, 10),
         updatedAt: DateTime(2026, 5, 25, 10),
         deletedAt: null,
+        ratePerKgSnapshotUgx: 0,
+        lineItems: '[]',
+        manualAdjustmentUgx: 0,
+        totalUgx: 0,
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
       expect(mapped.orderCode, equals(row.orderCode));
