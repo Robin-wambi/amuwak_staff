@@ -229,8 +229,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     setState(() => _saving = true);
     final now = widget.clock();
     final customRateText = _customRateController.text.trim();
-    final customRate =
-        customRateText.isEmpty ? null : double.tryParse(customRateText);
+    // Round before validating so the persisted rate matches the displayed whole
+    // UGX (consistent with the settings screen) and a sub-0.5 input can't slip
+    // past the ">0" guard as zero.
+    final customRate = customRateText.isEmpty
+        ? null
+        : double.tryParse(customRateText)?.roundToDouble();
     if (customRateText.isNotEmpty && (customRate == null || customRate <= 0)) {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(

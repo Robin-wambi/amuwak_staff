@@ -230,6 +230,51 @@ void main() {
     expect(order.ratePerKgSnapshotUgx, 4000.0,
         reason: 'order snapshot should use the typed custom rate');
   });
+
+  testWidgets('a fractional custom rate is rounded before saving',
+      (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(
+        find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+        find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_custom_rate')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(find.byKey(const Key('np_custom_rate')), '4000.7');
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    // 4000.7 must be persisted as the rounded whole UGX it is displayed as,
+    // consistent with the settings-screen rate handling.
+    expect(capturedCustomer().customRatePerKgUgx, 4001.0,
+        reason: 'custom rate should be rounded on the customer');
+    expect(capturedOrder().ratePerKgSnapshotUgx, 4001.0,
+        reason: 'order snapshot should use the rounded custom rate');
+  });
 }
 
 class _FormHandle {
