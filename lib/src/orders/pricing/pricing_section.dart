@@ -96,50 +96,71 @@ class TotalCard extends StatelessWidget {
 }
 
 /// Shows a bottom sheet collecting a line-item name + amount. Returns the
-/// validated [LineItem], or null if cancelled / invalid.
+/// validated [LineItem], or null if dismissed without saving. Invalid input
+/// keeps the sheet open with an inline error rather than silently closing, so
+/// the rider can tell a rejected entry from a deliberate cancel.
 Future<LineItem?> showAddLineItemSheet(BuildContext context) {
   final nameController = TextEditingController();
   final amountController = TextEditingController();
+  String? nameError;
+  String? amountError;
   return showModalBottomSheet<LineItem>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.xl,
-        AppSpacing.xl,
-        MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.xl,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            key: const Key('line_item_name'),
-            controller: nameController,
-            decoration: const InputDecoration(labelText: 'Item (e.g. Blanket)'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            key: const Key('line_item_amount'),
-            controller: amountController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Amount (UGX)'),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          ElevatedButton(
-            key: const Key('line_item_save'),
-            onPressed: () {
-              final name = nameController.text.trim();
-              final amount = int.tryParse(amountController.text.trim());
-              if (name.isEmpty || amount == null || amount < 0) {
-                Navigator.pop(sheetContext); // invalid → cancel
-                return;
-              }
-              Navigator.pop(sheetContext, LineItem(name: name, amountUgx: amount));
-            },
-            child: const Text('Add'),
-          ),
-        ],
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (sheetContext, setSheetState) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.xl,
+          AppSpacing.xl,
+          MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const Key('line_item_name'),
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Item (e.g. Blanket)',
+                errorText: nameError,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              key: const Key('line_item_amount'),
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Amount (UGX)',
+                errorText: amountError,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ElevatedButton(
+              key: const Key('line_item_save'),
+              onPressed: () {
+                final name = nameController.text.trim();
+                final amount = int.tryParse(amountController.text.trim());
+                final nextNameError =
+                    name.isEmpty ? 'Enter an item name' : null;
+                final nextAmountError = (amount == null || amount < 0)
+                    ? 'Enter a valid amount'
+                    : null;
+                if (nextNameError != null || nextAmountError != null) {
+                  setSheetState(() {
+                    nameError = nextNameError;
+                    amountError = nextAmountError;
+                  });
+                  return;
+                }
+                Navigator.pop(
+                    sheetContext, LineItem(name: name, amountUgx: amount!));
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
       ),
     ),
   );
