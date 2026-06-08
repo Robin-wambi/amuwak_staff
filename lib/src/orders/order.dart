@@ -153,9 +153,9 @@ class LaundryOrder {
                 notes: e['notes'] as String?,
               ))
           .toList(growable: false),
-      // Tolerate a missing/null snapshot (e.g. a DB where migration 0019 hasn't
-      // been applied/backfilled yet): degrade one row to 0 rather than throwing
-      // and erroring the entire orders stream.
+      // Invariant: a missing or null rate snapshot must never error the whole
+      // orders stream — degrade the row to 0. (Can occur for a row that predates
+      // the pricing columns being added/backfilled.)
       ratePerKgSnapshotUgx:
           (row['rate_per_kg_snapshot_ugx'] as num?)?.toDouble() ?? 0,
       estimatedWeightKg: (row['estimated_weight_kg'] as num?)?.toDouble(),
