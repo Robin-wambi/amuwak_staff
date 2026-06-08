@@ -92,6 +92,27 @@ void main() {
       expect(o.ratePerKgSnapshotUgx, 0);
     });
 
+    test('fromSupabase tolerates an explicit null rate snapshot (degrades to 0)',
+        () {
+      // Distinct from the absent-key case above: a present-but-null column must
+      // also degrade to 0, so a future change can't regress one path silently.
+      final o = LaundryOrder.fromSupabase({
+        'id': 'o4',
+        'order_code': 'AMW-2026-0004',
+        'customer_id': null,
+        'customer_name': 'Dan',
+        'phone': '+256 700000003',
+        'address': 'Gulu',
+        'service_type': 'Wash only',
+        'status': 'pending_pickup',
+        'item_count': 0,
+        'notes': null,
+        'scheduled_for': null,
+        'rate_per_kg_snapshot_ugx': null,
+      }, const []);
+      expect(o.ratePerKgSnapshotUgx, 0);
+    });
+
     test('equality includes pricing fields', () {
       expect(_base().copyWith(totalUgx: 1) == _base(), isFalse);
     });
