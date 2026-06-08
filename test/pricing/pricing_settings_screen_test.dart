@@ -46,4 +46,25 @@ void main() {
     expect(saved, 5001);
     expect(find.text('Default rate set to USh 5,001/kg.'), findsOneWidget);
   });
+
+  testWidgets('rejects a positive rate that rounds to zero', (tester) async {
+    double? saved;
+    await tester.pumpWidget(MaterialApp(
+      home: PricingSettingsScreen(
+        load: () async => PricingSettings(
+          id: 'p1',
+          defaultRatePerKgUgx: 5000,
+          updatedAt: DateTime.utc(2026, 6, 6),
+        ),
+        save: (rate) async => saved = rate,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('settings_rate')), '0.4');
+    await tester.tap(find.byKey(const Key('settings_save')));
+    await tester.pump();
+    // 0.4 rounds to 0 — must not persist a zero rate.
+    expect(saved, isNull);
+    expect(find.text('Enter a rate greater than 0.'), findsOneWidget);
+  });
 }

@@ -51,16 +51,17 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
   }
 
   Future<void> _save() async {
-    final parsed = double.tryParse(_controller.text.trim());
-    if (parsed == null || parsed <= 0) {
+    // Rates are displayed and confirmed as whole UGX/kg, so persist the rounded
+    // value too — otherwise the saved rate could diverge from the confirmation.
+    // Round before validating so a positive sub-0.5 input can't slip past the
+    // ">0" guard and be saved as zero.
+    final rate = double.tryParse(_controller.text.trim())?.roundToDouble();
+    if (rate == null || rate <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a rate greater than 0.')),
       );
       return;
     }
-    // Rates are displayed and confirmed as whole UGX/kg, so persist the rounded
-    // value too — otherwise the saved rate could diverge from the confirmation.
-    final rate = parsed.roundToDouble();
     setState(() => _saving = true);
     try {
       await widget.save(rate);
