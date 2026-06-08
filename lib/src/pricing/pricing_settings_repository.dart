@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'pricing_settings.dart';
 
 typedef FetchRows = Future<List<Map<String, dynamic>>> Function();
+typedef UpdateRow = Future<void> Function(
+    String id, Map<String, dynamic> values);
 
 /// Reads and updates the singleton `pricing_settings` row.
 ///
@@ -11,17 +13,27 @@ typedef FetchRows = Future<List<Map<String, dynamic>>> Function();
 class PricingSettingsRepository {
   PricingSettingsRepository(this._supabase, {DateTime Function()? clock})
       : _clock = clock ?? DateTime.now,
-        _fetchRowsOverride = null;
+        _fetchRowsOverride = null,
+        _updateRowOverride = null;
 
-  /// Test seam: inject the raw row fetch so unit tests don't mock SupabaseClient.
-  PricingSettingsRepository.forTest({required FetchRows fetchRows})
-      : _supabase = null,
+  /// Test seam: inject the raw row fetch/update so unit tests don't mock
+  /// SupabaseClient.
+  PricingSettingsRepository.forTest({
+    required FetchRows fetchRows,
+    UpdateRow? updateRow,
+  })  : _supabase = null,
         _clock = DateTime.now,
-        _fetchRowsOverride = fetchRows;
+        _fetchRowsOverride = fetchRows,
+        _updateRowOverride = updateRow;
 
   final SupabaseClient? _supabase;
   final DateTime Function() _clock;
   final FetchRows? _fetchRowsOverride;
+  final UpdateRow? _updateRowOverride;
+
+  /// The singleton row's id, cached after the first read. It never changes, so
+  /// once known a save can skip the extra SELECT that fetched it.
+  String? _cachedId;
 
   Future<List<Map<String, dynamic>>> _fetchRows() {
     final override = _fetchRowsOverride;
@@ -41,17 +53,27 @@ class PricingSettingsRepository {
     if (rows.isEmpty) {
       throw StateError('pricing_settings has no row');
     }
-    return PricingSettings.fromSupabase(rows.first);
+    final settings = PricingSettings.fromSupabase(rows.first);
+    _cachedId = settings.id;
+    return settings;
   }
 
-  /// Updates the global default rate on the singleton row.
+  /// Updates the global default rate on the singleton row. Reuses the cached id
+  /// when known (the settings screen always reads before it can save), so a save
+  /// doesn't pay for an extra SELECT just to learn the singleton's id.
   Future<void> updateDefaultRate(double ratePerKgUgx,
       {required String actorStaffId}) async {
-    final id = (await fetch()).id;
-    await _supabase!.from('pricing_settings').update({
+    final id = _cachedId ?? (await fetch()).id;
+    final values = {
       'default_rate_per_kg_ugx': ratePerKgUgx,
       'updated_at': _clock().toUtc().toIso8601String(),
       'updated_by': actorStaffId,
-    }).eq('id', id);
+    };
+    final override = _updateRowOverride;
+    if (override != null) {
+      await override(id, values);
+      return;
+    }
+    await _supabase!.from('pricing_settings').update(values).eq('id', id);
   }
 }
