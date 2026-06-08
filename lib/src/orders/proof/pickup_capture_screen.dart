@@ -239,6 +239,19 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         error: e,
         stackTrace: st,
       );
+      // Status already advanced, so we still close — but surface the gap. The
+      // snackbar uses the app-root ScaffoldMessenger, so it survives the pop
+      // and shows on the screen the rider lands on.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Pickup confirmed, but pricing wasn't saved — add the weight and "
+              'any line items on the order.',
+            ),
+          ),
+        );
+      }
     }
 
     if (!mounted) return;

@@ -252,6 +252,78 @@ void main() {
   );
 
   testWidgets(
+    'On Done, a failed updatePricing surfaces a warning snackbar to the rider',
+    (tester) async {
+      final ordersRepo = _MockOrdersRepository();
+      when(() => ordersRepo.updateStatus(any(), any(),
+              actorStaffId: any(named: 'actorStaffId'),
+              updatedAt: any(named: 'updatedAt')))
+          .thenAnswer((_) async {});
+      when(() => ordersRepo.updatePricing(any(),
+              actorStaffId: any(named: 'actorStaffId')))
+          .thenThrow(Exception('network down'));
+      final proofEventsRepo = _okProofRepo();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PickupCaptureScreen(
+                      order: _pricedOrder,
+                      photoStorage: InMemoryProofPhotoStorage(),
+                      pickPhoto: () async => const [1, 2, 3],
+                      clock: () => DateTime(2026, 5, 12, 9, 42),
+                      ordersRepo: ordersRepo,
+                      proofEventsRepo: proofEventsRepo,
+                      actorStaffId: 's-test',
+                      proofEventIdGenerator: () => 'pe-fail-test',
+                    ),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('pickup_estimated_weight')),
+        '3',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("pricing wasn't saved"),
+        findsOneWidget,
+        reason: 'rider must be told pricing data needs re-entry on the order',
+      );
+    },
+  );
+
+  testWidgets(
     'Empty estimated weight field → provisional total is USh 0',
     (tester) async {
       await tester.pumpWidget(
