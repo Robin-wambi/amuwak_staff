@@ -72,6 +72,26 @@ void main() {
       expect(o.totalUgx, 17500);
     });
 
+    test('fromSupabase tolerates a missing rate snapshot (degrades to 0)', () {
+      // A row from a DB where migration 0019 has not yet added/backfilled the
+      // pricing columns: the snapshot key is absent. One such row must not take
+      // down the whole orders stream — degrade to 0 instead of throwing.
+      final o = LaundryOrder.fromSupabase({
+        'id': 'o3',
+        'order_code': 'AMW-2026-0003',
+        'customer_id': null,
+        'customer_name': 'Carol',
+        'phone': '+256 700000002',
+        'address': 'Mbarara',
+        'service_type': 'Wash only',
+        'status': 'pending_pickup',
+        'item_count': 0,
+        'notes': null,
+        'scheduled_for': null,
+      }, const []);
+      expect(o.ratePerKgSnapshotUgx, 0);
+    });
+
     test('equality includes pricing fields', () {
       expect(_base().copyWith(totalUgx: 1) == _base(), isFalse);
     });

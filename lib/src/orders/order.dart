@@ -153,7 +153,11 @@ class LaundryOrder {
                 notes: e['notes'] as String?,
               ))
           .toList(growable: false),
-      ratePerKgSnapshotUgx: (row['rate_per_kg_snapshot_ugx'] as num).toDouble(),
+      // Tolerate a missing/null snapshot (e.g. a DB where migration 0019 hasn't
+      // been applied/backfilled yet): degrade one row to 0 rather than throwing
+      // and erroring the entire orders stream.
+      ratePerKgSnapshotUgx:
+          (row['rate_per_kg_snapshot_ugx'] as num?)?.toDouble() ?? 0,
       estimatedWeightKg: (row['estimated_weight_kg'] as num?)?.toDouble(),
       finalWeightKg: (row['final_weight_kg'] as num?)?.toDouble(),
       lineItems: _parseLineItems(row['line_items']),
