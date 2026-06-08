@@ -157,6 +157,37 @@ void main() {
     expect(find.text('Rate: USh 4,000/kg'), findsNothing);
   });
 
+  testWidgets('rate label live-updates as a custom rate is typed',
+      (tester) async {
+    await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
+    expect(find.text('Rate: USh 5,000/kg'), findsOneWidget);
+
+    // Expand optional details and enter a custom rate.
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_custom_rate')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(find.byKey(const Key('np_custom_rate')), '4500');
+    await tester.pump();
+
+    // Scroll the label back into view and confirm it reflects the typed rate.
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_rate')),
+      find.byType(ListView),
+      const Offset(0, 200),
+    );
+    expect(find.text('Rate: USh 4,500/kg'), findsOneWidget);
+    expect(find.text('Rate: USh 5,000/kg'), findsNothing);
+  });
+
   testWidgets(
       'snapshot uses the default rate for an order with no customer override',
       (tester) async {

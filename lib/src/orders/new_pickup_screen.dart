@@ -72,7 +72,14 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _notesController = TextEditingController();
   final _customRateController = TextEditingController();
 
-  double get _resolvedRate => _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
+  /// The rate the order will be billed at: a valid typed custom rate wins, then
+  /// a matched customer's stored rate, then the global default. Drives the
+  /// "Rate:" label so it confirms what will actually be frozen on the order.
+  double get _resolvedRate {
+    final typed = double.tryParse(_customRateController.text.trim());
+    if (typed != null && typed > 0) return typed;
+    return _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
+  }
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
     setState(() {
@@ -528,6 +535,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 key: const Key('np_custom_rate'),
                 controller: _customRateController,
                 keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText:
                       'Custom rate (USh/kg) — blank = default of ${formatUgx(widget.defaultRatePerKgUgx.round())}',
