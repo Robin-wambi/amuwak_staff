@@ -471,6 +471,52 @@ void main() {
     expect(capturedOrder().scheduledFor, DateTime(2026, 5, 26, 9));
   });
 
+  testWidgets('Schedule for later with no time chosen keeps Create disabled '
+      'until a time is picked', (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // All required fields filled — in "Pickup now" mode Create is enabled.
+    final create = find.widgetWithText(ElevatedButton, 'Create pickup');
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
+
+    // Switching to "Schedule for later" without choosing a time must disable
+    // Create — otherwise the order silently submits as an immediate pickup.
+    await tester.tap(find.text('Schedule for later'));
+    await tester.pumpAndSettle();
+    // The schedule controls grow the form; bring Create back into view (the
+    // lazy ListView disposes off-screen children) before reading its state.
+    await tester.dragUntilVisible(
+      create,
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+
+    // Choosing a time re-enables it — scroll the chip back into view to tap it.
+    await tester.dragUntilVisible(
+      find.widgetWithText(ChoiceChip, 'Tomorrow morning'),
+      find.byType(ListView),
+      const Offset(0, 200),
+    );
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Tomorrow morning'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      create,
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
+  });
+
   testWidgets('Optional details: expand → stepper increments count, notes '
       'are persisted in the order row', (tester) async {
     await pumpFormAndOpen(tester);

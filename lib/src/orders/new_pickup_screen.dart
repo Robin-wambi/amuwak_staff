@@ -125,6 +125,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       ugandaNationalDigits(_phoneController.text).length == 9 &&
       _addressController.text.trim().isNotEmpty &&
       _serviceType != null &&
+      // In "Schedule for later" mode a time must be chosen, otherwise the order
+      // would silently fall back to an immediate pickup (startPickupNow == true).
+      (_pickupMode == _PickupTimeMode.now || _scheduledFor != null) &&
       !_saving;
 
   Future<void> _useMyLocation() async {
