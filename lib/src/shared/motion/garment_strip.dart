@@ -31,7 +31,8 @@ typedef GarmentItemBuilder = Widget Function(
 /// the garments on a gentle loop to make the header feel alive.
 ///
 /// Honours reduce-motion: when the OS requests reduced motion it shows a static
-/// strip (no auto-advance), mirroring [AnimatedGradientHeader].
+/// strip (no auto-advance), and it reacts to the preference being toggled at
+/// runtime — stopping or resuming the slide accordingly.
 class GarmentStrip extends StatefulWidget {
   const GarmentStrip({
     super.key,
@@ -68,7 +69,6 @@ class _GarmentStripState extends State<GarmentStrip> {
   // sliding-carousel feel rather than a full-width page flip.
   final PageController _controller = PageController(viewportFraction: 0.46);
   Timer? _timer;
-  bool _started = false;
   int _index = 0;
   // +1 while sliding towards the last garment, -1 while sliding back. Ping-pong
   // rather than wrapping, so we never rewind across the whole strip at once.
@@ -79,11 +79,18 @@ class _GarmentStripState extends State<GarmentStrip> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    // Static strip when the OS asks for reduced motion.
-    if (!MediaQuery.of(context).disableAnimations) {
-      _timer = Timer.periodic(widget.autoAdvanceInterval, (_) => _advance());
+    // React to runtime reduce-motion toggles: run the timer only while motion
+    // is allowed, and stop it (static strip) the moment it isn't. Subscribing
+    // to just the disableAnimations aspect avoids needless rebuilds.
+    _syncAutoAdvance(MediaQuery.disableAnimationsOf(context));
+  }
+
+  void _syncAutoAdvance(bool reduceMotion) {
+    if (reduceMotion) {
+      _timer?.cancel();
+      _timer = null;
+    } else {
+      _timer ??= Timer.periodic(widget.autoAdvanceInterval, (_) => _advance());
     }
   }
 

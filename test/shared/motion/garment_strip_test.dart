@@ -99,5 +99,46 @@ void main() {
 
       expect(lastPage, isNull);
     });
+
+    testWidgets('starts sliding when reduce-motion is turned off at runtime',
+        (tester) async {
+      final reduceMotion = ValueNotifier<bool>(true);
+      addTearDown(reduceMotion.dispose);
+      int? lastPage;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ValueListenableBuilder<bool>(
+                valueListenable: reduceMotion,
+                builder: (context, reduce, _) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(disableAnimations: reduce),
+                  child: SizedBox(
+                    height: 84,
+                    child: GarmentStrip(
+                      itemBuilder: _labelBuilder,
+                      onPageChanged: (i) => lastPage = i,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Reduced motion: no auto-advance.
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(lastPage, isNull);
+
+      // Toggle the preference off; the same strip should begin advancing.
+      reduceMotion.value = false;
+      await tester.pump(); // rebuild -> didChangeDependencies starts the timer
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(lastPage, 1);
+    });
   });
 }
