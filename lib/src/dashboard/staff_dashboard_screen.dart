@@ -838,38 +838,35 @@ class _SummaryGrid extends StatelessWidget {
     );
   }
 
+  // A pair of equal-width cards that also share a height: IntrinsicHeight +
+  // stretch makes the shorter card grow to its row-mate, so a one-line label
+  // ("Assigned") doesn't leave its card stubbier than a card whose label wraps
+  // ("Pending pickup") on a narrow phone.
+  Widget _row(Widget left, Widget right) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _card(OrderFilter.all, Icons.assignment_outlined),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _card(
-                OrderFilter.pendingPickup,
-                Icons.local_shipping_outlined,
-              ),
-            ),
-          ],
+        _row(
+          _card(OrderFilter.all, Icons.assignment_outlined),
+          _card(OrderFilter.pendingPickup, Icons.local_shipping_outlined),
         ),
         const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: _card(OrderFilter.inProgress, Icons.timelapse_rounded),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _card(
-                OrderFilter.readyForDelivery,
-                Icons.checkroom_outlined,
-              ),
-            ),
-          ],
+        _row(
+          _card(OrderFilter.inProgress, Icons.timelapse_rounded),
+          _card(OrderFilter.readyForDelivery, Icons.checkroom_outlined),
         ),
         const SizedBox(height: AppSpacing.md),
         _card(
