@@ -263,7 +263,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-      customRatePerKgUgx: customRate ?? _matchedCustomerRate,
+      // A typed custom rate is a one-off that bills only this order (via the
+      // order snapshot below). For a matched returning customer we never touch
+      // their stored standing rate; only a brand-new customer's typed rate
+      // establishes one.
+      customRatePerKgUgx:
+          _matchedCustomerId != null ? _matchedCustomerRate : customRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);

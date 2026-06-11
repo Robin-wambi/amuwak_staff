@@ -184,6 +184,67 @@ void main() {
     );
   });
 
+  testWidgets(
+      'returning customer + typed custom rate: the rate is a one-off — it bills '
+      'this order but does NOT overwrite the customer stored rate',
+      (tester) async {
+    // Arrange: a returning customer with a negotiated standing rate of 4000.
+    when(() => customersRepo.getAll()).thenAnswer((_) async => [
+          _customer(
+            id: 'returning-cust-1',
+            name: 'VIP Returner',
+            phone: '+256 700 555 666',
+            address: 'Ntinda, Kampala',
+            customRatePerKgUgx: 4000,
+          ),
+        ]);
+    await pumpFormAndOpen(tester);
+
+    // Match and accept the returning customer.
+    await tester.enterText(
+        find.byKey(const Key('np_phone')), '+256 700 555 666');
+    await tester.tap(find.byKey(const Key('np_name')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this customer'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // Type a one-off custom rate of 6000 for this order only.
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_custom_rate')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(find.byKey(const Key('np_custom_rate')), '6000');
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    // The order is billed at the typed one-off rate...
+    expect(capturedOrder().ratePerKgSnapshotUgx, 6000.0,
+        reason: 'the order snapshot should use the typed one-off rate');
+    // ...but the matched customer's standing rate is left untouched.
+    expect(capturedCustomer().customRatePerKgUgx, 4000.0,
+        reason: 'a one-off custom rate must not overwrite the returning '
+            'customer\'s stored standing rate');
+  });
+
   testWidgets('a positive custom rate is saved on the customer and order',
       (tester) async {
     await pumpFormAndOpen(tester);
