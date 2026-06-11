@@ -58,6 +58,21 @@ class LaundryOrder {
   bool get hasPickupProof => pickupProof != null;
   bool get hasDeliveryProof => deliveryProof != null;
 
+  /// The single date this order should be grouped/sorted by on a list screen.
+  ///
+  /// - Completed orders are anchored to when they were *delivered*
+  ///   ([deliveryProof] capturedAt), falling back to [scheduledFor] if a
+  ///   completed order is missing its proof (the non-atomic proof-vs-status
+  ///   write).
+  /// - Everything else is anchored to its upcoming [scheduledFor], falling
+  ///   back to when it was *picked up* once it's in the shop.
+  ///
+  /// Immediate orders with neither a schedule nor any proof have no meaningful
+  /// date and return `null` — callers group these under a "Now" section.
+  DateTime? get relevantDate => status == OrderStatus.completed
+      ? (deliveryProof?.capturedAt ?? scheduledFor)
+      : (scheduledFor ?? pickupProof?.capturedAt);
+
   ProofEvent? _firstOfType(ProofEventType type) {
     for (final event in proofEvents) {
       if (event.type == type) return event;
@@ -202,21 +217,27 @@ class LaundryOrder {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
+  /// Date-only label for a day relative to "now".
+  /// Examples: `'Today'`, `'Tomorrow'`, `'Yesterday'`, `'Mon 1 Jun'`.
+  /// The reference "now" is injectable for tests; defaults to [DateTime.now].
+  static String formatDay(DateTime when, {DateTime Function()? now}) {
+    final today = (now ?? DateTime.now)();
+    final whenDay = DateTime(when.year, when.month, when.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    final dayDelta = whenDay.difference(todayDay).inDays;
+    if (dayDelta == 0) return 'Today';
+    if (dayDelta == 1) return 'Tomorrow';
+    if (dayDelta == -1) return 'Yesterday';
+    final weekday = _weekdayShort[when.weekday - 1];
+    final month = _monthShort[when.month - 1];
+    return '$weekday ${when.day} $month';
+  }
+
   /// Human-readable label for a scheduled pickup/delivery time.
   /// Examples: `'Today, 2:15 PM'`, `'Tomorrow, 9:00 AM'`, `'Mon 1 Jun, 9:00 AM'`.
   /// The reference "now" is injectable for tests; defaults to [DateTime.now].
-  static String formatScheduled(DateTime when, {DateTime Function()? now}) {
-    final today = (now ?? DateTime.now)();
-    final scheduledDay = DateTime(when.year, when.month, when.day);
-    final todayDay = DateTime(today.year, today.month, today.day);
-    final dayDelta = scheduledDay.difference(todayDay).inDays;
-    final time = _formatTime(when);
-    if (dayDelta == 0) return 'Today, $time';
-    if (dayDelta == 1) return 'Tomorrow, $time';
-    final weekday = _weekdayShort[when.weekday - 1];
-    final month = _monthShort[when.month - 1];
-    return '$weekday ${when.day} $month, $time';
-  }
+  static String formatScheduled(DateTime when, {DateTime Function()? now}) =>
+      '${formatDay(when, now: now)}, ${_formatTime(when)}';
 
   /// Single source of truth for the `timeLabel` shown on the dashboard order
   /// card. Both [LaundryOrder.fromDriftRow] (when the stream re-emits an
