@@ -18,6 +18,17 @@ enum _PickupTimeMode { now, scheduled }
 
 enum _ScheduleChip { inOneHour, tomorrowMorning, tomorrowAfternoon, custom }
 
+/// Whether [chosen] is before the start of [now]'s minute — i.e. already in the
+/// past for scheduling purposes. Compared at minute granularity so picking the
+/// current minute (the time picker yields seconds == 0, while [now] carries
+/// real seconds) is treated as valid rather than wrongly rejected.
+@visibleForTesting
+bool scheduledTimeIsInPast(DateTime chosen, DateTime now) {
+  final nowMinute =
+      DateTime(now.year, now.month, now.day, now.hour, now.minute);
+  return chosen.isBefore(nowMinute);
+}
+
 class NewPickupScreen extends StatefulWidget {
   const NewPickupScreen({
     super.key,
@@ -143,7 +154,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     );
     // The time picker has no lower bound, so a rider can land on an earlier
     // time today. Reject a past pickup rather than scheduling into the past.
-    if (chosen.isBefore(now)) {
+    // Re-read the clock (the pickers may have been open a while) and compare at
+    // minute granularity so picking the current minute isn't falsely rejected.
+    if (scheduledTimeIsInPast(chosen, widget.clock())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose a pickup time in the future.')),
       );

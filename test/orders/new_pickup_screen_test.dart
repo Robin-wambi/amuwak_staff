@@ -728,6 +728,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(handle.popped, isNotNull);
   });
+
+  group('scheduledTimeIsInPast', () {
+    final now = DateTime(2026, 5, 25, 14, 30, 45);
+
+    test('a time earlier today is in the past', () {
+      expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 0), now), isTrue);
+    });
+
+    test('a time one minute earlier is in the past', () {
+      expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 29), now), isTrue);
+    });
+
+    test('the current minute is NOT in the past (now\'s seconds are ignored)',
+        () {
+      // The time picker yields 14:30:00 for "this minute"; comparing against
+      // now=14:30:45 at second precision would wrongly reject it.
+      expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 30), now), isFalse);
+    });
+
+    test('a future time is not in the past', () {
+      expect(
+          scheduledTimeIsInPast(DateTime(2026, 5, 25, 15, 0), now), isFalse);
+    });
+  });
 }
 
 /// Mutable holder so tests can read the value the form pops with AFTER the
