@@ -1,10 +1,11 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_database.dart' show Customer;
 import '../shared/format_ugx.dart';
 import '../shared/phone.dart';
-import '../shared/theme/app_colors.dart';
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
 import 'geo_services.dart';
@@ -16,6 +17,17 @@ import 'service_type.dart';
 enum _PickupTimeMode { now, scheduled }
 
 enum _ScheduleChip { inOneHour, tomorrowMorning, tomorrowAfternoon, custom }
+
+/// Whether [chosen] is before the start of [now]'s minute — i.e. already in the
+/// past for scheduling purposes. Compared at minute granularity so picking the
+/// current minute (the time picker yields seconds == 0, while [now] carries
+/// real seconds) is treated as valid rather than wrongly rejected.
+@visibleForTesting
+bool scheduledTimeIsInPast(DateTime chosen, DateTime now) {
+  final nowMinute =
+      DateTime(now.year, now.month, now.day, now.hour, now.minute);
+  return chosen.isBefore(nowMinute);
+}
 
 class NewPickupScreen extends StatefulWidget {
   const NewPickupScreen({
@@ -69,8 +81,39 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   int _count = 0;
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
+  // Mirrors [_count] so the value can be typed directly (tap-to-edit) as well
+  // as stepped — NN/g recommends a typable value for counts that can grow past
+  // a few taps.
+  final _countController = TextEditingController(text: '0');
   final _notesController = TextEditingController();
   final _customRateController = TextEditingController();
+
+  /// Steps the item count by [delta], clamped to 0..[_maxItemCount], keeping the
+  /// typable field in sync.
+  void _changeCount(int delta) {
+    final next = (_count + delta).clamp(0, _maxItemCount);
+    setState(() {
+      _count = next;
+      _countController.text = '$next';
+      _countController.selection =
+          TextSelection.collapsed(offset: _countController.text.length);
+    });
+  }
+
+  /// Handles a directly-typed item count. Empty/non-numeric reads as 0; a value
+  /// over the cap is clamped (and the field corrected) so the persisted count
+  /// can't exceed [_maxItemCount].
+  void _onCountTyped(String raw) {
+    final parsed = raw.trim().isEmpty ? 0 : int.tryParse(raw.trim());
+    if (parsed == null) return;
+    final clamped = parsed.clamp(0, _maxItemCount);
+    setState(() => _count = clamped);
+    if (clamped != parsed) {
+      _countController.text = '$clamped';
+      _countController.selection =
+          TextSelection.collapsed(offset: _countController.text.length);
+    }
+  }
 
   /// The rate the order will be billed at: a valid typed custom rate wins, then
   /// a matched customer's stored rate, then the global default. Drives the
@@ -102,14 +145,25 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       initialTime: TimeOfDay.fromDateTime(now),
     );
     if (time == null || !mounted) return;
-    setState(() {
-      _scheduledFor = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
+    final chosen = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    // The time picker has no lower bound, so a rider can land on an earlier
+    // time today. Reject a past pickup rather than scheduling into the past.
+    // Re-read the clock (the pickers may have been open a while) and compare at
+    // minute granularity so picking the current minute isn't falsely rejected.
+    if (scheduledTimeIsInPast(chosen, widget.clock())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a pickup time in the future.')),
       );
+      return;
+    }
+    setState(() {
+      _scheduledFor = chosen;
       _selectedChip = _ScheduleChip.custom;
     });
   }
@@ -125,13 +179,26 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       ugandaNationalDigits(_phoneController.text).length == 9 &&
       _addressController.text.trim().isNotEmpty &&
       _serviceType != null &&
+      // In "Schedule for later" mode a time must be chosen, otherwise the order
+      // would silently fall back to an immediate pickup (startPickupNow == true).
+      (_pickupMode == _PickupTimeMode.now || _scheduledFor != null) &&
       !_saving;
 
   Future<void> _useMyLocation() async {
     setState(() => _locating = true);
     try {
       final loc = await widget.geolocate();
-      if (loc == null) return;
+      if (!mounted) return;
+      if (loc == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                "Couldn't get your location — check permissions, or type the "
+                'address manually.'),
+          ),
+        );
+        return;
+      }
       final addr = await widget.reverseGeocode(loc);
       if (!mounted) return;
       if (addr == null) {
@@ -167,7 +234,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       }
       if (matched == null || !mounted) return;
       await _showCustomerMatchSheet(matched);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Customer phone-match lookup failed.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -196,7 +265,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               if (match.address != null) ...[
                 const SizedBox(height: 4),
                 Text(match.address!,
-                    style: const TextStyle(color: AppColors.secondaryText)),
+                    style: TextStyle(
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
               const SizedBox(height: 16),
               Row(
@@ -260,11 +331,18 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-      customRatePerKgUgx: customRate ?? _matchedCustomerRate,
+      // A typed custom rate is a one-off that bills only this order (via the
+      // order snapshot below). For a matched returning customer we never touch
+      // their stored standing rate; only a brand-new customer's typed rate
+      // establishes one.
+      customRatePerKgUgx:
+          _matchedCustomerId != null ? _matchedCustomerRate : customRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('upsertCustomer failed during pickup creation.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,7 +357,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     final String orderCode;
     try {
       orderCode = _pendingOrderCode ??= await widget.ordersRepo.reserveOrderCode();
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('reserveOrderCode failed during pickup creation.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -311,7 +391,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     try {
       await widget.ordersRepo
           .upsertOrder(order, actorStaffId: widget.actorStaffId);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('upsertOrder failed during pickup creation.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -338,6 +420,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _countController.dispose();
     _notesController.dispose();
     _customRateController.dispose();
     super.dispose();
@@ -399,7 +482,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               child: Text(
                 'Rate: ${formatUgx(_resolvedRate.round())}/kg',
                 key: const Key('np_rate'),
-                style: const TextStyle(color: AppColors.secondaryText),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 12),
@@ -471,7 +555,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Scheduled for: ${LaundryOrder.formatScheduled(_scheduledFor!, now: widget.clock)}',
-                  style: const TextStyle(color: AppColors.secondaryText),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ],
@@ -498,27 +583,58 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               ),
             ),
             if (_optionalExpanded) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Number of items',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Pieces of clothing to collect — weight is recorded at pickup',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
+                    key: const Key('np_count_dec'),
+                    tooltip: 'Fewer items',
                     icon: const Icon(Icons.remove_circle_outline),
-                    onPressed:
-                        _count > 0 ? () => setState(() => _count--) : null,
+                    onPressed: _count > 0 ? () => _changeCount(-1) : null,
                   ),
                   SizedBox(
-                    width: 60,
-                    child: Text('$_count',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    width: 120,
+                    child: TextField(
+                      key: const Key('np_count_field'),
+                      controller: _countController,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: _onCountTyped,
+                      style: const TextStyle(
+                          fontSize: 24, fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        suffixText: 'items',
+                      ),
+                    ),
                   ),
                   IconButton(
                     key: const Key('np_count_inc'),
+                    tooltip: 'More items',
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _count < _maxItemCount
-                        ? () => setState(() => _count++)
-                        : null,
+                    onPressed:
+                        _count < _maxItemCount ? () => _changeCount(1) : null,
                   ),
                 ],
               ),
@@ -537,8 +653,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 keyboardType: TextInputType.number,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  labelText:
-                      'Custom rate (USh/kg) — blank = default of ${formatUgx(widget.defaultRatePerKgUgx.round())}',
+                  labelText: 'Custom rate (USh/kg)',
+                  helperText:
+                      'Leave blank to use the default — ${formatUgx(widget.defaultRatePerKgUgx.round())}/kg',
                 ),
               ),
             ],
