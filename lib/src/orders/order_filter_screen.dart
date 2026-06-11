@@ -28,10 +28,16 @@ class OrderFilterScreen extends ConsumerWidget {
     super.key,
     required this.filter,
     required this.onOrderTap,
+    this.now,
   });
 
   final OrderFilter filter;
   final void Function(LaundryOrder order) onOrderTap;
+
+  /// Injectable clock for tests so the "Completed today" predicate and the
+  /// "Today"/"Tomorrow" day-group labels are deterministic. Defaults to the
+  /// real clock in production.
+  final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,8 +59,9 @@ class OrderFilterScreen extends ConsumerWidget {
   }
 
   Widget _buildBody(BuildContext context, List<LaundryOrder> orders) {
-    final groups =
-        filter.apply(orders).groupByDay(newestFirst: filter.newestFirst);
+    final groups = filter
+        .apply(orders, now: now)
+        .groupByDay(newestFirst: filter.newestFirst, now: now);
 
     if (groups.isEmpty) {
       return const EmptyState(

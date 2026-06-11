@@ -24,7 +24,11 @@ LaundryOrder _pending(String name) => LaundryOrder(
       notes: '',
     );
 
-LaundryOrder _completedNow(String name) => LaundryOrder(
+// Fixed reference clock so "Completed today" and date-group labels are
+// deterministic (no wall-clock / midnight fragility).
+DateTime _fixedNow() => DateTime(2026, 6, 11, 10);
+
+LaundryOrder _completedToday(String name) => LaundryOrder(
       orderId: name,
       orderCode: name,
       customerName: name,
@@ -39,7 +43,7 @@ LaundryOrder _completedNow(String name) => LaundryOrder(
         ProofEvent(
           id: 'd-$name',
           type: ProofEventType.delivery,
-          capturedAt: DateTime.now(),
+          capturedAt: DateTime(2026, 6, 11, 9),
           count: 1,
           photoPaths: const [],
         ),
@@ -59,7 +63,11 @@ Future<void> _pump(
         ),
       ],
       child: MaterialApp(
-        home: OrderFilterScreen(filter: filter, onOrderTap: (_) {}),
+        home: OrderFilterScreen(
+          filter: filter,
+          onOrderTap: (_) {},
+          now: _fixedNow,
+        ),
       ),
     ),
   );
@@ -79,7 +87,7 @@ void main() {
     await _pump(tester, filter: OrderFilter.pendingPickup, orders: [
       _pending('Jane'),
       _pending('Bob'),
-      _completedNow('Carol'), // filtered out by pendingPickup
+      _completedToday('Carol'), // filtered out by pendingPickup
     ]);
 
     // Count == preview: exactly the two pending orders are shown.
@@ -94,7 +102,7 @@ void main() {
   testWidgets('completedToday lists only orders delivered today',
       (tester) async {
     await _pump(tester, filter: OrderFilter.completedToday, orders: [
-      _completedNow('Carol'),
+      _completedToday('Carol'),
       _pending('Jane'),
     ]);
 
@@ -108,6 +116,29 @@ void main() {
       _pending('Jane'),
     ]);
     expect(find.text('Nothing here'), findsOneWidget);
+    expect(find.byType(OrderCard), findsNothing);
+  });
+
+  testWidgets('stream error shows the load-error state', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.error(Exception('boom')),
+          ),
+        ],
+        child: MaterialApp(
+          home: OrderFilterScreen(
+            filter: OrderFilter.all,
+            onOrderTap: (_) {},
+            now: _fixedNow,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("Couldn't load orders"), findsOneWidget);
     expect(find.byType(OrderCard), findsNothing);
   });
 }

@@ -46,7 +46,12 @@ extension OrderListGrouping on List<LaundryOrder> {
       if (date == null) {
         nowBucket.add(order);
       } else {
-        final day = DateTime(date.year, date.month, date.day);
+        // relevantDate (capturedAt/scheduledFor) is UTC when sourced from
+        // Supabase; bucket by the LOCAL calendar day so a late-night order
+        // doesn't land under the previous day's header. toLocal() is a no-op
+        // when the value is already local.
+        final local = date.toLocal();
+        final day = DateTime(local.year, local.month, local.day);
         (dated[day] ??= <LaundryOrder>[]).add(order);
       }
     }

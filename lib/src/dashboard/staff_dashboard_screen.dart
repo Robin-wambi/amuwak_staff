@@ -826,7 +826,7 @@ class _SummaryGrid extends StatelessWidget {
   final List<LaundryOrder> orders;
   final void Function(OrderFilter) onCardTap;
 
-  int _count(OrderFilter filter) => filter.apply(orders).length;
+  int _count(OrderFilter filter) => filter.count(orders);
 
   Widget _card(OrderFilter filter, IconData icon, {bool wide = false}) {
     return _SummaryCard(

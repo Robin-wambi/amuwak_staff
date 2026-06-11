@@ -48,12 +48,26 @@ enum OrderFilter {
         .toList(growable: false);
   }
 
+  /// How many orders match, without materializing a list — for summary-card
+  /// counts, which are read on every dashboard rebuild.
+  int count(List<LaundryOrder> orders, {DateTime Function()? now}) {
+    final reference = (now ?? DateTime.now)();
+    return orders.where((o) => matches(o, now: reference)).length;
+  }
+
   static bool _isCompletedToday(LaundryOrder o, DateTime now) {
     if (o.status != OrderStatus.completed) return false;
     final delivered = o.deliveryProof?.capturedAt;
     if (delivered == null) return false;
-    return delivered.year == now.year &&
-        delivered.month == now.month &&
-        delivered.day == now.day;
+    // capturedAt arrives from Supabase as UTC (DateTime.parse of a "...Z"
+    // timestamp). Compare calendar days in the same zone as `now` (local),
+    // or an order delivered in the 00:00–03:00 EAT window — stored as the
+    // previous UTC day — would be mis-dated. toLocal() is a no-op when the
+    // value is already local.
+    final deliveredLocal = delivered.toLocal();
+    final today = now.toLocal();
+    return deliveredLocal.year == today.year &&
+        deliveredLocal.month == today.month &&
+        deliveredLocal.day == today.day;
   }
 }

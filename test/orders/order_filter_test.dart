@@ -67,6 +67,13 @@ void main() {
         orders.countByStatus(OrderStatus.readyForDelivery),
       );
     });
+
+    test('count() equals apply().length for every filter', () {
+      for (final f in OrderFilter.values) {
+        expect(f.count(orders, now: now), f.apply(orders, now: now).length,
+            reason: '$f');
+      }
+    });
   });
 
   group('OrderFilter.completedToday', () {
@@ -91,6 +98,23 @@ void main() {
       final o = _order(OrderStatus.readyForDelivery,
           deliveredAt: DateTime(2026, 6, 11, 9));
       expect(OrderFilter.completedToday.matches(o, now: now()), isFalse);
+    });
+
+    test('classification is independent of UTC-vs-local capturedAt', () {
+      // capturedAt arrives from Supabase as UTC; the same instant expressed as
+      // UTC vs local must classify identically. Without toLocal() these diverge
+      // for an instant whose UTC and local calendar days differ (the EAT
+      // 00:00–03:00 window) — this fails on any non-UTC machine if the
+      // normalization regresses, and never false-fails on a UTC machine.
+      final instantUtc = DateTime.utc(2026, 6, 10, 21, 30); // 00:30 EAT Jun 11
+      final asUtc = _order(OrderStatus.completed, deliveredAt: instantUtc);
+      final asLocal =
+          _order(OrderStatus.completed, deliveredAt: instantUtc.toLocal());
+      final reference = DateTime(2026, 6, 11, 10);
+      expect(
+        OrderFilter.completedToday.matches(asUtc, now: reference),
+        OrderFilter.completedToday.matches(asLocal, now: reference),
+      );
     });
   });
 
