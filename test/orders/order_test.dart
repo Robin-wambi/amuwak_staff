@@ -266,6 +266,105 @@ void main() {
       });
     });
 
+    group('formatDay', () {
+      // 26 May 2026 is a Tuesday; 1 Jun 2026 is a Monday (see formatScheduled).
+      DateTime fixedNow() => DateTime(2026, 5, 26, 10);
+
+      test('"Today" when the date matches now (time ignored)', () {
+        expect(
+          LaundryOrder.formatDay(DateTime(2026, 5, 26, 14, 15), now: fixedNow),
+          'Today',
+        );
+      });
+
+      test('"Tomorrow" for the next day', () {
+        expect(
+          LaundryOrder.formatDay(DateTime(2026, 5, 27, 9), now: fixedNow),
+          'Tomorrow',
+        );
+      });
+
+      test('"Yesterday" for the previous day', () {
+        expect(
+          LaundryOrder.formatDay(DateTime(2026, 5, 25, 9), now: fixedNow),
+          'Yesterday',
+        );
+      });
+
+      test('weekday + day + month for dates further out', () {
+        expect(
+          LaundryOrder.formatDay(DateTime(2026, 6, 1, 9), now: fixedNow),
+          'Mon 1 Jun',
+        );
+      });
+
+      test('weekday + day + month for dates further in the past', () {
+        expect(
+          LaundryOrder.formatDay(DateTime(2026, 5, 20, 9), now: fixedNow),
+          'Wed 20 May',
+        );
+      });
+    });
+
+    group('relevantDate', () {
+      final pickupAt = DateTime(2026, 5, 12, 9, 42);
+      final deliveryAt = DateTime(2026, 5, 12, 16, 13);
+      final scheduled = DateTime(2026, 6, 1, 9);
+      ProofEvent pickup() => ProofEvent(
+            id: 'pe-p',
+            type: ProofEventType.pickup,
+            capturedAt: pickupAt,
+            count: 1,
+            photoPaths: const [],
+          );
+      ProofEvent delivery() => ProofEvent(
+            id: 'pe-d',
+            type: ProofEventType.delivery,
+            capturedAt: deliveryAt,
+            count: 1,
+            photoPaths: const [],
+          );
+
+      test('completed → delivery proof time', () {
+        final o = a.copyWith(
+          status: OrderStatus.completed,
+          scheduledFor: scheduled,
+          proofEvents: [pickup(), delivery()],
+        );
+        expect(o.relevantDate, deliveryAt);
+      });
+
+      test('completed without delivery proof → scheduledFor', () {
+        final o = a.copyWith(
+          status: OrderStatus.completed,
+          scheduledFor: scheduled,
+        );
+        expect(o.relevantDate, scheduled);
+      });
+
+      test('non-completed with a schedule → scheduledFor', () {
+        final o = a.copyWith(
+          status: OrderStatus.inProgress,
+          scheduledFor: scheduled,
+          proofEvents: [pickup()],
+        );
+        expect(o.relevantDate, scheduled);
+      });
+
+      test('non-completed, no schedule → pickup proof time', () {
+        final o = a.copyWith(
+          status: OrderStatus.inProgress,
+          proofEvents: [pickup()],
+        );
+        expect(o.relevantDate, pickupAt);
+      });
+
+      test('immediate order with neither → null', () {
+        final o = a.copyWith(status: OrderStatus.pendingPickup);
+        expect(o.relevantDate, isNull);
+      });
+    });
+
     group('computeTimeLabel', () {
       DateTime fixedNow() => DateTime(2026, 5, 26, 10);
 

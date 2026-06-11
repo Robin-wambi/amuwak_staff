@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_list_extensions.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 
 LaundryOrder _orderWith(OrderStatus status, {int items = 1}) {
@@ -18,6 +19,55 @@ LaundryOrder _orderWith(OrderStatus status, {int items = 1}) {
     notes: 'X',
   );
 }
+
+LaundryOrder _scheduled(String code, DateTime when) => LaundryOrder(
+      orderId: code,
+      orderCode: code,
+      customerName: 'X',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 't',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+      scheduledFor: when,
+    );
+
+LaundryOrder _immediate(String code) => LaundryOrder(
+      orderId: code,
+      orderCode: code,
+      customerName: 'X',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 't',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+    );
+
+LaundryOrder _deliveredAt(String code, DateTime when) => LaundryOrder(
+      orderId: code,
+      orderCode: code,
+      customerName: 'X',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.completed,
+      timeLabel: 't',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+      proofEvents: [
+        ProofEvent(
+          id: 'd-$code',
+          type: ProofEventType.delivery,
+          capturedAt: when,
+          count: 1,
+          photoPaths: const [],
+        ),
+      ],
+    );
 
 const _searchBase = LaundryOrder(
   orderId: 'AMW-2026-0042',
@@ -113,6 +163,66 @@ void main() {
 
     test('returns empty when nothing matches', () {
       expect(orders.searchBy('zzz-no-match'), isEmpty);
+    });
+  });
+
+  group('OrderListGrouping.groupByDay', () {
+    // 11 Jun 2026, mid-morning.
+    DateTime now() => DateTime(2026, 6, 11, 10);
+
+    test('empty list yields no groups', () {
+      expect(<LaundryOrder>[].groupByDay(newestFirst: false, now: now), isEmpty);
+    });
+
+    test('immediate orders form a "Now" group placed first', () {
+      final groups = [
+        _scheduled('s1', DateTime(2026, 6, 11, 14)),
+        _immediate('i1'),
+      ].groupByDay(newestFirst: false, now: now);
+
+      expect(groups.first.label, 'Now');
+      expect(groups.first.day, isNull);
+      expect(groups.first.orders.map((o) => o.orderCode), ['i1']);
+    });
+
+    test('ascending: Now, then Today, then Tomorrow, soonest-first within day',
+        () {
+      final groups = [
+        _scheduled('tomorrow', DateTime(2026, 6, 12, 9)),
+        _scheduled('today-pm', DateTime(2026, 6, 11, 16)),
+        _scheduled('today-am', DateTime(2026, 6, 11, 8)),
+        _immediate('now'),
+      ].groupByDay(newestFirst: false, now: now);
+
+      expect(groups.map((g) => g.label), ['Now', 'Today', 'Tomorrow']);
+      expect(
+        groups[1].orders.map((o) => o.orderCode),
+        ['today-am', 'today-pm'],
+      );
+    });
+
+    test('newestFirst: most-recent day and order first', () {
+      final groups = [
+        _deliveredAt('yest', DateTime(2026, 6, 10, 9)),
+        _deliveredAt('today-early', DateTime(2026, 6, 11, 9)),
+        _deliveredAt('today-late', DateTime(2026, 6, 11, 17)),
+      ].groupByDay(newestFirst: true, now: now);
+
+      expect(groups.map((g) => g.label), ['Today', 'Yesterday']);
+      expect(
+        groups.first.orders.map((o) => o.orderCode),
+        ['today-late', 'today-early'],
+      );
+    });
+
+    test('orderCode breaks ties within the same instant', () {
+      final at = DateTime(2026, 6, 11, 9);
+      final groups = [
+        _scheduled('b', at),
+        _scheduled('a', at),
+      ].groupByDay(newestFirst: false, now: now);
+
+      expect(groups.single.orders.map((o) => o.orderCode), ['a', 'b']);
     });
   });
 }

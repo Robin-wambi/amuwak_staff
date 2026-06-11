@@ -12,10 +12,9 @@ import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
 import '../orders/order_details_screen.dart';
-import '../orders/order_list_extensions.dart';
+import '../orders/order_filter.dart';
+import '../orders/order_filter_screen.dart';
 import '../orders/order_search_screen.dart';
-import '../orders/order_status.dart';
-import '../orders/widgets/order_card.dart';
 import '../orders/widgets/order_card_list.dart';
 import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/pickup_capture_screen.dart';
@@ -325,6 +324,20 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     );
   }
 
+  /// Opens the read-only list of orders behind a tapped summary card. The
+  /// session check + repository wiring live in [_openOrderDetails], which the
+  /// filter screen calls on tap.
+  void _openFilteredOrders(OrderFilter filter) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => OrderFilterScreen(
+          filter: filter,
+          onOrderTap: _openOrderDetails,
+        ),
+      ),
+    );
+  }
+
   void _selectTab(int index) {
     setState(() {
       _selectedTabIndex = index;
@@ -422,7 +435,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 )
               : _HomeTab(
                   orders: ordersAsync.valueOrNull,
-                  onOrderTap: _openOrderDetails,
+                  onOpenFiltered: _openFilteredOrders,
                   onNewPickup: _handleNewPickup,
                   onShowReport: () => _selectTab(2),
                   onCheckOrder: _openOrderSearch,
@@ -481,20 +494,25 @@ class _DashboardTabShell extends StatelessWidget {
 /// mount once (during loading, so a rider can tap straight into a new pickup)
 /// and stay put when orders arrive, instead of re-revealing on the
 /// loading→data swap. Only the variable middle (progress bar → summary grid)
-/// and the orders list reveal as they appear.
+/// reveals as it appears.
+///
+/// The summary cards are the entry point to the orders themselves: each is
+/// tappable and opens a filtered list via [onOpenFiltered]. The full
+/// assigned-orders list lives on the Orders tab, so it is intentionally NOT
+/// repeated here.
 ///
 /// [orders] is null while the stream is still loading.
 class _HomeTab extends StatelessWidget {
   const _HomeTab({
     required this.orders,
-    required this.onOrderTap,
+    required this.onOpenFiltered,
     required this.onNewPickup,
     required this.onShowReport,
     required this.onCheckOrder,
   });
 
   final List<LaundryOrder>? orders;
-  final void Function(LaundryOrder) onOrderTap;
+  final void Function(OrderFilter) onOpenFiltered;
   final VoidCallback onNewPickup;
   final VoidCallback onShowReport;
   final VoidCallback onCheckOrder;
@@ -524,14 +542,7 @@ class _HomeTab extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: LinearProgressIndicator(),
           )
-        : _SummaryGrid(
-            totalOrders: list.length,
-            pendingPickup: list.countByStatus(OrderStatus.pendingPickup),
-            inProgress: list.countByStatus(OrderStatus.inProgress),
-            readyForDelivery:
-                list.countByStatus(OrderStatus.readyForDelivery),
-            completed: list.countByStatus(OrderStatus.completed),
-          );
+        : _SummaryGrid(orders: list, onCardTap: onOpenFiltered);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -550,20 +561,6 @@ class _HomeTab extends StatelessWidget {
           onShowReport: onShowReport,
           onCheckOrder: onCheckOrder,
         )),
-        // Assigned-orders section only once orders have loaded — keeps the
-        // loading state free of a zero-count flicker.
-        if (!loading) ...[
-          const SizedBox(height: AppSpacing.xxl),
-          reveal(Text(
-            'Assigned orders',
-            style: Theme.of(context).textTheme.titleLarge,
-          )),
-          const SizedBox(height: AppSpacing.md),
-          for (final order in list) ...[
-            reveal(OrderCard(order: order, onTap: () => onOrderTap(order))),
-            const SizedBox(height: AppSpacing.md),
-          ],
-        ],
       ],
     );
   }
@@ -820,20 +817,26 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
+/// The five tappable summary cards. Each card's count and the list it opens
+/// both derive from the same [OrderFilter] (via [OrderFilter.apply]), so the
+/// number on a card can never disagree with the orders behind it.
 class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({
-    required this.totalOrders,
-    required this.pendingPickup,
-    required this.inProgress,
-    required this.readyForDelivery,
-    required this.completed,
-  });
+  const _SummaryGrid({required this.orders, required this.onCardTap});
 
-  final int totalOrders;
-  final int pendingPickup;
-  final int inProgress;
-  final int readyForDelivery;
-  final int completed;
+  final List<LaundryOrder> orders;
+  final void Function(OrderFilter) onCardTap;
+
+  int _count(OrderFilter filter) => filter.count(orders);
+
+  Widget _card(OrderFilter filter, IconData icon, {bool wide = false}) {
+    return _SummaryCard(
+      title: filter.label,
+      value: _count(filter),
+      icon: icon,
+      wide: wide,
+      onTap: () => onCardTap(filter),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -842,18 +845,13 @@ class _SummaryGrid extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _SummaryCard(
-                title: 'Assigned',
-                value: totalOrders,
-                icon: Icons.assignment_outlined,
-              ),
+              child: _card(OrderFilter.all, Icons.assignment_outlined),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: _SummaryCard(
-                title: OrderStatus.pendingPickup.label,
-                value: pendingPickup,
-                icon: Icons.local_shipping_outlined,
+              child: _card(
+                OrderFilter.pendingPickup,
+                Icons.local_shipping_outlined,
               ),
             ),
           ],
@@ -862,27 +860,21 @@ class _SummaryGrid extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _SummaryCard(
-                title: OrderStatus.inProgress.label,
-                value: inProgress,
-                icon: Icons.timelapse_rounded,
-              ),
+              child: _card(OrderFilter.inProgress, Icons.timelapse_rounded),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: _SummaryCard(
-                title: OrderStatus.readyForDelivery.label,
-                value: readyForDelivery,
-                icon: Icons.checkroom_outlined,
+              child: _card(
+                OrderFilter.readyForDelivery,
+                Icons.checkroom_outlined,
               ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        _SummaryCard(
-          title: 'Completed today',
-          value: completed,
-          icon: Icons.check_circle_outline_rounded,
+        _card(
+          OrderFilter.completedToday,
+          Icons.check_circle_outline_rounded,
           wide: true,
         ),
       ],
@@ -895,12 +887,14 @@ class _SummaryCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
+    this.onTap,
     this.wide = false,
   });
 
   final String title;
   final int value;
   final IconData icon;
+  final VoidCallback? onTap;
   final bool wide;
 
   @override
@@ -908,6 +902,7 @@ class _SummaryCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     return AppCard(
+      onTap: onTap,
       child: SizedBox(
         width: wide ? double.infinity : null,
         child: Row(

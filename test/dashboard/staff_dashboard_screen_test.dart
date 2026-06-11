@@ -13,10 +13,13 @@ import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
+import 'package:amuwak_staff/src/orders/order_filter_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
-import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
+import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/pricing/pricing_providers.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings.dart';
@@ -282,11 +285,16 @@ void main() {
 
   // ------------------------------------------------------------------ Task 9
 
-  testWidgets('renders an order card for each row in ordersStreamProvider',
-      (tester) async {
-    // Seed a single order through the stream and verify the dashboard
-    // renders a card for it.  `Stream.value` emits synchronously on subscribe
-    // so the first `pumpAndSettle` after `pumpWidget` is enough.
+  testWidgets(
+      'the Assigned card opens a filtered screen listing each row in '
+      'ordersStreamProvider', (tester) async {
+    // The order list now lives behind the summary cards rather than on Home.
+    // Seed a single order, open it via the Assigned card, and verify its card
+    // renders on the filtered screen.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     const seeded = LaundryOrder(
       orderId: 'X',
       customerName: 'Test',
@@ -299,32 +307,17 @@ void main() {
       notes: '',
     );
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        ordersStreamProvider.overrideWith(
-          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
-        ),
-        pendingOutboxCountProvider
-            .overrideWith((ref) => const Stream<int>.empty()),
-        lastSyncedAtProvider
-            .overrideWith((ref) => const Stream<DateTime?>.empty()),
-      ],
-      child: MaterialApp(
-        home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(disableAnimations: true),
-            child:
-                StaffDashboardScreen(retrieveLostPhoto: () async => false),
-          ),
-        ),
+    await pumpDashboardWithDb(tester, extraOverrides: [
+      ordersStreamProvider.overrideWith(
+        (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
       ),
-    ));
+    ]);
+
+    await tester.tap(find.text('Assigned'));
     await tester.pumpAndSettle();
 
-    // The customer name is in the card; `skipOffstage: false` because cards
-    // sit below the visible viewport in the lazy ListView on the default
-    // 800x600 test surface.
-    expect(find.text('Test', skipOffstage: false), findsOneWidget);
+    expect(find.byType(OrderFilterScreen), findsOneWidget);
+    expect(find.text('Test'), findsOneWidget);
   });
 
   testWidgets(
@@ -617,10 +610,8 @@ void main() {
     // intake_recorded_by/created_by, FK-failing the outbox dispatch and
     // silently dead-lettering the row.
 
-    // Use a tall surface so the single order card renders fully on-screen,
-    // above the bottom NavigationBar. On the default 800x600 surface the card
-    // sits below the fold and, once scrolled in, lands under the nav bar where
-    // the tap silently misses.
+    // Use a tall surface so the summary card and the order card both render
+    // fully on-screen, above the bottom NavigationBar.
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -660,20 +651,145 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Tap the card directly — the tall surface keeps it built and on-screen.
+    // The order list no longer lives on Home — open it from the Assigned
+    // summary card, then tap the order there.
+    await tester.tap(find.text('Assigned'));
+    await tester.pumpAndSettle();
+    expect(find.byType(OrderFilterScreen), findsOneWidget);
+
     await tester.tap(find.text('No Session'));
     await tester.pumpAndSettle();
 
-    // OrderDetailsScreen must not be in the tree.
+    // OrderDetailsScreen must not be in the tree; we stay on the filter screen.
     expect(find.byType(OrderDetailsScreen), findsNothing);
-    // Dashboard is still visible.
-    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+    expect(find.byType(OrderFilterScreen), findsOneWidget);
     // Session-expired SnackBar surfaced.
     expect(
       find.textContaining('Session expired'),
       findsOneWidget,
     );
   });
+
+  // ------------------------------------------------ Tappable summary cards
+
+  testWidgets(
+    'the Home tab no longer repeats the assigned-orders list',
+    (tester) async {
+      const seeded = LaundryOrder(
+        orderId: 'AMW-1',
+        customerName: 'Home List Gone',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      // Summary cards are present, but the order itself is not listed on Home.
+      expect(find.text('Assigned'), findsOneWidget);
+      expect(find.text('Assigned orders', skipOffstage: false), findsNothing);
+      expect(find.text('Home List Gone'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'tapping a summary card opens the matching filtered screen with all of '
+    'its orders',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      LaundryOrder pending(String id) => LaundryOrder(
+            orderId: id,
+            orderCode: id,
+            customerName: 'Cust $id',
+            serviceType: ServiceType.washOnly,
+            status: OrderStatus.pendingPickup,
+            timeLabel: 't',
+            itemCount: 1,
+            phone: 'p',
+            address: 'a',
+            notes: '',
+          );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(
+            [pending('a'), pending('b'), pending('c')],
+          ),
+        ),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Pending pickup'));
+      await tester.pumpAndSettle();
+
+      // Right screen, right title, and exactly the three pending orders — the
+      // count on the card and the list behind it cannot disagree.
+      expect(find.byType(OrderFilterScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Pending pickup'), findsOneWidget);
+      expect(find.byType(OrderCard), findsNWidgets(3));
+    },
+  );
+
+  testWidgets(
+    '"Completed today" previews only orders delivered today',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      LaundryOrder completedAt(String id, DateTime when) => LaundryOrder(
+            orderId: id,
+            orderCode: id,
+            customerName: 'Cust $id',
+            serviceType: ServiceType.washOnly,
+            status: OrderStatus.completed,
+            timeLabel: 't',
+            itemCount: 1,
+            phone: 'p',
+            address: 'a',
+            notes: '',
+            proofEvents: [
+              ProofEvent(
+                id: 'd-$id',
+                type: ProofEventType.delivery,
+                capturedAt: when,
+                count: 1,
+                photoPaths: const [],
+              ),
+            ],
+          );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([
+            completedAt('today', DateTime.now()),
+            completedAt('old', DateTime(2020, 1, 1, 9)),
+          ]),
+        ),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Completed today'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppBar, 'Completed today'), findsOneWidget);
+      // Only the order delivered today is previewed; the 2020 one is excluded.
+      expect(find.byType(OrderCard), findsOneWidget);
+      expect(find.text('Cust today'), findsOneWidget);
+      expect(find.text('Cust old'), findsNothing);
+    },
+  );
 
   // ---------------------------------------------------------------- Plan 4 #3
 
