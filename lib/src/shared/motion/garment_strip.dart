@@ -96,8 +96,10 @@ class _GarmentStripState extends State<GarmentStrip> {
     } else if (_index <= 0) {
       _direction = 1;
     }
+    // Clamp guards against overshooting a boundary if a caller sets an
+    // interval shorter than the slide animation, leaving _index lagging.
     _controller.animateToPage(
-      _index + _direction,
+      (_index + _direction).clamp(0, _garments.length - 1),
       duration: AppMotion.medium,
       curve: AppMotion.standard,
     );
@@ -146,6 +148,9 @@ class _GarmentStripState extends State<GarmentStrip> {
               garment.assetPath,
               height: 40,
               width: 40,
+              // The adjacent label already conveys the garment to screen
+              // readers; skip the empty image node rather than double-announce.
+              excludeFromSemantics: true,
             ),
             const SizedBox(width: AppSpacing.sm),
             Flexible(
