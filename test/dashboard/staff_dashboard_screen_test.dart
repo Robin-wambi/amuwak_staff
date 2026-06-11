@@ -791,6 +791,37 @@ void main() {
     },
   );
 
+  testWidgets(
+    'summary grid cards share one height on a narrow phone, despite '
+    'different label lengths',
+    (tester) async {
+      // 360px wide: the label column is narrow enough that "Pending pickup" /
+      // "Ready for delivery" wrap while "Assigned" stays one line. The four
+      // 2x2 cards must still match height (regression: "Assigned" was 100px
+      // next to a 132px neighbour).
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester);
+
+      double cardHeight(String title) => tester
+          .getSize(find
+              .ancestor(of: find.text(title), matching: find.byType(Card))
+              .first)
+          .height;
+
+      final assigned = cardHeight('Assigned');
+      for (final title in const [
+        'Pending pickup',
+        'In progress',
+        'Ready for delivery',
+      ]) {
+        expect(cardHeight(title), assigned, reason: '$title vs Assigned');
+      }
+    },
+  );
+
   // ---------------------------------------------------------------- Plan 4 #3
 
   testWidgets(
