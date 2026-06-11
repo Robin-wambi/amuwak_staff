@@ -407,6 +407,25 @@ void main() {
   });
 
   testWidgets(
+      'Use my location chip shows a SnackBar when geolocation is unavailable '
+      '(permission denied / GPS off) and leaves the address blank',
+      (tester) async {
+    // geolocate returns null — no fix available.
+    await pumpFormAndOpen(tester, geolocate: () async => null);
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining("Couldn't get your location"), findsOneWidget);
+    expect(
+      (tester.widget<TextFormField>(find.byKey(const Key('np_address'))))
+          .controller!
+          .text,
+      isEmpty,
+    );
+  });
+
+  testWidgets(
       'Use my location chip shows a SnackBar when reverseGeocode returns '
       'null after a successful geolocate, and leaves the address blank',
       (tester) async {
@@ -540,6 +559,11 @@ void main() {
       await tester.tap(find.byKey(const Key('np_count_inc')));
       await tester.pump();
     }
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_notes')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
     await tester.enterText(
         find.byKey(const Key('np_notes')), 'Gate locked after 6');
 
@@ -579,6 +603,102 @@ void main() {
         tester.widget<IconButton>(find.byKey(const Key('np_count_inc')));
     expect(incButton.onPressed, isNull,
         reason: 'increment is disabled once the cap is reached');
+  });
+
+  testWidgets('Optional details: the count is labelled and carries its unit',
+      (tester) async {
+    await pumpFormAndOpen(tester);
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+
+    // The bare number is gone — a rider now sees what the value means.
+    expect(find.text('Number of items'), findsOneWidget);
+    expect(find.byKey(const Key('np_count_field')), findsOneWidget);
+    expect(find.text('items'), findsOneWidget);
+  });
+
+  testWidgets('Optional details: typing a count sets itemCount (tap-to-edit)',
+      (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_count_field')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    // Type the count directly instead of tapping + thirty times.
+    await tester.enterText(find.byKey(const Key('np_count_field')), '30');
+    await tester.pump();
+
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    expect(capturedOrder().itemCount, 30);
+  });
+
+  testWidgets('Optional details: a typed count over 99 is clamped to 99',
+      (tester) async {
+    await pumpFormAndOpen(tester);
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_count_field')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(find.byKey(const Key('np_count_field')), '150');
+    await tester.pump();
+
+    // The field self-corrects to the cap and the persisted count never exceeds it.
+    expect(find.text('99'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+    await tester.pumpAndSettle();
+
+    expect(capturedOrder().itemCount, 99);
   });
 
   testWidgets('Create pickup shows a spinner while the submit is in flight',
