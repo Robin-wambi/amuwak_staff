@@ -10,7 +10,8 @@ import '../theme/app_spacing.dart';
 /// away from content. Drop-in replacement for the dashboard's flat brand header
 /// container: keeps the card radius and the soft brand shadow.
 ///
-/// Honours reduce-motion: paints a single static gradient frame.
+/// Honours reduce-motion: paints a static gradient frame, and reacts to the
+/// preference being toggled at runtime — freezing or resuming the sheen.
 class AnimatedGradientHeader extends StatefulWidget {
   const AnimatedGradientHeader({
     super.key,
@@ -31,7 +32,6 @@ class _AnimatedGradientHeaderState extends State<AnimatedGradientHeader>
     vsync: this,
     duration: AppMotion.gradientLoop,
   );
-  bool _started = false;
 
   // The sheen travels between the brand terracotta and a slightly lighter
   // terracotta — low contrast, so it reads as a living surface, not a flashy
@@ -43,9 +43,16 @@ class _AnimatedGradientHeaderState extends State<AnimatedGradientHeader>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (!MediaQuery.of(context).disableAnimations) {
+    // React to runtime reduce-motion toggles: run the sheen only while motion
+    // is allowed, freezing on a static frame the moment it isn't. Subscribing
+    // to just the disableAnimations aspect avoids needless rebuilds.
+    _syncSheen(MediaQuery.disableAnimationsOf(context));
+  }
+
+  void _syncSheen(bool reduceMotion) {
+    if (reduceMotion) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
       _controller.repeat(reverse: true);
     }
   }
