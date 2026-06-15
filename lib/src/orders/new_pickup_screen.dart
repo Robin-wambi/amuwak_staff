@@ -179,28 +179,49 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     _loadAddressSuggestions();
   }
 
-  /// Loads distinct customer addresses, ranked by how often they occur, to feed
-  /// the address field's auto-suggest. Best-effort: a failure leaves the list
-  /// empty (the field still works as a plain text input).
+  /// Loads distinct addresses used across customers and orders, ranked by how
+  /// often they occur, to feed the address field's auto-suggest. Each source is
+  /// best-effort and independent: customer addresses publish first, then orders
+  /// augment the ranking, so a slow/failing orders read can't block suggestions
+  /// (and a failure in either just logs and leaves that source out).
   Future<void> _loadAddressSuggestions() async {
-    try {
-      final customers = await widget.customersRepo.getAll();
-      final counts = <String, int>{};
-      final firstSeen = <String, String>{};
-      for (final c in customers) {
-        final addr = c.address?.trim();
-        if (addr == null || addr.isEmpty) continue;
-        final key = addr.toLowerCase();
-        counts[key] = (counts[key] ?? 0) + 1;
-        firstSeen.putIfAbsent(key, () => addr);
-      }
+    final counts = <String, int>{};
+    final firstSeen = <String, String>{};
+
+    void tally(String? raw) {
+      final addr = raw?.trim();
+      if (addr == null || addr.isEmpty) return;
+      final key = addr.toLowerCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+      firstSeen.putIfAbsent(key, () => addr);
+    }
+
+    void publish() {
+      if (!mounted) return;
       final ranked = counts.keys.toList()
         ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
-      if (!mounted) return;
       setState(() => _addressSuggestions =
           ranked.map((k) => firstSeen[k]!).toList(growable: false));
+    }
+
+    // Kick off the orders read alongside the customers read so they overlap.
+    final ordersFuture = widget.ordersRepo.watchAll().first;
+    try {
+      for (final c in await widget.customersRepo.getAll()) {
+        tally(c.address);
+      }
+      publish();
     } catch (e, st) {
-      developer.log('Address suggestions load failed.',
+      developer.log('Customer address suggestions load failed.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
+    }
+    try {
+      for (final o in await ordersFuture) {
+        tally(o.address);
+      }
+      publish();
+    } catch (e, st) {
+      developer.log('Order address suggestions load failed.',
           name: 'NewPickupScreen', error: e, stackTrace: st);
     }
   }

@@ -72,6 +72,9 @@ void main() {
         .thenAnswer((_) async => 'AMW-2026-0001');
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    // initState loads address suggestions from customers + orders.
+    when(() => ordersRepo.watchAll())
+        .thenAnswer((_) => Stream.value(const <LaundryOrder>[]));
   });
 
   /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
@@ -789,6 +792,47 @@ void main() {
       expect(
         tester.getTopLeft(find.text('Plot 2, Kampala')).dy <
             tester.getTopLeft(find.text('Plot 1, Kampala')).dy,
+        isTrue,
+      );
+    });
+
+    testWidgets('includes addresses from past orders and ranks by combined use',
+        (tester) async {
+      when(() => customersRepo.getAll()).thenAnswer((_) async => [
+            _customer(
+                id: 'c1',
+                name: 'Ann',
+                phone: '+256 700 000 001',
+                address: 'Bugolobi, Kampala'),
+          ]);
+      LaundryOrder order(String id, String address) => LaundryOrder(
+            orderId: id,
+            customerName: 'X',
+            serviceType: ServiceType.washAndIron,
+            status: OrderStatus.pendingPickup,
+            timeLabel: '',
+            itemCount: 0,
+            phone: '0',
+            address: address,
+            notes: '',
+          );
+      when(() => ordersRepo.watchAll()).thenAnswer((_) => Stream.value([
+            order('o1', 'Ntinda, Kampala'),
+            order('o2', 'Ntinda, Kampala'),
+          ]));
+      await pumpFormAndOpen(tester);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('np_address')), 'kampala');
+      await tester.pumpAndSettle();
+
+      // The order-only address is offered, and (used twice across orders) it
+      // ranks above the customer address that was used only once.
+      expect(find.text('Ntinda, Kampala'), findsOneWidget);
+      expect(find.text('Bugolobi, Kampala'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Ntinda, Kampala')).dy <
+            tester.getTopLeft(find.text('Bugolobi, Kampala')).dy,
         isTrue,
       );
     });

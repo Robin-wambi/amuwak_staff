@@ -62,6 +62,9 @@ void main() {
         .thenAnswer((_) async => 'AMW-2026-0001');
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    // initState loads address suggestions from customers + orders.
+    when(() => ordersRepo.watchAll())
+        .thenAnswer((_) => Stream.value(const <LaundryOrder>[]));
   });
 
   Widget buildScreen({double defaultRatePerKgUgx = 5000}) {
