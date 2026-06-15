@@ -100,24 +100,27 @@ extension OrderListSearch on List<LaundryOrder> {
   /// A bare-number query (e.g. `4` or `0042`) is treated as an order number and
   /// matched against the code's [orderCodeNumber] *exactly*, so a rider can type
   /// just the number off a bag instead of the full `AMW-2026-0042` — and typing
-  /// `4` finds order #4 only, not every code that happens to contain a 4.
+  /// `4` finds order #4 only, not every code that happens to contain a 4. A bare
+  /// number only ever matches an order code or a phone (a typed phone number is
+  /// digits too); it deliberately does NOT match names or addresses, so the
+  /// digit in "4th Avenue" can't surface unrelated orders.
   List<LaundryOrder> searchBy(String query) {
     final raw = query.trim();
     if (raw.isEmpty) return this;
     final q = raw.toLowerCase();
     final queryDigits = ugandaNationalDigits(q);
-    final queryNumber =
-        RegExp(r'^\d+$').hasMatch(raw) ? int.tryParse(raw) : null;
+    bool phoneMatches(LaundryOrder o) =>
+        queryDigits.isNotEmpty &&
+        ugandaNationalDigits(o.phone).contains(queryDigits);
+    final queryNumber = isBareOrderNumber(raw) ? int.tryParse(raw) : null;
     return where((o) {
       if (queryNumber != null) {
-        if (orderCodeNumber(o.orderCode) == queryNumber) return true;
-      } else if (o.orderCode.toLowerCase().contains(q)) {
-        return true;
+        return orderCodeNumber(o.orderCode) == queryNumber || phoneMatches(o);
       }
-      return o.customerName.toLowerCase().contains(q) ||
+      return o.orderCode.toLowerCase().contains(q) ||
+          o.customerName.toLowerCase().contains(q) ||
           o.address.toLowerCase().contains(q) ||
-          (queryDigits.isNotEmpty &&
-              ugandaNationalDigits(o.phone).contains(queryDigits));
+          phoneMatches(o);
     }).toList(growable: false);
   }
 }

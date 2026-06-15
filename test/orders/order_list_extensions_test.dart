@@ -153,6 +153,35 @@ void main() {
       expect([y2025, y2026].searchBy('6'), [y2025, y2026]);
     });
 
+    test('a bare number does not match names or addresses containing the digit',
+        () {
+      // Typing "4" must not surface a "4th Avenue" address or a name with a 4 —
+      // a bare number is an order # (or a phone), never a name/address.
+      final noise = _searchBase.copyWith(
+        orderCode: 'AMW-2026-0070',
+        phone: '0700000000',
+        address: '4th Avenue',
+        customerName: 'Plot 4 Holdings',
+      );
+      final four = _searchBase.copyWith(
+        orderCode: 'AMW-2026-0004',
+        phone: '0700000000',
+        address: 'No digits here',
+        customerName: 'Jane',
+      );
+      expect([noise, four].searchBy('4'), [four]);
+    });
+
+    test('a bare number still matches a phone (phone search is unchanged)', () {
+      // A typed phone number is digits-only too; it must keep matching by phone
+      // even though it is a "bare number".
+      final order = _searchBase.copyWith(
+        orderCode: 'AMW-2026-0001',
+        phone: '0788123456',
+      );
+      expect([order].searchBy('788123456'), [order]);
+    });
+
     test('matches on customer name (partial, case-insensitive)', () {
       expect(orders.searchBy('jane'), [_searchBase]);
       expect(orders.searchBy('JONES'), [other]);

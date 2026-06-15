@@ -53,6 +53,10 @@ String parseOrderCodeRpcResult(Object? result) {
 /// keeps short entry self-updating across calendar years: codes carry their own
 /// real year, so nothing here hardcodes the current one.
 int? orderCodeNumber(String input) {
-  final match = RegExp(r'(\d+)\s*$').firstMatch(input.trim());
+  final match = RegExp(r'(\d+)$').firstMatch(input.trim());
   return match == null ? null : int.tryParse(match.group(1)!);
 }
+
+/// Whether [input] is a bare order number — digits only, e.g. `4` or `0042` —
+/// the short form a rider types in place of the full `AMW-2026-0042`.
+bool isBareOrderNumber(String input) => RegExp(r'^\d+$').hasMatch(input.trim());

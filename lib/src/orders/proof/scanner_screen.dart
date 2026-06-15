@@ -56,7 +56,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     // match it by counter; a value carrying the AMW-/year format (e.g. a
     // scanned QR from a different year) must still match the full string, so a
     // same-counter tag from another year is correctly rejected below.
-    final isBareNumber = RegExp(r'^\d+$').hasMatch(trimmed);
+    final isBareNumber = isBareOrderNumber(trimmed);
     final expectedNumber = orderCodeNumber(widget.expectedOrderCode);
     final matched = isBareNumber
         ? expectedNumber != null && orderCodeNumber(trimmed) == expectedNumber
