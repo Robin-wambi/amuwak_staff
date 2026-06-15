@@ -124,7 +124,9 @@ void main() {
       expect(orders.searchBy('   '), orders);
     });
 
-    test('matches on order code (partial, case-insensitive)', () {
+    test('matches on order code: by number, or case-insensitive substring', () {
+      // '0042' is a bare number → matched by counter; the full code is matched
+      // as a case-insensitive substring.
       expect(orders.searchBy('0042'), [_searchBase]);
       expect(orders.searchBy('amw-2026-0042'), [_searchBase]);
     });
