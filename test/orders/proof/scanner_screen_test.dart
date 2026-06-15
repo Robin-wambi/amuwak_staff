@@ -206,6 +206,90 @@ void main() {
   );
 
   testWidgets(
+    'manual entry path: a bare number matches the expected code by counter',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-2026-0042',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order code instead'));
+      await tester.pumpAndSettle();
+
+      // The rider types just the number off the bag, not the full code.
+      await tester.enterText(find.byType(TextFormField), '42');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ScannerScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'manual entry path: a zero-padded bare number matches too',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-2026-0042',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order code instead'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField), '0042');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ScannerScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'manual entry path: a bare number for a different order fails',
+    (tester) async {
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-2026-0042',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order code instead'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField), '43');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Submit'));
+      await tester.pump();
+
+      expect(find.byType(ScannerScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a full code with the same counter but a different year is rejected',
+    (tester) async {
+      // Cross-year safety: scanning another year's QR that shares the counter
+      // must NOT verify. Only a BARE number is matched by counter; a formatted
+      // code is compared in full, year included.
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-2026-0042',
+        scannedValue: 'AMW-2025-0042',
+      );
+
+      await tester.tap(find.text('Simulate scan'));
+      await tester.pump();
+
+      expect(find.byType(ScannerScreen), findsOneWidget);
+      expect(
+        find.textContaining('belongs to order #AMW-2025-0042'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'manual-entry affordances are labelled "order code", not "order ID"',
     (tester) async {
       await _pumpAndPushScanner(
