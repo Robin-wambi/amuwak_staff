@@ -42,4 +42,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('static'), findsOneWidget);
   });
+
+  testWidgets('reacts to reduce-motion toggled at runtime', (tester) async {
+    final reduceMotion = ValueNotifier<bool>(true);
+    addTearDown(reduceMotion.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ValueListenableBuilder<bool>(
+              valueListenable: reduceMotion,
+              builder: (context, reduce, _) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: reduce),
+                child: const AnimatedGradientHeader(child: Text('header')),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Reduced motion: the ticker is idle, so the tree settles.
+    await tester.pumpAndSettle();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+
+    // Toggle off: the sheen resumes, so a frame is always scheduled.
+    reduceMotion.value = false;
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isTrue);
+
+    // Toggle back on: the sheen freezes and the tree settles again.
+    reduceMotion.value = true;
+    await tester.pumpAndSettle();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+  });
 }
