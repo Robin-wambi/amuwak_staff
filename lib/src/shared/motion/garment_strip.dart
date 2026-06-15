@@ -75,18 +75,22 @@ class _GarmentStripState extends State<GarmentStrip> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // React to runtime reduce-motion toggles: run the timer only while motion
-    // is allowed, and stop it (static strip) the moment it isn't. Subscribing
-    // to just the disableAnimations aspect avoids needless rebuilds.
-    _syncAutoAdvance(MediaQuery.disableAnimationsOf(context));
+    _syncAutoAdvance();
   }
 
-  void _syncAutoAdvance(bool reduceMotion) {
-    if (reduceMotion) {
+  /// Runs the auto-advance timer only while motion is allowed *and* this
+  /// subtree's tickers are active — i.e. the strip is on-screen, not muted by a
+  /// pushed route. Re-evaluated on every dependency change, so it reacts to
+  /// reduce-motion toggles and to the strip being covered / revealed (matching
+  /// how a ticker-driven [AnimationController] would pause when obscured).
+  void _syncAutoAdvance() {
+    final shouldRun =
+        !MediaQuery.disableAnimationsOf(context) && TickerMode.of(context);
+    if (shouldRun) {
+      _timer ??= Timer.periodic(widget.autoAdvanceInterval, (_) => _advance());
+    } else {
       _timer?.cancel();
       _timer = null;
-    } else {
-      _timer ??= Timer.periodic(widget.autoAdvanceInterval, (_) => _advance());
     }
   }
 

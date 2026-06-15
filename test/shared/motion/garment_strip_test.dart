@@ -147,5 +147,47 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       expect(lastPage, 1); // unchanged
     });
+
+    testWidgets('pauses while its subtree is muted, resumes when revealed',
+        (tester) async {
+      final ticking = ValueNotifier<bool>(false);
+      addTearDown(ticking.dispose);
+      int? lastPage;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ValueListenableBuilder<bool>(
+                valueListenable: ticking,
+                builder: (context, enabled, _) => TickerMode(
+                  enabled: enabled,
+                  child: SizedBox(
+                    height: 84,
+                    child: GarmentStrip(
+                      itemBuilder: _labelBuilder,
+                      onPageChanged: (i) => lastPage = i,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Muted (e.g. obscured by a pushed route): no auto-advance even though
+      // reduce-motion is off.
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(lastPage, isNull);
+
+      // Revealed again: the strip resumes advancing.
+      ticking.value = true;
+      await tester.pump(); // rebuild -> didChangeDependencies starts the timer
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(lastPage, 1);
+    });
   });
 }
