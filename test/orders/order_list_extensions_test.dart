@@ -129,6 +129,30 @@ void main() {
       expect(orders.searchBy('amw-2026-0042'), [_searchBase]);
     });
 
+    test('a bare number matches the exact order number, not a digit anywhere',
+        () {
+      // Typing "4" should find order #4 only — NOT #40, #14, or a code whose
+      // year digits happen to contain a 4. Leading zeros are irrelevant.
+      // Phones here are digit-"4"-free so this isolates code matching from the
+      // (intentionally unchanged) phone search.
+      final base = _searchBase.copyWith(phone: '0700000000');
+      final four = base.copyWith(orderCode: 'AMW-2026-0004');
+      final forty = base.copyWith(orderCode: 'AMW-2026-0040');
+      final fourteen = base.copyWith(orderCode: 'AMW-2026-0014');
+      final yearHasFour = base.copyWith(orderCode: 'AMW-2024-0099');
+      final list = [four, forty, fourteen, yearHasFour];
+
+      expect(list.searchBy('4'), [four]);
+      expect(list.searchBy('0004'), [four]);
+    });
+
+    test('a bare number matches the same order number across years', () {
+      final base = _searchBase.copyWith(phone: '0700000000');
+      final y2025 = base.copyWith(orderCode: 'AMW-2025-0006');
+      final y2026 = base.copyWith(orderCode: 'AMW-2026-0006');
+      expect([y2025, y2026].searchBy('6'), [y2025, y2026]);
+    });
+
     test('matches on customer name (partial, case-insensitive)', () {
       expect(orders.searchBy('jane'), [_searchBase]);
       expect(orders.searchBy('JONES'), [other]);
