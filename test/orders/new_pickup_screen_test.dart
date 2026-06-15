@@ -729,6 +729,88 @@ void main() {
     expect(handle.popped, isNotNull);
   });
 
+  group('Address auto-suggest', () {
+    testWidgets('suggests a previously-used address and fills it on tap',
+        (tester) async {
+      when(() => customersRepo.getAll()).thenAnswer((_) async => [
+            _customer(
+                id: 'c1',
+                name: 'Ann',
+                phone: '+256 700 000 001',
+                address: 'Kololo, Kampala'),
+          ]);
+      await pumpFormAndOpen(tester);
+      await tester.pumpAndSettle(); // let the initState suggestion load finish
+
+      await tester.enterText(find.byKey(const Key('np_address')), 'kol');
+      await tester.pumpAndSettle();
+
+      // The matching previous address is offered in the overlay.
+      expect(find.text('Kololo, Kampala'), findsOneWidget);
+
+      await tester.tap(find.text('Kololo, Kampala'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('np_address')))
+            .controller!
+            .text,
+        'Kololo, Kampala',
+      );
+    });
+
+    testWidgets('orders suggestions by how commonly the address is used',
+        (tester) async {
+      when(() => customersRepo.getAll()).thenAnswer((_) async => [
+            _customer(
+                id: 'a',
+                name: 'A',
+                phone: '+256 700 000 001',
+                address: 'Plot 1, Kampala'),
+            _customer(
+                id: 'b',
+                name: 'B',
+                phone: '+256 700 000 002',
+                address: 'Plot 2, Kampala'),
+            _customer(
+                id: 'c',
+                name: 'C',
+                phone: '+256 700 000 003',
+                address: 'Plot 2, Kampala'),
+          ]);
+      await pumpFormAndOpen(tester);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('np_address')), 'kampala');
+      await tester.pumpAndSettle();
+
+      // "Plot 2, Kampala" (used twice) ranks above "Plot 1, Kampala" (used once).
+      expect(
+        tester.getTopLeft(find.text('Plot 2, Kampala')).dy <
+            tester.getTopLeft(find.text('Plot 1, Kampala')).dy,
+        isTrue,
+      );
+    });
+
+    testWidgets('shows no suggestion when nothing matches', (tester) async {
+      when(() => customersRepo.getAll()).thenAnswer((_) async => [
+            _customer(
+                id: 'c1',
+                name: 'Ann',
+                phone: '+256 700 000 001',
+                address: 'Kololo, Kampala'),
+          ]);
+      await pumpFormAndOpen(tester);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('np_address')), 'zzz');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kololo, Kampala'), findsNothing);
+    });
+  });
+
   group('scheduledTimeIsInPast', () {
     final now = DateTime(2026, 5, 25, 14, 30, 45);
 

@@ -62,7 +62,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _phoneController = TextEditingController(text: '+256 ');
   final _addressController = TextEditingController();
   final _phoneFocus = FocusNode();
+  final _addressFocus = FocusNode();
   ServiceType? _serviceType;
+  // Distinct previously-used customer addresses, most-common first, for the
+  // address field's auto-suggest. Best-effort: empty if the one-shot load fails.
+  List<String> _addressSuggestions = const [];
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
@@ -172,6 +176,33 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   void initState() {
     super.initState();
     _phoneFocus.addListener(_onPhoneFocusChange);
+    _loadAddressSuggestions();
+  }
+
+  /// Loads distinct customer addresses, ranked by how often they occur, to feed
+  /// the address field's auto-suggest. Best-effort: a failure leaves the list
+  /// empty (the field still works as a plain text input).
+  Future<void> _loadAddressSuggestions() async {
+    try {
+      final customers = await widget.customersRepo.getAll();
+      final counts = <String, int>{};
+      final firstSeen = <String, String>{};
+      for (final c in customers) {
+        final addr = c.address?.trim();
+        if (addr == null || addr.isEmpty) continue;
+        final key = addr.toLowerCase();
+        counts[key] = (counts[key] ?? 0) + 1;
+        firstSeen.putIfAbsent(key, () => addr);
+      }
+      final ranked = counts.keys.toList()
+        ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+      if (!mounted) return;
+      setState(() => _addressSuggestions =
+          ranked.map((k) => firstSeen[k]!).toList(growable: false));
+    } catch (e, st) {
+      developer.log('Address suggestions load failed.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
+    }
   }
 
   bool get _canSubmit =>
@@ -417,6 +448,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   void dispose() {
     _phoneFocus.removeListener(_onPhoneFocusChange);
     _phoneFocus.dispose();
+    _addressFocus.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -470,11 +502,57 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              key: const Key('np_address'),
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address'),
-              onChanged: (_) => setState(() {}),
+            RawAutocomplete<String>(
+              // Reuse the existing controller/focus so "Use my location" and the
+              // phone-match prefill (which set _addressController.text) keep
+              // working and the field stays the source of truth at submit.
+              textEditingController: _addressController,
+              focusNode: _addressFocus,
+              optionsBuilder: (value) {
+                final q = value.text.trim().toLowerCase();
+                if (q.isEmpty) return const Iterable<String>.empty();
+                return _addressSuggestions
+                    .where((a) => a.toLowerCase().contains(q))
+                    .take(5);
+              },
+              onSelected: (_) => setState(() {}),
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                return TextFormField(
+                  key: const Key('np_address'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(labelText: 'Address'),
+                  onChanged: (_) => setState(() {}),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 240),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final option = options.elementAt(index);
+                          return InkWell(
+                            onTap: () => onSelected(option),
+                            child: ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.history, size: 18),
+                              title: Text(option),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             Align(
