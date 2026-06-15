@@ -62,7 +62,14 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _phoneController = TextEditingController(text: '+256 ');
   final _addressController = TextEditingController();
   final _phoneFocus = FocusNode();
+  final _addressFocus = FocusNode();
   ServiceType? _serviceType;
+  // Distinct previously-used addresses (customers + orders), most-common first,
+  // for the address field's auto-suggest. Best-effort: empty if the load fails.
+  List<String> _addressSuggestions = const [];
+  // The address field's measured width, so the suggestion overlay matches it
+  // instead of stretching full-screen on tablets/landscape.
+  double _addressFieldWidth = double.infinity;
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
@@ -172,6 +179,54 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   void initState() {
     super.initState();
     _phoneFocus.addListener(_onPhoneFocusChange);
+    _loadAddressSuggestions();
+  }
+
+  /// Loads distinct addresses used across customers and orders, ranked by how
+  /// often they occur, to feed the address field's auto-suggest. Each source is
+  /// best-effort and independent: customer addresses publish first, then orders
+  /// augment the ranking, so a slow/failing orders read can't block suggestions
+  /// (and a failure in either just logs and leaves that source out).
+  Future<void> _loadAddressSuggestions() async {
+    final counts = <String, int>{};
+    final firstSeen = <String, String>{};
+
+    void tally(String? raw) {
+      final addr = raw?.trim();
+      if (addr == null || addr.isEmpty) return;
+      final key = addr.toLowerCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+      firstSeen.putIfAbsent(key, () => addr);
+    }
+
+    void publish() {
+      if (!mounted) return;
+      final ranked = counts.keys.toList()
+        ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+      setState(() => _addressSuggestions =
+          ranked.map((k) => firstSeen[k]!).toList(growable: false));
+    }
+
+    // Kick off the orders read alongside the customers read so they overlap.
+    final ordersFuture = widget.ordersRepo.getAll();
+    try {
+      for (final c in await widget.customersRepo.getAll()) {
+        tally(c.address);
+      }
+      publish();
+    } catch (e, st) {
+      developer.log('Customer address suggestions load failed.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
+    }
+    try {
+      for (final o in await ordersFuture) {
+        tally(o.address);
+      }
+      publish();
+    } catch (e, st) {
+      developer.log('Order address suggestions load failed.',
+          name: 'NewPickupScreen', error: e, stackTrace: st);
+    }
   }
 
   bool get _canSubmit =>
@@ -417,6 +472,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   void dispose() {
     _phoneFocus.removeListener(_onPhoneFocusChange);
     _phoneFocus.dispose();
+    _addressFocus.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -470,11 +526,62 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              key: const Key('np_address'),
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address'),
-              onChanged: (_) => setState(() {}),
+            RawAutocomplete<String>(
+              // Reuse the existing controller/focus so "Use my location" and the
+              // phone-match prefill (which set _addressController.text) keep
+              // working and the field stays the source of truth at submit.
+              textEditingController: _addressController,
+              focusNode: _addressFocus,
+              optionsBuilder: (value) {
+                final q = value.text.trim().toLowerCase();
+                if (q.isEmpty) return const Iterable<String>.empty();
+                return _addressSuggestions
+                    .where((a) => a.toLowerCase().contains(q))
+                    .take(5);
+              },
+              onSelected: (_) => setState(() {}),
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                return LayoutBuilder(builder: (context, constraints) {
+                  // Cache the field width so the overlay below can match it.
+                  _addressFieldWidth = constraints.maxWidth;
+                  return TextFormField(
+                    key: const Key('np_address'),
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                    onChanged: (_) => setState(() {}),
+                  );
+                });
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          maxHeight: 240, maxWidth: _addressFieldWidth),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final option = options.elementAt(index);
+                          return InkWell(
+                            onTap: () => onSelected(option),
+                            child: ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.history, size: 18),
+                              title: Text(option),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             Align(
