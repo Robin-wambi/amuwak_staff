@@ -59,4 +59,7 @@ int? orderCodeNumber(String input) {
 
 /// Whether [input] is a bare order number — digits only, e.g. `4` or `0042` —
 /// the short form a rider types in place of the full `AMW-2026-0042`.
+///
+/// Tolerates surrounding whitespace, matching `int.tryParse` (which also
+/// accepts `' 42 '`), so the predicate and the subsequent parse never disagree.
 bool isBareOrderNumber(String input) => RegExp(r'^\d+$').hasMatch(input.trim());

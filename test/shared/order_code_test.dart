@@ -96,7 +96,6 @@ void main() {
     test('is true for digits only, with or without leading zeros', () {
       expect(isBareOrderNumber('4'), isTrue);
       expect(isBareOrderNumber('0042'), isTrue);
-      expect(isBareOrderNumber('  42  '), isTrue);
     });
 
     test('is false for a formatted code or anything non-numeric', () {
@@ -104,6 +103,13 @@ void main() {
       expect(isBareOrderNumber('AMW-1024'), isFalse);
       expect(isBareOrderNumber('42a'), isFalse);
       expect(isBareOrderNumber(''), isFalse);
+    });
+
+    test('tolerates whitespace, staying aligned with int.tryParse', () {
+      // int.tryParse also accepts a padded number, so the predicate must too —
+      // otherwise the gate and the parse in searchBy could disagree.
+      expect(isBareOrderNumber('  42  '), isTrue);
+      expect(int.tryParse('  42  '), 42);
     });
   });
 }
