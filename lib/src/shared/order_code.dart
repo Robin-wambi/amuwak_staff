@@ -38,3 +38,21 @@ String parseOrderCodeRpcResult(Object? result) {
   }
   throw StateError('next_order_code RPC returned an unexpected shape: $result');
 }
+
+/// The order's numeric counter — the `NNNN` suffix — with any `AMW-`/year
+/// prefix and leading zeros stripped, or null when there's no trailing digit
+/// run to parse.
+///
+/// Lets a rider type just the order number instead of the full code, matching
+/// it against whatever shape we hold or they type:
+///   'AMW-2026-0042' -> 42     (current prefix-year-counter form)
+///   'AMW-1024'      -> 1024   (legacy digits-only form)
+///   '0042' / '42'   -> 42     (bare number a rider types)
+///
+/// Matching on the trailing counter — rather than the embedded year — is what
+/// keeps short entry self-updating across calendar years: codes carry their own
+/// real year, so nothing here hardcodes the current one.
+int? orderCodeNumber(String input) {
+  final match = RegExp(r'(\d+)\s*$').firstMatch(input.trim());
+  return match == null ? null : int.tryParse(match.group(1)!);
+}

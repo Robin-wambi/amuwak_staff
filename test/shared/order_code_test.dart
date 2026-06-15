@@ -64,4 +64,31 @@ void main() {
           throwsStateError);
     });
   });
+
+  group('orderCodeNumber', () {
+    test('extracts the counter from the current AMW-YYYY-NNNN form', () {
+      expect(orderCodeNumber('AMW-2026-0042'), 42);
+    });
+
+    test('extracts the digits from the legacy AMW-NNNN form', () {
+      expect(orderCodeNumber('AMW-1024'), 1024);
+    });
+
+    test('parses a bare number a rider types, ignoring leading zeros', () {
+      expect(orderCodeNumber('0042'), 42);
+      expect(orderCodeNumber('42'), 42);
+      expect(orderCodeNumber('4'), 4);
+    });
+
+    test('is case-insensitive and tolerates surrounding whitespace', () {
+      expect(orderCodeNumber('  amw-2026-0007  '), 7);
+    });
+
+    test('returns null when there is no trailing digit run', () {
+      expect(orderCodeNumber(''), isNull);
+      expect(orderCodeNumber('   '), isNull);
+      expect(orderCodeNumber('AMW-'), isNull);
+      expect(orderCodeNumber('abc'), isNull);
+    });
+  });
 }
