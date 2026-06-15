@@ -64,9 +64,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   final _phoneFocus = FocusNode();
   final _addressFocus = FocusNode();
   ServiceType? _serviceType;
-  // Distinct previously-used customer addresses, most-common first, for the
-  // address field's auto-suggest. Best-effort: empty if the one-shot load fails.
+  // Distinct previously-used addresses (customers + orders), most-common first,
+  // for the address field's auto-suggest. Best-effort: empty if the load fails.
   List<String> _addressSuggestions = const [];
+  // The address field's measured width, so the suggestion overlay matches it
+  // instead of stretching full-screen on tablets/landscape.
+  double _addressFieldWidth = double.infinity;
   bool _saving = false;
   bool _locating = false;
   String? _matchedCustomerId;
@@ -205,7 +208,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     }
 
     // Kick off the orders read alongside the customers read so they overlap.
-    final ordersFuture = widget.ordersRepo.watchAll().first;
+    final ordersFuture = widget.ordersRepo.getAll();
     try {
       for (final c in await widget.customersRepo.getAll()) {
         tally(c.address);
@@ -539,13 +542,17 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               onSelected: (_) => setState(() {}),
               fieldViewBuilder:
                   (context, controller, focusNode, onFieldSubmitted) {
-                return TextFormField(
-                  key: const Key('np_address'),
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: const InputDecoration(labelText: 'Address'),
-                  onChanged: (_) => setState(() {}),
-                );
+                return LayoutBuilder(builder: (context, constraints) {
+                  // Cache the field width so the overlay below can match it.
+                  _addressFieldWidth = constraints.maxWidth;
+                  return TextFormField(
+                    key: const Key('np_address'),
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                    onChanged: (_) => setState(() {}),
+                  );
+                });
               },
               optionsViewBuilder: (context, onSelected, options) {
                 return Align(
@@ -553,7 +560,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   child: Material(
                     elevation: 4,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 240),
+                      constraints: BoxConstraints(
+                          maxHeight: 240, maxWidth: _addressFieldWidth),
                       child: ListView.builder(
                         padding: EdgeInsets.zero,
                         shrinkWrap: true,

@@ -73,8 +73,8 @@ void main() {
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
     // initState loads address suggestions from customers + orders.
-    when(() => ordersRepo.watchAll())
-        .thenAnswer((_) => Stream.value(const <LaundryOrder>[]));
+    when(() => ordersRepo.getAll())
+        .thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
   /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
@@ -816,10 +816,10 @@ void main() {
             address: address,
             notes: '',
           );
-      when(() => ordersRepo.watchAll()).thenAnswer((_) => Stream.value([
+      when(() => ordersRepo.getAll()).thenAnswer((_) async => [
             order('o1', 'Ntinda, Kampala'),
             order('o2', 'Ntinda, Kampala'),
-          ]));
+          ]);
       await pumpFormAndOpen(tester);
       await tester.pumpAndSettle();
 

@@ -63,8 +63,8 @@ void main() {
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
     // initState loads address suggestions from customers + orders.
-    when(() => ordersRepo.watchAll())
-        .thenAnswer((_) => Stream.value(const <LaundryOrder>[]));
+    when(() => ordersRepo.getAll())
+        .thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
   /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
