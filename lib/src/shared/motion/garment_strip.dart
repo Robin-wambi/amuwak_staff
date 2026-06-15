@@ -21,10 +21,8 @@ class Garment {
 /// Builds the visual for a single [Garment] page. Defaults to rendering the
 /// bundled SVG illustration; tests inject a lightweight placeholder so they
 /// don't depend on asset loading.
-typedef GarmentItemBuilder = Widget Function(
-  BuildContext context,
-  Garment garment,
-);
+typedef GarmentItemBuilder =
+    Widget Function(BuildContext context, Garment garment);
 
 /// A slim, auto-advancing carousel of the garments the team launders, sitting
 /// beneath the dashboard header text on the brand gradient. It slides through
@@ -74,8 +72,6 @@ class _GarmentStripState extends State<GarmentStrip> {
   // rather than wrapping, so we never rewind across the whole strip at once.
   int _direction = 1;
 
-  List<Garment> get _garments => GarmentStrip.defaultGarments;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -98,7 +94,7 @@ class _GarmentStripState extends State<GarmentStrip> {
     if (!_controller.hasClients) return;
     // Flip direction at either end so the slide reverses instead of rewinding
     // the whole strip back to the start.
-    if (_index >= _garments.length - 1) {
+    if (_index >= GarmentStrip.defaultGarments.length - 1) {
       _direction = -1;
     } else if (_index <= 0) {
       _direction = 1;
@@ -106,7 +102,7 @@ class _GarmentStripState extends State<GarmentStrip> {
     // Clamp guards against overshooting a boundary if a caller sets an
     // interval shorter than the slide animation, leaving _index lagging.
     _controller.animateToPage(
-      (_index + _direction).clamp(0, _garments.length - 1),
+      (_index + _direction).clamp(0, GarmentStrip.defaultGarments.length - 1),
       duration: AppMotion.medium,
       curve: AppMotion.standard,
     );
@@ -130,8 +126,13 @@ class _GarmentStripState extends State<GarmentStrip> {
     return PageView.builder(
       controller: _controller,
       onPageChanged: _onPageChanged,
-      itemCount: _garments.length,
-      itemBuilder: (context, i) => builder(context, _garments[i]),
+      // Decorative auto-advancing strip: it drives itself, so don't let a
+      // user drag compete with the surrounding ListView. animateToPage still
+      // moves it programmatically.
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: GarmentStrip.defaultGarments.length,
+      itemBuilder: (context, i) =>
+          builder(context, GarmentStrip.defaultGarments[i]),
     );
   }
 
