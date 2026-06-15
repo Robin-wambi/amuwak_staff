@@ -90,6 +90,18 @@ class _GarmentStripState extends State<GarmentStrip> {
     }
   }
 
+  @override
+  void didUpdateWidget(GarmentStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Pick up a changed interval on a running timer; restart it with the new
+    // cadence. (Idle under reduce-motion: the next start uses the new value.)
+    if (widget.autoAdvanceInterval != oldWidget.autoAdvanceInterval &&
+        _timer != null) {
+      _timer!.cancel();
+      _timer = Timer.periodic(widget.autoAdvanceInterval, (_) => _advance());
+    }
+  }
+
   void _advance() {
     if (!_controller.hasClients) return;
     // Flip direction at either end so the slide reverses instead of rewinding

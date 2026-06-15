@@ -100,7 +100,7 @@ void main() {
       expect(lastPage, isNull);
     });
 
-    testWidgets('starts sliding when reduce-motion is turned off at runtime',
+    testWidgets('reacts to reduce-motion toggled off then on at runtime',
         (tester) async {
       final reduceMotion = ValueNotifier<bool>(true);
       addTearDown(reduceMotion.dispose);
@@ -139,6 +139,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 2800));
       await tester.pump(const Duration(milliseconds: 600));
       expect(lastPage, 1);
+
+      // Toggle it back on; the timer is cancelled, so it stops advancing.
+      reduceMotion.value = true;
+      await tester.pump(); // rebuild -> didChangeDependencies cancels the timer
+      await tester.pump(const Duration(milliseconds: 2800));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(lastPage, 1); // unchanged
     });
   });
 }
