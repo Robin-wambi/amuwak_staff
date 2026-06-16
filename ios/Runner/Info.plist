@@ -49,5 +49,7 @@
 	<string>Amuwak Staff uses the camera to scan order QR tags and capture pickup and delivery proof photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used to pre-fill the customer address when you create a new pickup.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Amuwak Staff connects to a nearby Bluetooth thermal printer to print order bag tags.</string>
 </dict>
 </plist>

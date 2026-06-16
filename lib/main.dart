@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'src/auth/login_screen.dart';
 import 'src/bootstrap/app_bootstrap.dart';
+import 'src/printing/printing_providers.dart';
 import 'src/shared/widgets/app_theme.dart';
 // ONLINE-ONLY: the sync orchestrator (offline engine) is disabled. Re-add this
 // import and the `ref.watch(syncLifecycleProvider)` below to restore offline.
@@ -9,7 +11,14 @@ import 'src/shared/widgets/app_theme.dart';
 
 Future<void> main() async {
   await AppBootstrap.initialize();
-  runApp(const ProviderScope(child: AmuwakStaffApp()));
+  // Resolved once here so screens can read PrinterStore synchronously.
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      child: const AmuwakStaffApp(),
+    ),
+  );
 }
 
 class AmuwakStaffApp extends ConsumerWidget {

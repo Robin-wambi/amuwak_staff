@@ -31,6 +31,7 @@ import '../shared/theme/app_spacing.dart';
 import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../shared/uuid.dart';
+import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
 // orchestrator, local DB) are disabled. Re-add these imports with the
@@ -257,6 +258,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           ordersRepo: ref.read(ordersRepositoryProvider),
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
+          labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );
@@ -287,6 +290,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           ordersRepo: ref.read(ordersRepositoryProvider),
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
+          labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );

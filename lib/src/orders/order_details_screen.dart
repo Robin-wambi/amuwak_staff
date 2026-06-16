@@ -6,6 +6,8 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
+import '../printing/label_printer.dart';
+import '../printing/printer_store.dart';
 import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
@@ -18,8 +20,10 @@ import 'proof_event.dart';
 import 'proof/barcode_reader.dart';
 import 'proof/delivery_capture_screen.dart';
 import 'proof/pickup_capture_screen.dart';
+import 'proof/printable_tag.dart';
 import 'proof/proof_photo_storage.dart';
 import 'proof/scanner_screen.dart';
+import 'proof/tag_print_view.dart';
 
 DateTime _defaultClock() => DateTime.now();
 
@@ -34,6 +38,9 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.proofEventsRepo,
     required this.actorStaffId,
     this.clock = _defaultClock,
+    this.labelPrinter,
+    this.printerStore,
+    this.captureTag = captureTagPng,
   });
 
   final LaundryOrder order;
@@ -44,6 +51,16 @@ class OrderDetailsScreen extends StatefulWidget {
   final ProofEventsRepository proofEventsRepo;
   final String actorStaffId;
   final DateTime Function() clock;
+
+  /// Label printer for bag tags, threaded through to pickup capture and the
+  /// reprint sheet. Null at a printerless site (the print action doesn't appear).
+  final LabelPrinter? labelPrinter;
+
+  /// Remembers the last printer so the rider needn't re-pick it each shift.
+  final PrinterStore? printerStore;
+
+  /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
+  final TagCapturer captureTag;
 
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
@@ -154,6 +171,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ordersRepo: widget.ordersRepo,
           proofEventsRepo: widget.proofEventsRepo,
           actorStaffId: widget.actorStaffId,
+          labelPrinter: widget.labelPrinter,
         ),
       ),
     );
@@ -198,6 +216,43 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         _order = _order.copyWith(status: OrderStatus.completed);
       });
     }
+  }
+
+  /// The bag is tagged once it's cleaned, then scanned at delivery. Offer a
+  /// reprint while it's in the depot (in progress / ready) so a missing or
+  /// damaged tag can be replaced — but only when a printer is wired up.
+  bool get _canReprintTag =>
+      widget.labelPrinter != null &&
+      (_order.status == OrderStatus.inProgress ||
+          _order.status == OrderStatus.readyForDelivery);
+
+  Future<void> _reprintTag() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Reprint bag tag',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TagPrintView(
+                orderCode: _order.orderCode,
+                customerName: _order.customerName,
+                labelPrinter: widget.labelPrinter,
+                printerStore: widget.printerStore,
+                captureTag: widget.captureTag,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _handleBackNavigation() {
@@ -450,7 +505,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   AppSpacing.xl,
                   AppSpacing.xxl,
                 ),
-                child: _buildPrimaryAction(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_canReprintTag) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const Key('reprint_tag'),
+                          onPressed: _reprintTag,
+                          icon: const Icon(Icons.print_outlined),
+                          label: const Text('Reprint tag'),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    _buildPrimaryAction(),
+                  ],
+                ),
               ),
             ],
           ),

@@ -16,8 +16,11 @@ import '../pricing/line_item.dart';
 import '../pricing/pricing_calculator.dart';
 import '../pricing/pricing_inputs.dart';
 import '../pricing/pricing_section.dart';
+import '../../printing/label_printer.dart';
+import '../../printing/printer_store.dart';
+import 'printable_tag.dart';
 import 'proof_photo_storage.dart';
-import 'qr_display_widget.dart';
+import 'tag_print_view.dart';
 
 DateTime _defaultClock() => DateTime.now();
 
@@ -34,6 +37,9 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.actorStaffId,
     this.clock = _defaultClock,
     this.proofEventIdGenerator = defaultUuidV7,
+    this.labelPrinter,
+    this.printerStore,
+    this.captureTag = captureTagPng,
   });
 
   final LaundryOrder order;
@@ -44,6 +50,17 @@ class PickupCaptureScreen extends StatefulWidget {
   final ProofEventsRepository proofEventsRepo;
   final String actorStaffId;
   final String Function() proofEventIdGenerator;
+
+  /// Optional label printer. When null the "Print tag" action is hidden and the
+  /// screen falls back to its write-the-code / scan-on-screen guidance, so a
+  /// printerless site still works.
+  final LabelPrinter? labelPrinter;
+
+  /// Remembers the last printer so the rider needn't re-pick it each shift.
+  final PrinterStore? printerStore;
+
+  /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
+  final TagCapturer captureTag;
 
   @override
   State<PickupCaptureScreen> createState() => _PickupCaptureScreenState();
@@ -452,28 +469,43 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   }
 
   Widget _buildQrStage() {
+    final canPrint = widget.labelPrinter != null;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          Text(
-            'Tie tag to the bag',
-            style: Theme.of(context).textTheme.titleLarge,
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(
+                    'Tie tag to the bag',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    canPrint
+                        ? 'Print the tag and tie it to the bag, or write order '
+                            '#${widget.order.orderCode} on it.'
+                        : 'Write order #${widget.order.orderCode} on the bag, '
+                            'or scan this QR.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.secondaryText),
+                  ),
+                  const SizedBox(height: 24),
+                  TagPrintView(
+                    orderCode: widget.order.orderCode,
+                    customerName: widget.order.customerName,
+                    labelPrinter: widget.labelPrinter,
+                    printerStore: widget.printerStore,
+                    captureTag: widget.captureTag,
+                    buttonKey: const Key('pickup_print_tag'),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Write order #${widget.order.orderCode} on the bag, or scan this QR.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.secondaryText),
-          ),
-          const SizedBox(height: 24),
-          QrDisplayWidget(data: widget.order.orderCode),
           const SizedBox(height: 16),
-          Text(
-            widget.order.orderCode,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const Spacer(),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
