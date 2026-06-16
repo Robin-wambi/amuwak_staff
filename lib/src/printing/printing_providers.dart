@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,10 +14,12 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
   ),
 );
 
-/// The label printer the app drives. A single instance holds the live Bluetooth
-/// connection across screens. Tests override this with a fake.
-final labelPrinterProvider = Provider<LabelPrinter>(
-  (ref) => BluetoothLabelPrinter(),
+/// The label printer the app drives, or null where there's no Bluetooth-print
+/// path (the web PWA). A single instance holds the live connection across
+/// screens; a null printer hides the print/reprint actions. Tests inject a fake
+/// via the screen constructors.
+final labelPrinterProvider = Provider<LabelPrinter?>(
+  (ref) => kIsWeb ? null : BluetoothLabelPrinter(),
 );
 
 /// Persists the last-connected printer so the rider needn't re-pick it.
