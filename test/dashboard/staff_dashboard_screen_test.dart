@@ -26,6 +26,8 @@ import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/pricing/pricing_providers.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings_repository.dart';
+import 'package:amuwak_staff/src/sync/customers_repository.dart';
+import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
@@ -47,6 +49,14 @@ import 'package:amuwak_staff/src/sync/sync_status.dart';
 /// override it with a mock — the repo constructors only store the client (no
 /// calls), which is enough for navigation tests like "open New pickup".
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
+
+/// Stub repos so opening NewPickupScreen — whose initState reads orders +
+/// customers to seed the address auto-suggest — doesn't hit the unstubbed
+/// Supabase mock. Both reads resolve to empty lists, which is all the
+/// navigation tests need.
+class _StubOrdersRepository extends Mock implements OrdersRepository {}
+
+class _StubCustomersRepository extends Mock implements CustomersRepository {}
 
 /// Stub repository that always returns a settings row with [defaultRatePerKgUgx]
 /// so dashboard tests can open NewPickupScreen without hitting Supabase.
@@ -70,10 +80,19 @@ Future<void> pumpDashboardWithDb(
   bool lostPhoto = false,
   List<Override> extraOverrides = const [],
 }) async {
+  final stubOrdersRepo = _StubOrdersRepository();
+  final stubCustomersRepo = _StubCustomersRepository();
+  when(() => stubOrdersRepo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+  when(() => stubCustomersRepo.getAll())
+      .thenAnswer((_) async => <Customer>[]);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+        // Empty read-repos so NewPickupScreen's address-suggest init resolves
+        // without touching the unstubbed Supabase mock.
+        ordersRepositoryProvider.overrideWithValue(stubOrdersRepo),
+        customersRepositoryProvider.overrideWithValue(stubCustomersRepo),
         // Provide a trivial in-memory implementation of every Drift-backed
         // stream so that no real Drift stream subscriptions are opened.
         pendingOutboxCountProvider
