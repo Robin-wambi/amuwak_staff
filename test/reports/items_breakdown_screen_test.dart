@@ -70,6 +70,22 @@ void main() {
     expect(find.text('Cust none'), findsNothing);
   });
 
+  testWidgets('orders with equal item counts are ordered by orderCode',
+      (tester) async {
+    await _pump(tester, orders: [
+      _order('zebra', 5),
+      _order('apple', 5),
+      _order('mango', 5),
+    ]);
+
+    // Same itemCount, so the ascending orderCode tiebreak decides: apple < mango < zebra.
+    final appleY = tester.getTopLeft(find.text('Cust apple')).dy;
+    final mangoY = tester.getTopLeft(find.text('Cust mango')).dy;
+    final zebraY = tester.getTopLeft(find.text('Cust zebra')).dy;
+    expect(appleY, lessThan(mangoY));
+    expect(mangoY, lessThan(zebraY));
+  });
+
   testWidgets('tapping a row invokes onOrderTap with that order', (tester) async {
     LaundryOrder? tapped;
     await _pump(

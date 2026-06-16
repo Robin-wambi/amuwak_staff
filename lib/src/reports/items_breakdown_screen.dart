@@ -58,6 +58,9 @@ class ItemsBreakdownScreen extends ConsumerWidget {
       );
     }
 
+    // Sum over the FULL list (not just withItems) so this header equals the
+    // daily report's "Items" card count that opened this screen — orders with
+    // zero items contribute nothing, so the two always agree.
     final totalItems = orders.totalItems;
 
     return ListView.builder(
