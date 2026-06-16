@@ -54,6 +54,8 @@ class BluetoothLabelPrinter implements LabelPrinter {
 
   @override
   Future<void> connect(PrinterDevice device) async {
+    // connectionStatus (like disconnect below) is a static getter on the
+    // plugin, not a method — the missing () is intentional.
     if (_connected == device && await PrintBluetoothThermal.connectionStatus) {
       return;
     }
