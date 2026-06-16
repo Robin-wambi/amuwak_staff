@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../orders/order.dart';
+import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
 import '../shared/format_ugx.dart';
@@ -34,9 +35,21 @@ class DailyReportScreen extends StatelessWidget {
 }
 
 class DailyReportView extends StatelessWidget {
-  const DailyReportView({super.key, required this.orders});
+  const DailyReportView({
+    super.key,
+    required this.orders,
+    this.onOpenFiltered,
+    this.onOpenItems,
+  });
 
   final List<LaundryOrder> orders;
+
+  /// Opens the read-only list behind a tappable metric card. Null in the
+  /// standalone/test render path, which leaves the cards inert.
+  final void Function(OrderFilter filter, {String? title})? onOpenFiltered;
+
+  /// Opens the items breakdown page behind the "Items" card.
+  final VoidCallback? onOpenItems;
 
   @override
   Widget build(BuildContext context) {
@@ -44,14 +57,21 @@ class DailyReportView extends StatelessWidget {
     final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
     final inProgress = orders.countByStatus(OrderStatus.inProgress);
     final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = orders.countByStatus(OrderStatus.completed);
+    // Derive the two tappable cards' counts from the exact OrderFilter each
+    // card opens, so a card's number can never disagree with the list behind it
+    // (vs. re-deriving completed via countByStatus and pendingWork via the
+    // `totalOrders - completed` arithmetic, which are separate code paths).
+    final completed = OrderFilter.completed.count(orders);
+    final pendingWork = OrderFilter.pendingWork.count(orders);
     final totalItems = orders.totalItems;
-    final pendingWork = totalOrders - completed;
     final earnedRevenue = orders.earnedRevenueUgx;
     final expectedRevenue = orders.expectedRevenueUgx;
     // total == earned + expected by construction (every order is either
     // completed or not), so add them rather than make a third list pass.
     final totalRevenue = earnedRevenue + expectedRevenue;
+
+    VoidCallback? openFilter(OrderFilter filter, String title) =>
+        onOpenFiltered == null ? null : () => onOpenFiltered!(filter, title: title);
 
     return SafeArea(
       child: ListView(
@@ -127,6 +147,7 @@ class DailyReportView extends StatelessWidget {
                   title: 'Orders',
                   value: '$totalOrders',
                   icon: Icons.assignment_outlined,
+                  onTap: openFilter(OrderFilter.all, 'Orders'),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -135,6 +156,7 @@ class DailyReportView extends StatelessWidget {
                   title: 'Items',
                   value: '$totalItems',
                   icon: Icons.inventory_2_outlined,
+                  onTap: onOpenItems,
                 ),
               ),
             ],
@@ -147,6 +169,7 @@ class DailyReportView extends StatelessWidget {
                   title: OrderStatus.completed.label,
                   value: '$completed',
                   icon: Icons.check_circle_outline_rounded,
+                  onTap: openFilter(OrderFilter.completed, OrderStatus.completed.label),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -155,6 +178,7 @@ class DailyReportView extends StatelessWidget {
                   title: 'Pending work',
                   value: '$pendingWork',
                   icon: Icons.pending_actions_outlined,
+                  onTap: openFilter(OrderFilter.pendingWork, 'Pending work'),
                 ),
               ),
             ],
@@ -195,16 +219,19 @@ class _ReportMetricCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
+    this.onTap,
   });
 
   final String title;
   final String value;
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return AppCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

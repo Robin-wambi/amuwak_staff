@@ -18,12 +18,16 @@ import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
+import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
 import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/pricing/pricing_providers.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings_repository.dart';
+import 'package:amuwak_staff/src/sync/customers_repository.dart';
+import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
@@ -45,6 +49,14 @@ import 'package:amuwak_staff/src/sync/sync_status.dart';
 /// override it with a mock — the repo constructors only store the client (no
 /// calls), which is enough for navigation tests like "open New pickup".
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
+
+/// Stub repos so opening NewPickupScreen — whose initState reads orders +
+/// customers to seed the address auto-suggest — doesn't hit the unstubbed
+/// Supabase mock. Both reads resolve to empty lists, which is all the
+/// navigation tests need.
+class _StubOrdersRepository extends Mock implements OrdersRepository {}
+
+class _StubCustomersRepository extends Mock implements CustomersRepository {}
 
 /// Stub repository that always returns a settings row with [defaultRatePerKgUgx]
 /// so dashboard tests can open NewPickupScreen without hitting Supabase.
@@ -68,10 +80,19 @@ Future<void> pumpDashboardWithDb(
   bool lostPhoto = false,
   List<Override> extraOverrides = const [],
 }) async {
+  final stubOrdersRepo = _StubOrdersRepository();
+  final stubCustomersRepo = _StubCustomersRepository();
+  when(() => stubOrdersRepo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+  when(() => stubCustomersRepo.getAll())
+      .thenAnswer((_) async => <Customer>[]);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+        // Empty read-repos so NewPickupScreen's address-suggest init resolves
+        // without touching the unstubbed Supabase mock.
+        ordersRepositoryProvider.overrideWithValue(stubOrdersRepo),
+        customersRepositoryProvider.overrideWithValue(stubCustomersRepo),
         // Provide a trivial in-memory implementation of every Drift-backed
         // stream so that no real Drift stream subscriptions are opened.
         pendingOutboxCountProvider
@@ -823,6 +844,123 @@ void main() {
       ]) {
         expect(cardHeight(title), assigned, reason: '$title vs Assigned');
       }
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Pending work" card opens the matching filter',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'P1',
+        orderCode: 'P1',
+        customerName: 'Pending Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 2,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pending work'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderFilterScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Pending work'), findsOneWidget);
+      expect(find.text('Pending Cust'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Orders" card opens a screen titled "Orders"',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'O1',
+        orderCode: 'O1',
+        customerName: 'Orders Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      // 'Orders' is also the bottom-nav label, so scope the tap to the report's
+      // metric card.
+      await tester.tap(find.descendant(
+        of: find.byType(DailyReportView),
+        matching: find.text('Orders'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderFilterScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Orders'), findsOneWidget);
+      expect(find.text('Orders Cust'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Items" card opens ItemsBreakdownScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'I1',
+        orderCode: 'I1',
+        customerName: 'Items Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 4,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      // .first: the metric card is the only 'Items' text before the screen is
+      // pushed; pin it so a future 'Items' label can't make the tap ambiguous.
+      await tester.tap(find.text('Items').first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ItemsBreakdownScreen), findsOneWidget);
+      expect(find.text('Total items handled today: 4'), findsOneWidget);
     },
   );
 

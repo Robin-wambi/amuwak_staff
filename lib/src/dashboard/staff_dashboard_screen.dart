@@ -20,6 +20,7 @@ import '../orders/proof/barcode_reader.dart';
 import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
+import '../reports/items_breakdown_screen.dart';
 import '../shared/motion/animated_gradient_header.dart';
 import '../shared/motion/count_up_text.dart';
 import '../shared/motion/garment_strip.dart';
@@ -333,13 +334,25 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   /// Opens the read-only list of orders behind a tapped summary card. The
   /// session check + repository wiring live in [_openOrderDetails], which the
   /// filter screen calls on tap.
-  void _openFilteredOrders(OrderFilter filter) {
+  void _openFilteredOrders(OrderFilter filter, {String? title}) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => OrderFilterScreen(
           filter: filter,
           onOrderTap: _openOrderDetails,
+          title: title,
         ),
+      ),
+    );
+  }
+
+  /// Opens the items breakdown behind the daily report's "Items" card. Reuses
+  /// [_openOrderDetails] for row taps so the session check + repository wiring
+  /// live in one place.
+  void _openItemsBreakdown() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ItemsBreakdownScreen(onOrderTap: _openOrderDetails),
       ),
     );
   }
@@ -421,7 +434,11 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               ),
             ),
           2 => ordersAsync.when(
-              data: (orders) => DailyReportView(orders: orders),
+              data: (orders) => DailyReportView(
+                orders: orders,
+                onOpenFiltered: _openFilteredOrders,
+                onOpenItems: _openItemsBreakdown,
+              ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => _ErrorRetry(
                 onRetry: () => ref.invalidate(ordersStreamProvider),

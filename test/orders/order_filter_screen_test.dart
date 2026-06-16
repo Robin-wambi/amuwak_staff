@@ -82,6 +82,32 @@ void main() {
     expect(find.widgetWithText(AppBar, 'Pending pickup'), findsOneWidget);
   });
 
+  testWidgets('title override replaces the filter label in the app bar',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([_pending('Jane')]),
+          ),
+        ],
+        child: MaterialApp(
+          home: OrderFilterScreen(
+            filter: OrderFilter.all,
+            onOrderTap: (_) {},
+            now: _fixedNow,
+            title: 'Orders',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The override wins; the filter's own label ("Assigned") is not shown.
+    expect(find.widgetWithText(AppBar, 'Orders'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Assigned'), findsNothing);
+  });
+
   testWidgets('renders one card per matching order and a "Now" date header',
       (tester) async {
     await _pump(tester, filter: OrderFilter.pendingPickup, orders: [
