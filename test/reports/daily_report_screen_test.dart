@@ -81,15 +81,9 @@ void main() {
     ));
 
     await tester.tap(find.text('Orders'));
-    // "Completed" also appears in the status-breakdown card, so scope the tap
-    // to the metric card identified by its check icon.
-    await tester.tap(find.descendant(
-      of: find.ancestor(
-        of: find.byIcon(Icons.check_circle_outline_rounded),
-        matching: find.byType(GestureDetector),
-      ),
-      matching: find.text('Completed'),
-    ));
+    // 'Completed' also appears in the Status breakdown card, so tap the metric
+    // card via its unique icon instead of the ambiguous label.
+    await tester.tap(find.byIcon(Icons.check_circle_outline_rounded));
     await tester.tap(find.text('Pending work'));
     await tester.tap(find.text('Items'));
 
