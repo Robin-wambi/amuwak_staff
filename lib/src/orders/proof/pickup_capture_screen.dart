@@ -19,6 +19,7 @@ import '../pricing/pricing_section.dart';
 import '../../printing/label_printer.dart';
 import 'printable_tag.dart';
 import 'proof_photo_storage.dart';
+import 'tag_print_view.dart';
 
 DateTime _defaultClock() => DateTime.now();
 
@@ -70,11 +71,6 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   List<LineItem> _lineItems = [];
   bool _saving = false;
   bool _pickingPhoto = false;
-  bool _printing = false;
-
-  /// Wraps the on-screen [PrintableTag] so [TagCapturer] can rasterise exactly
-  /// what the rider sees.
-  final GlobalKey _tagBoundaryKey = GlobalKey();
 
   // Cached across retries so re-tapping "Done" after a downstream failure
   // produces a byte-identical ProofEvent + outbox payload. With the outbox's
@@ -140,74 +136,6 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         setState(() => _pickingPhoto = false);
       }
     }
-  }
-
-  /// Print the bag tag to the connected label printer, prompting the rider to
-  /// pick one first if needed. No-op when no printer is wired up.
-  Future<void> _onPrintTag() async {
-    final printer = widget.labelPrinter;
-    if (printer == null || _printing) return;
-    setState(() => _printing = true);
-    try {
-      if (!printer.isConnected) {
-        final device = await _pickPrinter(printer);
-        if (device == null) return; // cancelled or none paired
-        await printer.connect(device);
-      }
-      final bytes = await widget.captureTag(_tagBoundaryKey);
-      await printer.printRaster(bytes);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tag sent to printer.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not print the tag: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _printing = false);
-    }
-  }
-
-  /// Ask the rider which paired printer to use. Returns null if they cancel or
-  /// none are paired (in which case we point them at the write/scan fallback).
-  Future<PrinterDevice?> _pickPrinter(LabelPrinter printer) async {
-    final devices = await printer.discover();
-    if (!mounted) return null;
-    if (devices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No paired printer found. Pair one in Bluetooth settings, or write '
-            'the order # on the bag.',
-          ),
-        ),
-      );
-      return null;
-    }
-    return showModalBottomSheet<PrinterDevice>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Choose a printer'),
-            ),
-            for (final device in devices)
-              ListTile(
-                leading: const Icon(Icons.print_outlined),
-                title: Text(device.name),
-                onTap: () => Navigator.pop(context, device),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _onConfirm() {
@@ -560,22 +488,13 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                     style: const TextStyle(color: AppColors.secondaryText),
                   ),
                   const SizedBox(height: 24),
-                  // The on-screen preview IS what prints — captured via the key.
-                  PrintableTag(
+                  TagPrintView(
                     orderCode: widget.order.orderCode,
                     customerName: widget.order.customerName,
-                    boundaryKey: _tagBoundaryKey,
-                    qrSize: 220,
+                    labelPrinter: widget.labelPrinter,
+                    captureTag: widget.captureTag,
+                    buttonKey: const Key('pickup_print_tag'),
                   ),
-                  if (canPrint) ...[
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      key: const Key('pickup_print_tag'),
-                      onPressed: _printing ? null : _onPrintTag,
-                      icon: const Icon(Icons.print_outlined),
-                      label: const Text('Print tag'),
-                    ),
-                  ],
                 ],
               ),
             ),
