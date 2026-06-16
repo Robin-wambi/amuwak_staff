@@ -9,6 +9,23 @@ extension OrderListStats on List<LaundryOrder> {
 
   int get totalItems =>
       fold<int>(0, (sum, order) => sum + order.itemCount);
+
+  /// Revenue already earned: the sum of [LaundryOrder.totalUgx] across
+  /// completed (delivered) orders. Accrual basis — revenue is recognised once
+  /// the order is delivered.
+  int get earnedRevenueUgx => where((o) => o.status == OrderStatus.completed)
+      .fold<int>(0, (sum, o) => sum + o.totalUgx);
+
+  /// Revenue still outstanding: the sum of [LaundryOrder.totalUgx] across
+  /// orders that are not yet completed (their totals may be provisional when
+  /// the final weight isn't in yet).
+  int get expectedRevenueUgx => where((o) => o.status != OrderStatus.completed)
+      .fold<int>(0, (sum, o) => sum + o.totalUgx);
+
+  /// Total booked revenue across every order — equal to
+  /// [earnedRevenueUgx] + [expectedRevenueUgx].
+  int get totalRevenueUgx =>
+      fold<int>(0, (sum, o) => sum + o.totalUgx);
 }
 
 /// A run of orders that share a calendar day, with a ready-to-render header
