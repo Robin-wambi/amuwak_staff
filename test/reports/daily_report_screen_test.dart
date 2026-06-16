@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_filter.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
+
+Expense _expense(ExpenseCategory category, int amountUgx) => Expense(
+      id: '$category-$amountUgx',
+      category: category,
+      amountUgx: amountUgx,
+      note: '',
+      spentAt: DateTime.utc(2026, 6, 17, 8),
+    );
 
 LaundryOrder _order(String id, OrderStatus status, int totalUgx) => LaundryOrder(
       orderId: id,
@@ -145,5 +154,66 @@ void main() {
 
     expect(valueInCard(Icons.check_circle_outline_rounded, '2'), findsOneWidget);
     expect(valueInCard(Icons.pending_actions_outlined, '3'), findsOneWidget);
+  });
+
+  testWidgets('shows per-category spend, total spent, and net profit',
+      (tester) async {
+    final orders = [
+      _order('A', OrderStatus.completed, 10000),
+      _order('B', OrderStatus.completed, 12000), // earned = 22,000
+      _order('C', OrderStatus.inProgress, 5000), // expected = 5,000
+    ];
+    final expenses = [
+      _expense(ExpenseCategory.detergent, 6000),
+      _expense(ExpenseCategory.packaging, 3000), // total spent = 9,000
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: DailyReportView(orders: orders, expenses: expenses)),
+    ));
+
+    expect(find.text('Expenses'), findsOneWidget);
+    expect(find.text('Detergent & cleaning'), findsOneWidget);
+    expect(find.text('USh 6,000'), findsOneWidget);
+    expect(find.text('Packaging'), findsOneWidget);
+    expect(find.text('USh 3,000'), findsOneWidget);
+    expect(find.text('Total spent'), findsOneWidget);
+    expect(find.text('USh 9,000'), findsOneWidget);
+    // Net = earned (22,000) − total spent (9,000).
+    expect(find.text('Net'), findsOneWidget);
+    expect(find.text('USh 13,000'), findsOneWidget);
+  });
+
+  testWidgets('net goes negative when spend exceeds earned revenue',
+      (tester) async {
+    final orders = [_order('A', OrderStatus.completed, 10000)]; // earned 10,000
+    final expenses = [_expense(ExpenseCategory.fuel, 18000)]; // spent 18,000
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: DailyReportView(orders: orders, expenses: expenses)),
+    ));
+
+    // Net = 10,000 − 18,000 = −8,000.
+    expect(find.text('USh -8,000'), findsOneWidget);
+  });
+
+  testWidgets('shows the Expenses card with an Add action even when empty',
+      (tester) async {
+    var addTaps = 0;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: DailyReportView(
+          orders: const [],
+          onAddExpense: () => addTaps++,
+        ),
+      ),
+    ));
+
+    // The card renders (so staff can record the first expense of the day) even
+    // with no expenses yet.
+    expect(find.text('Expenses'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.add));
+    expect(addTaps, 1);
   });
 }

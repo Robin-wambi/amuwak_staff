@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../expenses/expense.dart';
+import '../expenses/expense_list_extensions.dart';
 import '../orders/order.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
@@ -12,9 +14,14 @@ import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
 
 class DailyReportScreen extends StatelessWidget {
-  const DailyReportScreen({super.key, required this.orders});
+  const DailyReportScreen({
+    super.key,
+    required this.orders,
+    this.expenses = const [],
+  });
 
   final List<LaundryOrder> orders;
+  final List<Expense> expenses;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +36,7 @@ class DailyReportScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: DailyReportView(orders: orders),
+      body: DailyReportView(orders: orders, expenses: expenses),
     );
   }
 }
@@ -38,11 +45,18 @@ class DailyReportView extends StatelessWidget {
   const DailyReportView({
     super.key,
     required this.orders,
+    this.expenses = const [],
     this.onOpenFiltered,
     this.onOpenItems,
+    this.onAddExpense,
+    this.onOpenExpenses,
   });
 
   final List<LaundryOrder> orders;
+
+  /// Today's recorded expenses, netted against earned revenue. Defaults to empty
+  /// so the standalone/test render path stays valid.
+  final List<Expense> expenses;
 
   /// Opens the read-only list behind a tappable metric card. Null in the
   /// standalone/test render path, which leaves the cards inert.
@@ -50,6 +64,13 @@ class DailyReportView extends StatelessWidget {
 
   /// Opens the items breakdown page behind the "Items" card.
   final VoidCallback? onOpenItems;
+
+  /// Opens the "record an expense" form. When non-null the Expenses card always
+  /// renders (with an Add action) even before any expense is logged today.
+  final VoidCallback? onAddExpense;
+
+  /// Opens the full expenses list (tap target on the Expenses card). Optional.
+  final VoidCallback? onOpenExpenses;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +90,15 @@ class DailyReportView extends StatelessWidget {
     // total == earned + expected by construction (every order is either
     // completed or not), so add them rather than make a third list pass.
     final totalRevenue = earnedRevenue + expectedRevenue;
+
+    final totalExpenses = expenses.totalExpenseUgx;
+    final expensesByCategory = expenses.byCategory;
+    // Net profit is earned (recognised) revenue minus what was spent today —
+    // computed here, not in the widget, mirroring the revenue derivations above.
+    final netUgx = earnedRevenue - totalExpenses;
+    // Show the Expenses section once there's something to show or a way to add:
+    // keeps the standalone/test render path (no expenses, no callback) unchanged.
+    final showExpenses = expenses.isNotEmpty || onAddExpense != null;
 
     VoidCallback? openFilter(OrderFilter filter, String title) =>
         onOpenFiltered == null ? null : () => onOpenFiltered!(filter, title: title);
@@ -139,6 +169,32 @@ class DailyReportView extends StatelessWidget {
             completed: completed,
             pendingWork: pendingWork,
           ),
+          if (showExpenses) ...[
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Expenses',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                if (onAddExpense != null)
+                  IconButton(
+                    onPressed: onAddExpense,
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Record an expense',
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ExpensesCard(
+              byCategory: expensesByCategory,
+              totalSpent: totalExpenses,
+              net: netUgx,
+              onTap: onOpenExpenses,
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
@@ -362,6 +418,87 @@ class _RevenueRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ExpensesCard extends StatelessWidget {
+  const _ExpensesCard({
+    required this.byCategory,
+    required this.totalSpent,
+    required this.net,
+    this.onTap,
+  });
+
+  final Map<ExpenseCategory, int> byCategory;
+  final int totalSpent;
+  final int net;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Iterate the enum so categories always render in a stable, defined order;
+    // skip any with no spend today.
+    final rows = <Widget>[];
+    for (final category in ExpenseCategory.values) {
+      final amount = byCategory[category];
+      if (amount == null) continue;
+      if (rows.isNotEmpty) {
+        rows.add(const SizedBox(height: AppSpacing.lg - 2));
+      }
+      rows.add(_RevenueRow(label: category.label, amountUgx: amount));
+    }
+
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rows.isEmpty)
+            const Text(
+              'No expenses recorded yet today.',
+              style: TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            ...rows,
+          const Divider(height: AppSpacing.xl),
+          _RevenueRow(
+            label: 'Total spent',
+            amountUgx: totalSpent,
+            emphasized: true,
+          ),
+          const SizedBox(height: AppSpacing.lg - 2),
+          // Net = earned revenue − total spent. Green-tinted when in the black,
+          // error-tinted when spend has outrun earnings, both from the theme.
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Net',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Text(
+                formatUgx(net),
+                style: TextStyle(
+                  color: net < 0 ? colorScheme.error : colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
