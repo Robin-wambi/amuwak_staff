@@ -888,7 +888,9 @@ void main() {
 
       await tester.tap(find.text('Report').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Items'));
+      // .first: the metric card is the only 'Items' text before the screen is
+      // pushed; pin it so a future 'Items' label can't make the tap ambiguous.
+      await tester.tap(find.text('Items').first);
       await tester.pumpAndSettle();
 
       expect(find.byType(ItemsBreakdownScreen), findsOneWidget);
