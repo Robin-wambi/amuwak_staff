@@ -81,4 +81,15 @@ void main() {
     // PNG magic number: 0x89 'P' 'N' 'G'.
     expect(bytes.sublist(0, 4), equals(<int>[0x89, 0x50, 0x4E, 0x47]));
   });
+
+  testWidgets(
+      'captureTagPng throws a clean TagCaptureException when the boundary is '
+      'not mounted, not a null-check crash', (tester) async {
+    final unattachedKey = GlobalKey(); // never put in the tree
+
+    await expectLater(
+      captureTagPng(unattachedKey),
+      throwsA(isA<TagCaptureException>()),
+    );
+  });
 }

@@ -142,4 +142,45 @@ void main() {
     expect(printer.printed, isEmpty);
     expect(find.textContaining('No paired printer'), findsOneWidget);
   });
+
+  testWidgets('surfaces an error and re-enables the button when connect fails',
+      (tester) async {
+    final printer = FakeLabelPrinter(
+      devices: const [PrinterDevice(id: 'AB:CD', name: 'Phomemo M2')],
+      connectThrows: true,
+    );
+    await _pumpToTagStage(tester, printer: printer);
+
+    await tester.ensureVisible(find.byKey(const Key('pickup_print_tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pickup_print_tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Phomemo M2'));
+    await tester.pumpAndSettle();
+
+    expect(printer.printed, isEmpty);
+    expect(find.textContaining('Could not print the tag'), findsOneWidget);
+    // The button is enabled again so the rider can retry.
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const Key('pickup_print_tag')),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('surfaces an error when the printer rejects the tag',
+      (tester) async {
+    final printer = FakeLabelPrinter(
+      connected: const PrinterDevice(id: 'AB:CD', name: 'Munbyn'),
+      printThrows: Exception('printer offline'),
+    );
+    await _pumpToTagStage(tester, printer: printer);
+
+    await tester.ensureVisible(find.byKey(const Key('pickup_print_tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pickup_print_tag')));
+    await tester.pumpAndSettle();
+
+    expect(printer.printed, isEmpty);
+    expect(find.textContaining('Could not print the tag'), findsOneWidget);
+  });
 }

@@ -82,6 +82,10 @@ class BluetoothLabelPrinter implements LabelPrinter {
       throw PrinterException('Could not read the tag image.');
     }
     // Scale to the head width so the QR fills the label and stays square.
+    // Every _dotWidth (384/512/576) is a multiple of 8 — keep it that way:
+    // esc_pos_utils_plus's raster encoder has a broken non-multiple-of-8 width
+    // path (it zero-fills the buffer), and resizing to a multiple of 8 sidesteps
+    // it entirely.
     final scaled = decoded.width == _dotWidth
         ? decoded
         : img.copyResize(decoded, width: _dotWidth);

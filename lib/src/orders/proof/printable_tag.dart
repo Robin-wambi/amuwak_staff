@@ -82,6 +82,15 @@ class PrintableTag extends StatelessWidget {
 /// screens so tests can supply canned bytes instead of rasterising.
 typedef TagCapturer = Future<Uint8List> Function(GlobalKey boundaryKey);
 
+/// Thrown by [captureTagPng] when the tag can't be rasterised, carrying a
+/// rider-readable message instead of leaking a null-check crash.
+class TagCaptureException implements Exception {
+  const TagCaptureException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
 /// Rasterises the [RepaintBoundary] identified by [boundaryKey] to PNG bytes.
 ///
 /// [pixelRatio] sets the source crispness; the printer adapter resizes the
@@ -92,9 +101,13 @@ Future<Uint8List> captureTagPng(
   GlobalKey boundaryKey, {
   double pixelRatio = 4,
 }) async {
-  final boundary =
-      boundaryKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-  final image = await boundary.toImage(pixelRatio: pixelRatio);
+  final renderObject = boundaryKey.currentContext?.findRenderObject();
+  if (renderObject is! RenderRepaintBoundary) {
+    throw const TagCaptureException(
+      "The tag isn't ready to print yet. Please try again.",
+    );
+  }
+  final image = await renderObject.toImage(pixelRatio: pixelRatio);
   try {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
