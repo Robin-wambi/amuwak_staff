@@ -17,6 +17,7 @@ import '../pricing/pricing_calculator.dart';
 import '../pricing/pricing_inputs.dart';
 import '../pricing/pricing_section.dart';
 import '../../printing/label_printer.dart';
+import '../../printing/printer_store.dart';
 import 'printable_tag.dart';
 import 'proof_photo_storage.dart';
 import 'tag_print_view.dart';
@@ -37,6 +38,7 @@ class PickupCaptureScreen extends StatefulWidget {
     this.clock = _defaultClock,
     this.proofEventIdGenerator = defaultUuidV7,
     this.labelPrinter,
+    this.printerStore,
     this.captureTag = captureTagPng,
   });
 
@@ -53,6 +55,9 @@ class PickupCaptureScreen extends StatefulWidget {
   /// screen falls back to its write-the-code / scan-on-screen guidance, so a
   /// printerless site still works.
   final LabelPrinter? labelPrinter;
+
+  /// Remembers the last printer so the rider needn't re-pick it each shift.
+  final PrinterStore? printerStore;
 
   /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
   final TagCapturer captureTag;
@@ -492,6 +497,7 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                     orderCode: widget.order.orderCode,
                     customerName: widget.order.customerName,
                     labelPrinter: widget.labelPrinter,
+                    printerStore: widget.printerStore,
                     captureTag: widget.captureTag,
                     buttonKey: const Key('pickup_print_tag'),
                   ),

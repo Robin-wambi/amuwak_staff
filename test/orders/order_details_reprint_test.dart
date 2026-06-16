@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -34,6 +36,8 @@ LaundryOrder _order(OrderStatus status) => LaundryOrder(
       notes: '',
     );
 
+final _tagBytes = Uint8List.fromList(const [5, 5, 5, 5]);
+
 Widget _wrap(LaundryOrder order, {LabelPrinter? printer}) {
   return MaterialApp(
     theme: buildAmuwakTheme(),
@@ -48,6 +52,7 @@ Widget _wrap(LaundryOrder order, {LabelPrinter? printer}) {
       proofEventsRepo: _MockProofEventsRepository(),
       actorStaffId: 's-test',
       labelPrinter: printer,
+      captureTag: (_) async => _tagBytes,
     ),
   );
 }
@@ -96,5 +101,23 @@ void main() {
     expect(find.text('Reprint bag tag'), findsOneWidget);
     expect(find.byType(PrintableTag), findsOneWidget);
     expect(find.text('AMW-2026-0042'), findsWidgets);
+  });
+
+  testWidgets('Reprint sheet prints the tag to a connected printer',
+      (tester) async {
+    final printer = FakeLabelPrinter(
+      connected: const PrinterDevice(id: 'AB:CD', name: 'Munbyn'),
+    );
+    await tester.pumpWidget(
+      _wrap(_order(OrderStatus.readyForDelivery), printer: printer),
+    );
+
+    await tester.tap(find.byKey(const Key('reprint_tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('print_tag')));
+    await tester.pumpAndSettle();
+
+    expect(printer.printed, hasLength(1));
+    expect(printer.printed.single, equals(_tagBytes));
   });
 }

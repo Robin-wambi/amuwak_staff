@@ -2,10 +2,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:amuwak_staff/src/orders/proof/printable_tag.dart';
 import 'package:amuwak_staff/src/orders/proof/tag_print_view.dart';
 import 'package:amuwak_staff/src/printing/label_printer.dart';
+import 'package:amuwak_staff/src/printing/printer_store.dart';
 
 import '../../helpers/fake_label_printer.dart';
 
@@ -14,6 +16,8 @@ final _tagBytes = Uint8List.fromList(const [7, 7, 7, 7]);
 Future<void> _pump(
   WidgetTester tester, {
   required LabelPrinter? printer,
+  PrinterStore? printerStore,
+  BluetoothPermissionRequester? requestPermission,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -22,7 +26,10 @@ Future<void> _pump(
           orderCode: 'AMW-2026-0042',
           customerName: 'Jane Doe',
           labelPrinter: printer,
+          printerStore: printerStore,
           captureTag: (_) async => _tagBytes,
+          requestBluetoothPermission:
+              requestPermission ?? () async => true,
         ),
       ),
     ),
@@ -102,5 +109,56 @@ void main() {
       find.byKey(const Key('print_tag')),
     );
     expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('stops with guidance when Bluetooth permission is denied',
+      (tester) async {
+    final printer = FakeLabelPrinter(
+      devices: const [PrinterDevice(id: 'AB:CD', name: 'Phomemo M2')],
+    );
+    await _pump(tester, printer: printer, requestPermission: () async => false);
+
+    await tester.tap(find.byKey(const Key('print_tag')));
+    await tester.pumpAndSettle();
+
+    expect(printer.discoverCalls, equals(0));
+    expect(printer.printed, isEmpty);
+    expect(find.textContaining('Bluetooth permission'), findsOneWidget);
+  });
+
+  testWidgets('connects to the remembered printer without showing the picker',
+      (tester) async {
+    const remembered = PrinterDevice(id: 'AB:CD', name: 'Munbyn M2');
+    SharedPreferences.setMockInitialValues({});
+    final store = PrinterStore(await SharedPreferences.getInstance());
+    await store.save(remembered);
+
+    final printer = FakeLabelPrinter(
+      devices: const [PrinterDevice(id: 'ZZ:99', name: 'Other')],
+    );
+    await _pump(tester, printer: printer, printerStore: store);
+
+    await tester.tap(find.byKey(const Key('print_tag')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose a printer'), findsNothing);
+    expect(printer.connectCalls, equals(const [remembered]));
+    expect(printer.printed, hasLength(1));
+  });
+
+  testWidgets('remembers the printer chosen from the picker', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = PrinterStore(await SharedPreferences.getInstance());
+
+    const device = PrinterDevice(id: 'AB:CD', name: 'Phomemo M2');
+    final printer = FakeLabelPrinter(devices: const [device]);
+    await _pump(tester, printer: printer, printerStore: store);
+
+    await tester.tap(find.byKey(const Key('print_tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Phomemo M2'));
+    await tester.pumpAndSettle();
+
+    expect(store.load(), equals(device));
   });
 }

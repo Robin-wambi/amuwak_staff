@@ -258,6 +258,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );
@@ -289,6 +290,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );
