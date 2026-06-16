@@ -110,7 +110,10 @@ Future<Uint8List> captureTagPng(
   final image = await renderObject.toImage(pixelRatio: pixelRatio);
   try {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
+    if (byteData == null) {
+      throw const TagCaptureException('Could not encode the tag image.');
+    }
+    return byteData.buffer.asUint8List();
   } finally {
     image.dispose();
   }

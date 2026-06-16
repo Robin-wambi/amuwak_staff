@@ -67,6 +67,8 @@ class BluetoothLabelPrinter implements LabelPrinter {
 
   @override
   Future<void> disconnect() async {
+    // `disconnect` is a static getter on the plugin (returns Future<bool>), not
+    // a method — the missing () is intentional.
     await PrintBluetoothThermal.disconnect;
     _connected = null;
   }
@@ -101,6 +103,9 @@ class BluetoothLabelPrinter implements LabelPrinter {
 
     final ok = await PrintBluetoothThermal.writeBytes(bytes);
     if (!ok) {
+      // The link is likely dead (out of range / powered off). Drop it so the
+      // next print re-enters the connect flow instead of retrying a dead socket.
+      _connected = null;
       throw PrinterException(
         'The printer rejected the tag. Check paper and power, then retry.',
       );

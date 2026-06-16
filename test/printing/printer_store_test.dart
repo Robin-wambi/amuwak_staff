@@ -6,11 +6,16 @@ import 'package:amuwak_staff/src/printing/printer_store.dart';
 
 void main() {
   group('PrinterDevice', () {
-    test('values with the same id and name are equal', () {
-      const a = PrinterDevice(id: '00:11:22', name: 'Munbyn', address: 'x');
-      const b = PrinterDevice(id: '00:11:22', name: 'Munbyn', address: 'x');
-      expect(a, equals(b));
-      expect(a.hashCode, equals(b.hashCode));
+    test('equality is by id — name/address are display detail', () {
+      // Same MAC from a live discover() vs rehydrated from storage (where
+      // address may be null and name may differ) must still be the same device.
+      const live = PrinterDevice(id: '00:11:22', name: 'Munbyn M2', address: '00:11:22');
+      const stored = PrinterDevice(id: '00:11:22', name: 'Munbyn');
+      expect(live, equals(stored));
+      expect(live.hashCode, equals(stored.hashCode));
+
+      const other = PrinterDevice(id: 'AA:BB:CC', name: 'Munbyn M2');
+      expect(live, isNot(equals(other)));
     });
 
     test('round-trips through JSON', () {

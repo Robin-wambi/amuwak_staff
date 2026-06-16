@@ -31,15 +31,14 @@ class PrinterDevice {
         address: json['address'] as String?,
       );
 
+  // Identity is the [id] (MAC / iOS identifier). Name and address are display/
+  // transport detail and can differ between a live `discover()` result and one
+  // rehydrated from storage, so they're excluded from equality.
   @override
-  bool operator ==(Object other) =>
-      other is PrinterDevice &&
-      other.id == id &&
-      other.name == name &&
-      other.address == address;
+  bool operator ==(Object other) => other is PrinterDevice && other.id == id;
 
   @override
-  int get hashCode => Object.hash(id, name, address);
+  int get hashCode => id.hashCode;
 
   @override
   String toString() => 'PrinterDevice($name, $id)';
