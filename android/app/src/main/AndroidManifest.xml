@@ -2,6 +2,14 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Bluetooth thermal label printing (print_bluetooth_thermal). CONNECT/SCAN
+         are the Android 12+ (API 31) runtime perms the plugin requests; the
+         legacy BLUETOOTH/BLUETOOTH_ADMIN cover API <= 30. Declared here so the
+         app's printing needs are explicit, not only inherited from the plugin. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <application
         android:label="amuwak_staff"
         android:name="${applicationName}"
