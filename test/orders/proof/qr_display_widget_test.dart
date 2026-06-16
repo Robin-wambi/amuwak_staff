@@ -23,8 +23,8 @@ void main() {
   });
 
   testWidgets(
-      'configures medium error correction, a quiet-zone padding, and gapless '
-      'rendering so printed bag tags stay scannable when scuffed',
+      'defaults to high error correction, a quiet-zone padding, and gapless '
+      'rendering so printed bag tags stay scannable when scuffed or damp',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -35,9 +35,27 @@ void main() {
     );
 
     final qr = tester.widget<QrImageView>(find.byType(QrImageView));
-    expect(qr.errorCorrectionLevel, equals(QrErrorCorrectLevel.M));
+    expect(qr.errorCorrectionLevel, equals(QrErrorCorrectLevel.H));
     expect(qr.padding, equals(const EdgeInsets.all(16)));
     expect(qr.gapless, isTrue);
+  });
+
+  testWidgets(
+      'lets callers override the error correction level for denser symbols',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QrDisplayWidget(
+            data: 'AMW-2026-0042',
+            errorCorrectionLevel: QrErrorCorrectLevel.Q,
+          ),
+        ),
+      ),
+    );
+
+    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
+    expect(qr.errorCorrectionLevel, equals(QrErrorCorrectLevel.Q));
   });
 
   testWidgets('exposes a semantics label referencing the order code',
