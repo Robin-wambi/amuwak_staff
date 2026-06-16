@@ -57,9 +57,13 @@ class DailyReportView extends StatelessWidget {
     final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
     final inProgress = orders.countByStatus(OrderStatus.inProgress);
     final readyForDelivery = orders.countByStatus(OrderStatus.readyForDelivery);
-    final completed = orders.countByStatus(OrderStatus.completed);
+    // Derive the two tappable cards' counts from the exact OrderFilter each
+    // card opens, so a card's number can never disagree with the list behind it
+    // (vs. re-deriving completed via countByStatus and pendingWork via the
+    // `totalOrders - completed` arithmetic, which are separate code paths).
+    final completed = OrderFilter.completed.count(orders);
+    final pendingWork = OrderFilter.pendingWork.count(orders);
     final totalItems = orders.totalItems;
-    final pendingWork = totalOrders - completed;
     final earnedRevenue = orders.earnedRevenueUgx;
     final expectedRevenue = orders.expectedRevenueUgx;
     // total == earned + expected by construction (every order is either

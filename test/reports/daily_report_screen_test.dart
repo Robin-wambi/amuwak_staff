@@ -6,6 +6,7 @@ import 'package:amuwak_staff/src/orders/order_filter.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
+import 'package:amuwak_staff/src/shared/theme/app_card.dart';
 
 LaundryOrder _order(String id, OrderStatus status, int totalUgx) => LaundryOrder(
       orderId: id,
@@ -111,5 +112,38 @@ void main() {
 
     await tester.tap(find.text('Orders'), warnIfMissed: false);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'Completed and Pending work cards show their OrderFilter counts',
+      (tester) async {
+    final orders = [
+      _order('A', OrderStatus.completed, 1000),
+      _order('B', OrderStatus.completed, 1000),
+      _order('C', OrderStatus.inProgress, 1000),
+      _order('D', OrderStatus.pendingPickup, 1000),
+      _order('E', OrderStatus.readyForDelivery, 1000),
+    ];
+    // 2 completed, 3 not-completed (pending work).
+    expect(OrderFilter.completed.count(orders), 2);
+    expect(OrderFilter.pendingWork.count(orders), 3);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: DailyReportView(orders: orders)),
+    ));
+
+    // The number on each tappable card equals the count of the list it opens —
+    // scope to the card via its unique icon to avoid matching the same digit
+    // elsewhere on the report.
+    Finder valueInCard(IconData icon, String value) => find.descendant(
+          of: find.ancestor(
+            of: find.byIcon(icon),
+            matching: find.byType(AppCard),
+          ),
+          matching: find.text(value),
+        );
+
+    expect(valueInCard(Icons.check_circle_outline_rounded, '2'), findsOneWidget);
+    expect(valueInCard(Icons.pending_actions_outlined, '3'), findsOneWidget);
   });
 }
