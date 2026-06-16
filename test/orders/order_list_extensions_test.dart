@@ -6,7 +6,7 @@ import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 
-LaundryOrder _orderWith(OrderStatus status, {int items = 1}) {
+LaundryOrder _orderWith(OrderStatus status, {int items = 1, int totalUgx = 0}) {
   return LaundryOrder(
     orderId: 'X',
     customerName: 'X',
@@ -17,6 +17,7 @@ LaundryOrder _orderWith(OrderStatus status, {int items = 1}) {
     phone: 'X',
     address: 'X',
     notes: 'X',
+    totalUgx: totalUgx,
   );
 }
 
@@ -106,6 +107,48 @@ void main() {
 
     test('totalItems is 0 for an empty list', () {
       expect(<LaundryOrder>[].totalItems, 0);
+    });
+
+    test('earnedRevenueUgx sums totalUgx of completed orders only', () {
+      final orders = [
+        _orderWith(OrderStatus.completed, totalUgx: 8000),
+        _orderWith(OrderStatus.completed, totalUgx: 12000),
+        _orderWith(OrderStatus.inProgress, totalUgx: 5000),
+        _orderWith(OrderStatus.pendingPickup, totalUgx: 3000),
+      ];
+
+      expect(orders.earnedRevenueUgx, 20000);
+    });
+
+    test('expectedRevenueUgx sums totalUgx of non-completed orders only', () {
+      final orders = [
+        _orderWith(OrderStatus.completed, totalUgx: 8000),
+        _orderWith(OrderStatus.inProgress, totalUgx: 5000),
+        _orderWith(OrderStatus.pendingPickup, totalUgx: 3000),
+        _orderWith(OrderStatus.readyForDelivery, totalUgx: 2000),
+      ];
+
+      expect(orders.expectedRevenueUgx, 10000);
+    });
+
+    test('totalRevenueUgx equals earned plus expected', () {
+      final orders = [
+        _orderWith(OrderStatus.completed, totalUgx: 8000),
+        _orderWith(OrderStatus.inProgress, totalUgx: 5000),
+        _orderWith(OrderStatus.pendingPickup, totalUgx: 3000),
+      ];
+
+      expect(orders.totalRevenueUgx, 16000);
+      expect(
+        orders.totalRevenueUgx,
+        orders.earnedRevenueUgx + orders.expectedRevenueUgx,
+      );
+    });
+
+    test('revenue aggregates are 0 for an empty list', () {
+      expect(<LaundryOrder>[].earnedRevenueUgx, 0);
+      expect(<LaundryOrder>[].expectedRevenueUgx, 0);
+      expect(<LaundryOrder>[].totalRevenueUgx, 0);
     });
   });
 

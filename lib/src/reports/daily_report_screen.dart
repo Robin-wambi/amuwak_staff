@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../orders/order.dart';
 import '../orders/order_list_extensions.dart';
 import '../orders/order_status.dart';
+import '../shared/format_ugx.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
@@ -46,6 +47,9 @@ class DailyReportView extends StatelessWidget {
     final completed = orders.countByStatus(OrderStatus.completed);
     final totalItems = orders.totalItems;
     final pendingWork = totalOrders - completed;
+    final earnedRevenue = orders.earnedRevenueUgx;
+    final expectedRevenue = orders.expectedRevenueUgx;
+    final totalRevenue = orders.totalRevenueUgx;
 
     return SafeArea(
       child: ListView(
@@ -99,6 +103,19 @@ class DailyReportView extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'Revenue',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _RevenueCard(
+            earned: earnedRevenue,
+            expected: expectedRevenue,
+            total: totalRevenue,
+            completed: completed,
+            pendingWork: pendingWork,
           ),
           const SizedBox(height: AppSpacing.xl),
           Row(
@@ -214,6 +231,108 @@ class _ReportMetricCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RevenueCard extends StatelessWidget {
+  const _RevenueCard({
+    required this.earned,
+    required this.expected,
+    required this.total,
+    required this.completed,
+    required this.pendingWork,
+  });
+
+  final int earned;
+  final int expected;
+  final int total;
+  final int completed;
+  final int pendingWork;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _RevenueRow(
+            label: 'Earned',
+            subtitle: '$completed completed',
+            amountUgx: earned,
+          ),
+          const SizedBox(height: AppSpacing.lg - 2),
+          _RevenueRow(
+            label: 'Expected',
+            subtitle: '$pendingWork in progress',
+            amountUgx: expected,
+          ),
+          const Divider(height: AppSpacing.xl),
+          _RevenueRow(
+            label: 'Total booked',
+            amountUgx: total,
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RevenueRow extends StatelessWidget {
+  const _RevenueRow({
+    required this.label,
+    required this.amountUgx,
+    this.subtitle,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final int amountUgx;
+  final String? subtitle;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                  fontSize: emphasized ? 16 : 15,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs / 2),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Text(
+          formatUgx(amountUgx),
+          style: TextStyle(
+            color: emphasized ? colorScheme.primary : colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+            fontSize: emphasized ? 18 : 16,
+          ),
+        ),
+      ],
     );
   }
 }
