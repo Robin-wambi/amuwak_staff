@@ -49,7 +49,9 @@ class DailyReportView extends StatelessWidget {
     final pendingWork = totalOrders - completed;
     final earnedRevenue = orders.earnedRevenueUgx;
     final expectedRevenue = orders.expectedRevenueUgx;
-    final totalRevenue = orders.totalRevenueUgx;
+    // total == earned + expected by construction (every order is either
+    // completed or not), so add them rather than make a third list pass.
+    final totalRevenue = earnedRevenue + expectedRevenue;
 
     return SafeArea(
       child: ListView(
@@ -264,7 +266,7 @@ class _RevenueCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg - 2),
           _RevenueRow(
             label: 'Expected',
-            subtitle: '$pendingWork in progress',
+            subtitle: '$pendingWork outstanding',
             amountUgx: expected,
           ),
           const Divider(height: AppSpacing.xl),
