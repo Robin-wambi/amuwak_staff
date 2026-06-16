@@ -71,6 +71,19 @@ class OrdersRepository {
     });
   }
 
+  /// One-shot snapshot of all non-deleted orders — a plain `select`, with no
+  /// realtime subscription and no `proof_events` join. For snapshot callers that
+  /// don't need proof events or live updates (e.g. the New Pickup address-
+  /// suggestion seed). Mirrors [CustomersRepository.getAll].
+  Future<List<LaundryOrder>> getAll() async {
+    final rows = await _supabase
+        .from('orders')
+        .select()
+        .isFilter('deleted_at', null)
+        .order('created_at');
+    return hydrateOrders(rows, const []);
+  }
+
   Stream<LaundryOrder?> watchById(String orderId) {
     return _supabase
         .from('orders')

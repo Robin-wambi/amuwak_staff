@@ -6,10 +6,16 @@ class QrDisplayWidget extends StatelessWidget {
     super.key,
     required this.data,
     this.size = 240,
+    this.errorCorrectionLevel = QrErrorCorrectLevel.H,
   });
 
   final String data;
   final double size;
+
+  /// Reed-Solomon recovery level. Defaults to High (~30%) — DENSO WAVE
+  /// recommends Q or H for codes that get dirty or creased, which matches a
+  /// label riding on a damp laundry bag until it's scanned at delivery.
+  final int errorCorrectionLevel;
 
   /// Quiet-zone padding around the QR modules. Gives scanners a margin to lock
   /// onto and keeps the text fallback clear of the tag edge.
@@ -22,7 +28,7 @@ class QrDisplayWidget extends StatelessWidget {
       version: QrVersions.auto,
       size: size,
       backgroundColor: Colors.white,
-      errorCorrectionLevel: QrErrorCorrectLevel.M,
+      errorCorrectionLevel: errorCorrectionLevel,
       padding: const EdgeInsets.all(_padding),
       gapless: true,
       semanticsLabel: 'QR code for order $data',

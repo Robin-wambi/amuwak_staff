@@ -23,6 +23,7 @@ import '../reports/daily_report_screen.dart';
 import '../reports/items_breakdown_screen.dart';
 import '../shared/motion/animated_gradient_header.dart';
 import '../shared/motion/count_up_text.dart';
+import '../shared/motion/garment_strip.dart';
 import '../shared/motion/reveal_on_mount.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
@@ -31,6 +32,7 @@ import '../shared/theme/app_spacing.dart';
 import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../shared/uuid.dart';
+import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
 // orchestrator, local DB) are disabled. Re-add these imports with the
@@ -257,6 +259,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           ordersRepo: ref.read(ordersRepositoryProvider),
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
+          labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );
@@ -287,6 +291,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           ordersRepo: ref.read(ordersRepositoryProvider),
           proofEventsRepo: ref.read(proofEventsRepositoryProvider),
           actorStaffId: staffId,
+          labelPrinter: ref.read(labelPrinterProvider),
+          printerStore: ref.read(printerStoreProvider),
         ),
       ),
     );
@@ -789,45 +795,53 @@ class _DashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedGradientHeader(
       padding: const EdgeInsets.all(AppSpacing.lg2),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.white,
-            child: Icon(
-              Icons.local_laundry_service_rounded,
-              color: AppColors.primary,
-              size: 30,
-            ),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.white,
+                child: Icon(
+                  Icons.local_laundry_service_rounded,
+                  color: AppColors.primary,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Staff Workspace',
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(color: AppColors.white),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      "Today's laundry operations",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.white,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Staff Workspace',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.white,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  "Today's laundry operations",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: AppSpacing.lg),
+          // A slow, sliding strip of the garments the team launders — keeps the
+          // header feeling alive. Static under reduce-motion.
+          const SizedBox(height: 56, child: GarmentStrip()),
         ],
       ),
     );

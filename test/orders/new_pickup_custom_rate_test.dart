@@ -62,6 +62,9 @@ void main() {
         .thenAnswer((_) async => 'AMW-2026-0001');
     when(() => ordersRepo.upsertOrder(any(),
         actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    // initState loads address suggestions from customers + orders.
+    when(() => ordersRepo.getAll())
+        .thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
   /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].

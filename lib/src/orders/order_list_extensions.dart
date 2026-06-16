@@ -1,3 +1,4 @@
+import '../shared/order_code.dart';
 import '../shared/phone.dart';
 import 'order.dart';
 import 'order_status.dart';
@@ -112,16 +113,31 @@ extension OrderListSearch on List<LaundryOrder> {
   /// ([ugandaNationalDigits]) so a local query (`0700123456`) still matches an
   /// internationally-stored number (`+256 700 123 456`) and vice versa,
   /// regardless of spacing.
+  ///
+  /// A bare-number query (e.g. `4` or `0042`) is treated as an order number and
+  /// matched against the code's [orderCodeNumber] *exactly*, so a rider can type
+  /// just the number off a bag instead of the full `AMW-2026-0042` — and typing
+  /// `4` finds order #4 only, not every code that happens to contain a 4. A bare
+  /// number only ever matches an order code or a phone (a typed phone number is
+  /// digits too); it deliberately does NOT match names or addresses, so the
+  /// digit in "4th Avenue" can't surface unrelated orders.
   List<LaundryOrder> searchBy(String query) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return this;
+    final raw = query.trim();
+    if (raw.isEmpty) return this;
+    final q = raw.toLowerCase();
     final queryDigits = ugandaNationalDigits(q);
-    return where((o) =>
-            o.orderCode.toLowerCase().contains(q) ||
-            o.customerName.toLowerCase().contains(q) ||
-            o.address.toLowerCase().contains(q) ||
-            (queryDigits.isNotEmpty &&
-                ugandaNationalDigits(o.phone).contains(queryDigits)))
-        .toList(growable: false);
+    bool phoneMatches(LaundryOrder o) =>
+        queryDigits.isNotEmpty &&
+        ugandaNationalDigits(o.phone).contains(queryDigits);
+    final queryNumber = isBareOrderNumber(raw) ? int.tryParse(raw) : null;
+    return where((o) {
+      if (queryNumber != null) {
+        return orderCodeNumber(o.orderCode) == queryNumber || phoneMatches(o);
+      }
+      return o.orderCode.toLowerCase().contains(q) ||
+          o.customerName.toLowerCase().contains(q) ||
+          o.address.toLowerCase().contains(q) ||
+          phoneMatches(o);
+    }).toList(growable: false);
   }
 }

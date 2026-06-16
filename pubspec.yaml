@@ -54,6 +54,17 @@ dependencies:
   uuid: ^4.5.0
   geolocator: ^14.0.0
   geocoding: ^4.0.0
+  print_bluetooth_thermal: ^1.2.1
+  esc_pos_utils_plus: ^2.0.4
+  image: ^4.8.0
+  # Remembers the last-connected label printer (printer_store.dart) and is a
+  # transitive dep of supabase_flutter. Also used in tests via
+  # SharedPreferences.setMockInitialValues.
+  shared_preferences: ^2.5.0
+  permission_handler: ^12.0.3
+
+  # Bundled vector garment illustrations for the dashboard header strip.
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -71,9 +82,6 @@ dev_dependencies:
   mocktail: ^1.0.4
   integration_test:
     sdk: flutter
-  shared_preferences: ^2.5.0   # transitive dep of supabase_flutter; declared
-                               # here so test/end_to_end_sync_test.dart can
-                               # call SharedPreferences.setMockInitialValues
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
@@ -111,10 +119,9 @@ flutter:
         - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
           weight: 800
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # Bundled garment illustrations shown in the animated dashboard header strip.
+  assets:
+    - assets/garments/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

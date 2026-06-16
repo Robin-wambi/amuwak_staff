@@ -187,7 +187,7 @@ void main() {
         currentUserIdProvider.overrideWith((ref) => 'staff-1'),
       ]);
 
-      await tester.ensureVisible(find.text('New pickup'));
+      await tester.ensureVisible(find.text('New pickup', skipOffstage: false));
       await tester.pumpAndSettle();
       await tester.tap(find.text('New pickup'));
       await tester.pumpAndSettle();
@@ -204,7 +204,7 @@ void main() {
         currentUserIdProvider.overrideWith((ref) => null),
       ]);
 
-      await tester.ensureVisible(find.text('New pickup'));
+      await tester.ensureVisible(find.text('New pickup', skipOffstage: false));
       await tester.pumpAndSettle();
       await tester.tap(find.text('New pickup'));
       await tester.pumpAndSettle();
@@ -220,7 +220,7 @@ void main() {
     (tester) async {
       await pumpDashboardWithDb(tester);
 
-      await tester.ensureVisible(find.text('Check order'));
+      await tester.ensureVisible(find.text('Check order', skipOffstage: false));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Check order'));
       await tester.pumpAndSettle();
@@ -543,8 +543,10 @@ void main() {
     await pumpDashboardWithDb(tester);
 
     expect(find.text('Staff Workspace'), findsOneWidget);
-    expect(find.text('Quick actions'), findsOneWidget);
     expect(find.text('Assigned'), findsOneWidget);
+    // The garment strip makes the header taller, so the quick actions now sit
+    // just below the fold on the test viewport — assert they're mounted.
+    expect(find.text('Quick actions', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets(
@@ -582,7 +584,9 @@ void main() {
     // and there is no summary "Assigned" tile yet.
     await tester.pump();
     expect(find.text('Staff Workspace'), findsOneWidget);
-    expect(find.text('New pickup'), findsOneWidget);
+    // Quick actions stay mounted as chrome; on the data frame the taller header
+    // pushes them just below the fold, so assert on mount, not on-screen.
+    expect(find.text('New pickup', skipOffstage: false), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('Assigned'), findsNothing);
 
@@ -596,7 +600,7 @@ void main() {
     // Chrome stayed mounted (same Element), progress was replaced by the
     // summary grid.
     expect(find.text('Staff Workspace'), findsOneWidget);
-    expect(find.text('New pickup'), findsOneWidget);
+    expect(find.text('New pickup', skipOffstage: false), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('Assigned'), findsOneWidget);
     expect(tester.element(find.text('Staff Workspace')), same(headerElement));

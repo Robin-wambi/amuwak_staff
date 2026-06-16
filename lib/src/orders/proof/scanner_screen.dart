@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/order_code.dart';
 import 'barcode_reader.dart';
 import 'barcode_scanner_scaffold.dart';
 
@@ -50,7 +51,17 @@ class _ScannerScreenState extends State<ScannerScreen> {
       });
       return;
     }
-    if (trimmed.toUpperCase() == widget.expectedOrderCode.toUpperCase()) {
+    // A rider can type just the order number ("42" / "0042") instead of the
+    // full code printed on the bag. We only treat a BARE number that way and
+    // match it by counter; a value carrying the AMW-/year format (e.g. a
+    // scanned QR from a different year) must still match the full string, so a
+    // same-counter tag from another year is correctly rejected below.
+    final isBareNumber = isBareOrderNumber(trimmed);
+    final expectedNumber = orderCodeNumber(widget.expectedOrderCode);
+    final matched = isBareNumber
+        ? expectedNumber != null && orderCodeNumber(trimmed) == expectedNumber
+        : trimmed.toUpperCase() == widget.expectedOrderCode.toUpperCase();
+    if (matched) {
       _matched = true;
       Navigator.pop(context, true);
       return;
@@ -162,7 +173,7 @@ class _ManualEntryView extends StatelessWidget {
             controller: controller,
             textCapitalization: TextCapitalization.characters,
             decoration: const InputDecoration(
-              hintText: 'e.g. AMW-2026-0042',
+              hintText: 'e.g. 42 or AMW-2026-0042',
               border: OutlineInputBorder(),
             ),
             onFieldSubmitted: (_) => onSubmit(),
