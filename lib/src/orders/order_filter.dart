@@ -34,8 +34,8 @@ enum OrderFilter {
         OrderFilter.pendingWork => 'Pending work',
       };
 
-  /// Completed work reads best most-recent-first; upcoming work reads best
-  /// soonest-first. Only [completedToday] sorts newest-first.
+  /// Completed work (both [completedToday] and [completed]) reads best
+  /// most-recent-first; upcoming work reads best soonest-first.
   bool get newestFirst =>
       this == OrderFilter.completedToday || this == OrderFilter.completed;
 

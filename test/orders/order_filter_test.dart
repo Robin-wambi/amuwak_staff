@@ -130,7 +130,7 @@ void main() {
       expect(OrderFilter.completedToday.label, 'Completed today');
     });
 
-    test('newestFirst only for completedToday', () {
+    test('newestFirst is false for the non-completed filters', () {
       expect(OrderFilter.completedToday.newestFirst, isTrue);
       expect(OrderFilter.all.newestFirst, isFalse);
       expect(OrderFilter.pendingPickup.newestFirst, isFalse);
