@@ -18,6 +18,7 @@ import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
 import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
@@ -819,6 +820,79 @@ void main() {
       ]) {
         expect(cardHeight(title), assigned, reason: '$title vs Assigned');
       }
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Pending work" card opens the matching filter',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'P1',
+        orderCode: 'P1',
+        customerName: 'Pending Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 2,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pending work'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderFilterScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Pending work'), findsOneWidget);
+      expect(find.text('Pending Cust'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Items" card opens ItemsBreakdownScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'I1',
+        orderCode: 'I1',
+        customerName: 'Items Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 4,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Items'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ItemsBreakdownScreen), findsOneWidget);
+      expect(find.text('Total items handled today: 4'), findsOneWidget);
     },
   );
 
