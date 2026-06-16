@@ -7,6 +7,8 @@ import '../auth/session.dart';
 import '../auth/sign_out.dart';
 import '../notifications/notification_summary.dart';
 import '../notifications/notifications_screen.dart';
+import '../expenses/expense.dart';
+import '../expenses/expense_entry_screen.dart';
 import '../orders/geo_services.dart';
 import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
@@ -320,6 +322,27 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     ).then((_) => ref.invalidate(defaultRatePerKgUgxProvider));
   }
 
+  /// Opens the "record an expense" form. Writes go straight to Supabase; the
+  /// expenses stream re-emits and the report's Net updates on its own. Mirrors
+  /// the session guard in [_openPricingSettings].
+  void _openAddExpense() {
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired — please sign in again.')),
+      );
+      return;
+    }
+    final repo = ref.read(expensesRepositoryProvider);
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ExpenseEntryScreen(
+          save: (expense) => repo.addExpense(expense, actorStaffId: staffId),
+        ),
+      ),
+    );
+  }
+
   void _openOrderSearch() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -434,10 +457,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               ),
             ),
           2 => ordersAsync.when(
+              // Expenses are only needed on this tab — watch them here so the
+              // other tabs (and tests that never open the report) don't build
+              // the expenses stream. Degrade to empty while loading/errored so a
+              // hiccup never blanks the report; Net just reads as earned revenue.
               data: (orders) => DailyReportView(
                 orders: orders,
+                expenses: ref.watch(expensesStreamProvider).valueOrNull ??
+                    const <Expense>[],
                 onOpenFiltered: _openFilteredOrders,
                 onOpenItems: _openItemsBreakdown,
+                onAddExpense: _openAddExpense,
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => _ErrorRetry(
