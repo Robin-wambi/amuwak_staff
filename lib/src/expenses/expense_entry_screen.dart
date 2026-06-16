@@ -10,17 +10,18 @@ typedef SaveExpenseFn = Future<void> Function(Expense expense);
 /// note. Save is injected (the dashboard wires it to [ExpensesRepository]) so
 /// the screen is testable without Riverpod, mirroring [PricingSettingsScreen].
 class ExpenseEntryScreen extends StatefulWidget {
-  ExpenseEntryScreen({
+  const ExpenseEntryScreen({
     super.key,
     required this.save,
-    String Function()? idGenerator,
-    DateTime Function()? clock,
-  })  : idGenerator = idGenerator ?? defaultUuidV7,
-        clock = clock ?? DateTime.now;
+    this.idGenerator = defaultUuidV7,
+    this.clock = _defaultClock,
+  });
 
   final SaveExpenseFn save;
   final String Function() idGenerator;
   final DateTime Function() clock;
+
+  static DateTime _defaultClock() => DateTime.now();
 
   @override
   State<ExpenseEntryScreen> createState() => _ExpenseEntryScreenState();
