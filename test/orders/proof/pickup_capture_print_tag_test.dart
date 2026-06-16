@@ -159,7 +159,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(printer.printed, isEmpty);
-    expect(find.textContaining('Could not print the tag'), findsOneWidget);
+    // A connection failure reads as such, not as a generic print failure.
+    expect(find.textContaining('Could not connect to'), findsOneWidget);
     // The button is enabled again so the rider can retry.
     final button = tester.widget<OutlinedButton>(
       find.byKey(const Key('pickup_print_tag')),

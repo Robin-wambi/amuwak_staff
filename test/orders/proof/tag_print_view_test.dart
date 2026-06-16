@@ -146,6 +146,35 @@ void main() {
     expect(printer.printed, hasLength(1));
   });
 
+  testWidgets('falls back to the picker when the remembered printer is gone',
+      (tester) async {
+    const remembered = PrinterDevice(id: 'GONE:01', name: 'Old Printer');
+    SharedPreferences.setMockInitialValues({});
+    final store = PrinterStore(await SharedPreferences.getInstance());
+    await store.save(remembered);
+
+    const replacement = PrinterDevice(id: 'AB:CD', name: 'Phomemo M2');
+    final printer = FakeLabelPrinter(
+      devices: const [replacement],
+      connectFailingIds: {remembered.id},
+    );
+    await _pump(tester, printer: printer, printerStore: store);
+
+    await tester.tap(find.byKey(const Key('print_tag')));
+    await tester.pumpAndSettle();
+
+    // Remembered connect was attempted and failed, so the picker is shown.
+    expect(printer.connectCalls.first, equals(remembered));
+    expect(find.text('Phomemo M2'), findsOneWidget);
+
+    await tester.tap(find.text('Phomemo M2'));
+    await tester.pumpAndSettle();
+
+    expect(printer.printed, hasLength(1));
+    // The newly chosen printer replaces the dead one in storage.
+    expect(store.load(), equals(replacement));
+  });
+
   testWidgets('remembers the printer chosen from the picker', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = PrinterStore(await SharedPreferences.getInstance());

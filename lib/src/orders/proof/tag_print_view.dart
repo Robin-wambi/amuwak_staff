@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -16,7 +17,9 @@ typedef BluetoothPermissionRequester = Future<bool> Function();
 /// so we request them up front. On iOS the system prompts on first CoreBluetooth
 /// use via the Info.plist usage string, and in tests (host OS) this is a no-op.
 Future<bool> requestBluetoothPermissionDefault() async {
-  if (!Platform.isAndroid) return true;
+  // Web has no BT-print path (and dart:io Platform would throw there); iOS
+  // prompts via the Info.plist string on first CoreBluetooth use.
+  if (kIsWeb || !Platform.isAndroid) return true;
   final statuses = await [
     Permission.bluetoothConnect,
     Permission.bluetoothScan,
@@ -111,7 +114,13 @@ class _TagPrintViewState extends State<TagPrintView> {
     }
     final device = await _pickPrinter(printer);
     if (device == null) return false;
-    await printer.connect(device);
+    try {
+      await printer.connect(device);
+    } catch (_) {
+      // Distinguish a connection failure from a print failure for the rider.
+      _snack('Could not connect to ${device.name}. Is it on and in range?');
+      return false;
+    }
     await widget.printerStore?.save(device);
     return true;
   }

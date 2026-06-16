@@ -10,6 +10,7 @@ class FakeLabelPrinter implements LabelPrinter {
     List<PrinterDevice> devices = const [],
     PrinterDevice? connected,
     this.connectThrows = false,
+    this.connectFailingIds = const {},
     this.printThrows,
   })  : _devices = devices,
         _connected = connected;
@@ -17,8 +18,11 @@ class FakeLabelPrinter implements LabelPrinter {
   final List<PrinterDevice> _devices;
   PrinterDevice? _connected;
 
-  /// When true, [connect] throws to exercise the error path.
+  /// When true, [connect] throws for any device.
   final bool connectThrows;
+
+  /// Device ids whose [connect] throws — e.g. a remembered printer that's gone.
+  final Set<String> connectFailingIds;
 
   /// When set, [printRaster] throws this to exercise the error path.
   final Object? printThrows;
@@ -42,7 +46,7 @@ class FakeLabelPrinter implements LabelPrinter {
   @override
   Future<void> connect(PrinterDevice device) async {
     connectCalls.add(device);
-    if (connectThrows) {
+    if (connectThrows || connectFailingIds.contains(device.id)) {
       throw Exception('connect failed');
     }
     _connected = device;
