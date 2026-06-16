@@ -29,10 +29,17 @@ class OrderFilterScreen extends ConsumerWidget {
     required this.filter,
     required this.onOrderTap,
     this.now,
+    this.title,
   });
 
   final OrderFilter filter;
   final void Function(LaundryOrder order) onOrderTap;
+
+  /// Overrides the AppBar title. Defaults to [OrderFilter.label] when null —
+  /// used so a caller (e.g. the daily report's "Orders" card) can title the
+  /// screen to match the card the user tapped, even when it reuses
+  /// [OrderFilter.all] (whose own label is "Assigned").
+  final String? title;
 
   /// Injectable clock for tests so the "Completed today" predicate and the
   /// "Today"/"Tomorrow" day-group labels are deterministic. Defaults to the
@@ -45,7 +52,7 @@ class OrderFilterScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: Text(filter.label)),
+      appBar: AppBar(title: Text(title ?? filter.label)),
       body: ordersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const EmptyState(

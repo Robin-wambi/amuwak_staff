@@ -18,6 +18,7 @@ import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
 import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
@@ -857,6 +858,48 @@ void main() {
       expect(find.byType(OrderFilterScreen), findsOneWidget);
       expect(find.widgetWithText(AppBar, 'Pending work'), findsOneWidget);
       expect(find.text('Pending Cust'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping the "Orders" card opens a screen titled "Orders"',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const seeded = LaundryOrder(
+        orderId: 'O1',
+        orderCode: 'O1',
+        customerName: 'Orders Cust',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value(const [seeded]),
+        ),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      // 'Orders' is also the bottom-nav label, so scope the tap to the report's
+      // metric card.
+      await tester.tap(find.descendant(
+        of: find.byType(DailyReportView),
+        matching: find.text('Orders'),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderFilterScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Orders'), findsOneWidget);
+      expect(find.text('Orders Cust'), findsOneWidget);
     },
   );
 

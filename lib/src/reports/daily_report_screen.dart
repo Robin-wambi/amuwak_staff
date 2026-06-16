@@ -46,7 +46,7 @@ class DailyReportView extends StatelessWidget {
 
   /// Opens the read-only list behind a tappable metric card. Null in the
   /// standalone/test render path, which leaves the cards inert.
-  final void Function(OrderFilter filter)? onOpenFiltered;
+  final void Function(OrderFilter filter, {String? title})? onOpenFiltered;
 
   /// Opens the items breakdown page behind the "Items" card.
   final VoidCallback? onOpenItems;
@@ -66,8 +66,8 @@ class DailyReportView extends StatelessWidget {
     // completed or not), so add them rather than make a third list pass.
     final totalRevenue = earnedRevenue + expectedRevenue;
 
-    VoidCallback? openFilter(OrderFilter filter) =>
-        onOpenFiltered == null ? null : () => onOpenFiltered!(filter);
+    VoidCallback? openFilter(OrderFilter filter, String title) =>
+        onOpenFiltered == null ? null : () => onOpenFiltered!(filter, title: title);
 
     return SafeArea(
       child: ListView(
@@ -143,7 +143,7 @@ class DailyReportView extends StatelessWidget {
                   title: 'Orders',
                   value: '$totalOrders',
                   icon: Icons.assignment_outlined,
-                  onTap: openFilter(OrderFilter.all),
+                  onTap: openFilter(OrderFilter.all, 'Orders'),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -165,7 +165,7 @@ class DailyReportView extends StatelessWidget {
                   title: OrderStatus.completed.label,
                   value: '$completed',
                   icon: Icons.check_circle_outline_rounded,
-                  onTap: openFilter(OrderFilter.completed),
+                  onTap: openFilter(OrderFilter.completed, OrderStatus.completed.label),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -174,7 +174,7 @@ class DailyReportView extends StatelessWidget {
                   title: 'Pending work',
                   value: '$pendingWork',
                   icon: Icons.pending_actions_outlined,
-                  onTap: openFilter(OrderFilter.pendingWork),
+                  onTap: openFilter(OrderFilter.pendingWork, 'Pending work'),
                 ),
               ),
             ],

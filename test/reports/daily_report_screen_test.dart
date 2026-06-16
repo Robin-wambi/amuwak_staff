@@ -65,6 +65,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     final filters = <OrderFilter>[];
+    final titles = <String?>[];
     var itemsTaps = 0;
 
     await tester.pumpWidget(MaterialApp(
@@ -74,7 +75,10 @@ void main() {
             _order('A', OrderStatus.completed, 8000),
             _order('B', OrderStatus.inProgress, 5000),
           ],
-          onOpenFiltered: filters.add,
+          onOpenFiltered: (f, {title}) {
+            filters.add(f);
+            titles.add(title);
+          },
           onOpenItems: () => itemsTaps++,
         ),
       ),
@@ -92,6 +96,7 @@ void main() {
       OrderFilter.completed,
       OrderFilter.pendingWork,
     ]);
+    expect(titles, ['Orders', 'Completed', 'Pending work']);
     expect(itemsTaps, 1);
   });
 

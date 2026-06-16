@@ -328,12 +328,13 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   /// Opens the read-only list of orders behind a tapped summary card. The
   /// session check + repository wiring live in [_openOrderDetails], which the
   /// filter screen calls on tap.
-  void _openFilteredOrders(OrderFilter filter) {
+  void _openFilteredOrders(OrderFilter filter, {String? title}) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => OrderFilterScreen(
           filter: filter,
           onOrderTap: _openOrderDetails,
+          title: title,
         ),
       ),
     );
