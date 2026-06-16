@@ -15,7 +15,14 @@ enum OrderFilter {
 
   /// Orders *delivered today* (status completed + a delivery proof captured on
   /// the current calendar day). Distinct from an all-time completed count.
-  completedToday;
+  completedToday,
+
+  /// Every completed order, all-time (status completed, no date constraint) —
+  /// the daily report's "Completed" card.
+  completed,
+
+  /// Every order not yet completed — the daily report's "Pending work" card.
+  pendingWork;
 
   String get label => switch (this) {
         OrderFilter.all => 'Assigned',
@@ -23,11 +30,14 @@ enum OrderFilter {
         OrderFilter.inProgress => OrderStatus.inProgress.label,
         OrderFilter.readyForDelivery => OrderStatus.readyForDelivery.label,
         OrderFilter.completedToday => 'Completed today',
+        OrderFilter.completed => 'Completed',
+        OrderFilter.pendingWork => 'Pending work',
       };
 
   /// Completed work reads best most-recent-first; upcoming work reads best
   /// soonest-first. Only [completedToday] sorts newest-first.
-  bool get newestFirst => this == OrderFilter.completedToday;
+  bool get newestFirst =>
+      this == OrderFilter.completedToday || this == OrderFilter.completed;
 
   bool matches(LaundryOrder o, {required DateTime now}) => switch (this) {
         OrderFilter.all => true,
@@ -36,6 +46,8 @@ enum OrderFilter {
         OrderFilter.readyForDelivery =>
           o.status == OrderStatus.readyForDelivery,
         OrderFilter.completedToday => _isCompletedToday(o, now),
+        OrderFilter.completed => o.status == OrderStatus.completed,
+        OrderFilter.pendingWork => o.status != OrderStatus.completed,
       };
 
   List<LaundryOrder> apply(

@@ -138,4 +138,54 @@ void main() {
       expect(OrderFilter.readyForDelivery.newestFirst, isFalse);
     });
   });
+
+  group('OrderFilter.completed (all-time)', () {
+    final orders = [
+      _order(OrderStatus.pendingPickup),
+      _order(OrderStatus.inProgress),
+      _order(OrderStatus.completed, deliveredAt: DateTime(2026, 6, 11, 9)),
+      _order(OrderStatus.completed), // completed, no delivery proof
+    ];
+
+    test('matches every completed order regardless of delivery date', () {
+      expect(OrderFilter.completed.apply(orders, now: now).length, 2);
+    });
+
+    test('count equals countByStatus(completed)', () {
+      expect(
+        OrderFilter.completed.count(orders, now: now),
+        orders.countByStatus(OrderStatus.completed),
+      );
+    });
+
+    test('label and newestFirst', () {
+      expect(OrderFilter.completed.label, 'Completed');
+      expect(OrderFilter.completed.newestFirst, isTrue);
+    });
+  });
+
+  group('OrderFilter.pendingWork', () {
+    final orders = [
+      _order(OrderStatus.pendingPickup),
+      _order(OrderStatus.inProgress),
+      _order(OrderStatus.readyForDelivery),
+      _order(OrderStatus.completed, deliveredAt: DateTime(2026, 6, 11, 9)),
+    ];
+
+    test('matches every not-completed order', () {
+      expect(OrderFilter.pendingWork.apply(orders, now: now).length, 3);
+    });
+
+    test('count equals total minus completed', () {
+      expect(
+        OrderFilter.pendingWork.count(orders, now: now),
+        orders.length - orders.countByStatus(OrderStatus.completed),
+      );
+    });
+
+    test('label and newestFirst', () {
+      expect(OrderFilter.pendingWork.label, 'Pending work');
+      expect(OrderFilter.pendingWork.newestFirst, isFalse);
+    });
+  });
 }
