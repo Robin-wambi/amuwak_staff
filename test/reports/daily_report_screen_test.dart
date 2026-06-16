@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
+import 'package:amuwak_staff/src/orders/order_filter.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
@@ -56,5 +57,60 @@ void main() {
     expect(find.text('Revenue'), findsOneWidget);
     // Earned, Expected, and Total booked all render USh 0.
     expect(find.text('USh 0'), findsNWidgets(3));
+  });
+
+  testWidgets('each card invokes the right navigation callback', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final filters = <OrderFilter>[];
+    var itemsTaps = 0;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: DailyReportView(
+          orders: [
+            _order('A', OrderStatus.completed, 8000),
+            _order('B', OrderStatus.inProgress, 5000),
+          ],
+          onOpenFiltered: filters.add,
+          onOpenItems: () => itemsTaps++,
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Orders'));
+    // "Completed" also appears in the status-breakdown card, so scope the tap
+    // to the metric card identified by its check icon.
+    await tester.tap(find.descendant(
+      of: find.ancestor(
+        of: find.byIcon(Icons.check_circle_outline_rounded),
+        matching: find.byType(GestureDetector),
+      ),
+      matching: find.text('Completed'),
+    ));
+    await tester.tap(find.text('Pending work'));
+    await tester.tap(find.text('Items'));
+
+    expect(filters, [
+      OrderFilter.all,
+      OrderFilter.completed,
+      OrderFilter.pendingWork,
+    ]);
+    expect(itemsTaps, 1);
+  });
+
+  testWidgets('cards are inert when no callbacks are provided', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: DailyReportView(orders: [
+          _order('A', OrderStatus.completed, 8000),
+        ]),
+      ),
+    ));
+
+    await tester.tap(find.text('Orders'), warnIfMissed: false);
+    expect(tester.takeException(), isNull);
   });
 }
