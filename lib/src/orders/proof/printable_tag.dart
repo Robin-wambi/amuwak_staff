@@ -78,14 +78,18 @@ class PrintableTag extends StatelessWidget {
   }
 }
 
+/// Captures the printable tag behind [boundaryKey] to PNG bytes. Injected into
+/// screens so tests can supply canned bytes instead of rasterising.
+typedef TagCapturer = Future<Uint8List> Function(GlobalKey boundaryKey);
+
 /// Rasterises the [RepaintBoundary] identified by [boundaryKey] to PNG bytes.
 ///
 /// [pixelRatio] sets the source crispness; the printer adapter resizes the
 /// bitmap to the label width, so a high ratio just preserves QR sharpness.
 /// Must be called after the boundary has been laid out and painted (one frame
 /// after it is inserted into the tree).
-Future<Uint8List> captureTagPng({
-  required GlobalKey boundaryKey,
+Future<Uint8List> captureTagPng(
+  GlobalKey boundaryKey, {
   double pixelRatio = 4,
 }) async {
   final boundary =

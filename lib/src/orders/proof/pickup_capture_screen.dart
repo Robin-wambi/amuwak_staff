@@ -16,8 +16,9 @@ import '../pricing/line_item.dart';
 import '../pricing/pricing_calculator.dart';
 import '../pricing/pricing_inputs.dart';
 import '../pricing/pricing_section.dart';
+import '../../printing/label_printer.dart';
+import 'printable_tag.dart';
 import 'proof_photo_storage.dart';
-import 'qr_display_widget.dart';
 
 DateTime _defaultClock() => DateTime.now();
 
@@ -34,6 +35,8 @@ class PickupCaptureScreen extends StatefulWidget {
     required this.actorStaffId,
     this.clock = _defaultClock,
     this.proofEventIdGenerator = defaultUuidV7,
+    this.labelPrinter,
+    this.captureTag = captureTagPng,
   });
 
   final LaundryOrder order;
@@ -44,6 +47,14 @@ class PickupCaptureScreen extends StatefulWidget {
   final ProofEventsRepository proofEventsRepo;
   final String actorStaffId;
   final String Function() proofEventIdGenerator;
+
+  /// Optional label printer. When null the "Print tag" action is hidden and the
+  /// screen falls back to its write-the-code / scan-on-screen guidance, so a
+  /// printerless site still works.
+  final LabelPrinter? labelPrinter;
+
+  /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
+  final TagCapturer captureTag;
 
   @override
   State<PickupCaptureScreen> createState() => _PickupCaptureScreenState();
@@ -59,6 +70,11 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   List<LineItem> _lineItems = [];
   bool _saving = false;
   bool _pickingPhoto = false;
+  bool _printing = false;
+
+  /// Wraps the on-screen [PrintableTag] so [TagCapturer] can rasterise exactly
+  /// what the rider sees.
+  final GlobalKey _tagBoundaryKey = GlobalKey();
 
   // Cached across retries so re-tapping "Done" after a downstream failure
   // produces a byte-identical ProofEvent + outbox payload. With the outbox's
@@ -124,6 +140,74 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         setState(() => _pickingPhoto = false);
       }
     }
+  }
+
+  /// Print the bag tag to the connected label printer, prompting the rider to
+  /// pick one first if needed. No-op when no printer is wired up.
+  Future<void> _onPrintTag() async {
+    final printer = widget.labelPrinter;
+    if (printer == null || _printing) return;
+    setState(() => _printing = true);
+    try {
+      if (!printer.isConnected) {
+        final device = await _pickPrinter(printer);
+        if (device == null) return; // cancelled or none paired
+        await printer.connect(device);
+      }
+      final bytes = await widget.captureTag(_tagBoundaryKey);
+      await printer.printRaster(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tag sent to printer.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not print the tag: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Ask the rider which paired printer to use. Returns null if they cancel or
+  /// none are paired (in which case we point them at the write/scan fallback).
+  Future<PrinterDevice?> _pickPrinter(LabelPrinter printer) async {
+    final devices = await printer.discover();
+    if (!mounted) return null;
+    if (devices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No paired printer found. Pair one in Bluetooth settings, or write '
+            'the order # on the bag.',
+          ),
+        ),
+      );
+      return null;
+    }
+    return showModalBottomSheet<PrinterDevice>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Choose a printer'),
+            ),
+            for (final device in devices)
+              ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: Text(device.name),
+                onTap: () => Navigator.pop(context, device),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _onConfirm() {
@@ -452,28 +536,51 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
   }
 
   Widget _buildQrStage() {
+    final canPrint = widget.labelPrinter != null;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          Text(
-            'Tie tag to the bag',
-            style: Theme.of(context).textTheme.titleLarge,
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(
+                    'Tie tag to the bag',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    canPrint
+                        ? 'Print the tag and tie it to the bag, or write order '
+                            '#${widget.order.orderCode} on it.'
+                        : 'Write order #${widget.order.orderCode} on the bag, '
+                            'or scan this QR.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.secondaryText),
+                  ),
+                  const SizedBox(height: 24),
+                  // The on-screen preview IS what prints — captured via the key.
+                  PrintableTag(
+                    orderCode: widget.order.orderCode,
+                    customerName: widget.order.customerName,
+                    boundaryKey: _tagBoundaryKey,
+                    qrSize: 220,
+                  ),
+                  if (canPrint) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      key: const Key('pickup_print_tag'),
+                      onPressed: _printing ? null : _onPrintTag,
+                      icon: const Icon(Icons.print_outlined),
+                      label: const Text('Print tag'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Write order #${widget.order.orderCode} on the bag, or scan this QR.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.secondaryText),
-          ),
-          const SizedBox(height: 24),
-          QrDisplayWidget(data: widget.order.orderCode),
           const SizedBox(height: 16),
-          Text(
-            widget.order.orderCode,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const Spacer(),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

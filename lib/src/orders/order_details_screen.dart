@@ -6,6 +6,7 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
+import '../printing/label_printer.dart';
 import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
@@ -34,6 +35,7 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.proofEventsRepo,
     required this.actorStaffId,
     this.clock = _defaultClock,
+    this.labelPrinter,
   });
 
   final LaundryOrder order;
@@ -44,6 +46,10 @@ class OrderDetailsScreen extends StatefulWidget {
   final ProofEventsRepository proofEventsRepo;
   final String actorStaffId;
   final DateTime Function() clock;
+
+  /// Label printer for bag tags, threaded through to pickup capture. Null at a
+  /// printerless site (the print action simply doesn't appear).
+  final LabelPrinter? labelPrinter;
 
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
@@ -154,6 +160,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ordersRepo: widget.ordersRepo,
           proofEventsRepo: widget.proofEventsRepo,
           actorStaffId: widget.actorStaffId,
+          labelPrinter: widget.labelPrinter,
         ),
       ),
     );

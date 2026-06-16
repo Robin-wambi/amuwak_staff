@@ -74,7 +74,7 @@ void main() {
 
     late Uint8List bytes;
     await tester.runAsync(() async {
-      bytes = await captureTagPng(boundaryKey: boundaryKey, pixelRatio: 2);
+      bytes = await captureTagPng(boundaryKey, pixelRatio: 2);
     });
 
     expect(bytes, isNotEmpty);
