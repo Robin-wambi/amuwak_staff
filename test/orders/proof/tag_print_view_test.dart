@@ -189,5 +189,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.load(), equals(device));
+    expect(printer.printed, hasLength(1));
   });
 }

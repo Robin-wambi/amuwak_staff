@@ -121,7 +121,12 @@ class _TagPrintViewState extends State<TagPrintView> {
       _snack('Could not connect to ${device.name}. Is it on and in range?');
       return false;
     }
-    await widget.printerStore?.save(device);
+    try {
+      await widget.printerStore?.save(device);
+    } catch (_) {
+      // Remembering the printer is best-effort; a prefs failure must not abort
+      // the print now that we're connected.
+    }
     return true;
   }
 
