@@ -42,5 +42,11 @@ OrderTotal recomputeTotal(PricingInputs inputs) {
   );
 }
 
-/// Half-up rounding for non-negative values: (x + 0.5).floor().
-int _roundHalfUp(double x) => (x + 0.5).floor();
+/// Half-up rounding for non-negative values: (x + 0.5).floor(). All callers feed
+/// values constrained to >= 0 (weights, rates, amounts); the assert pins that
+/// precondition so a future negative input fails loudly in debug rather than
+/// rounding the wrong way.
+int _roundHalfUp(double x) {
+  assert(x >= 0, '_roundHalfUp expects a non-negative value, got $x');
+  return (x + 0.5).floor();
+}

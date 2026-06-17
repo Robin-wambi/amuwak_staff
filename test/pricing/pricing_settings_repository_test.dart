@@ -30,60 +30,7 @@ void main() {
           }
         ];
 
-    test('updateDefaultRate writes the rate, timestamp and actor by id',
-        () async {
-      String? updatedId;
-      Map<String, dynamic>? updatedValues;
-      final repo = PricingSettingsRepository.forTest(
-        fetchRows: () async => singletonRow(),
-        updateRow: (id, values) async {
-          updatedId = id;
-          updatedValues = values;
-        },
-      );
-      await repo.updateDefaultRate(6000, actorStaffId: 'staff-9');
-      expect(updatedId, 'p1');
-      expect(updatedValues!['default_rate_per_kg_ugx'], 6000);
-      expect(updatedValues!['updated_by'], 'staff-9');
-      expect(updatedValues!.containsKey('updated_at'), isTrue);
-    });
-
-    test('updateDefaultRate reuses the cached id and does not re-read',
-        () async {
-      var fetchCalls = 0;
-      final repo = PricingSettingsRepository.forTest(
-        fetchRows: () async {
-          fetchCalls++;
-          return singletonRow();
-        },
-        updateRow: (_, __) async {},
-      );
-      // The settings screen always loads before saving — prime the cache.
-      await repo.fetch();
-      expect(fetchCalls, 1);
-      await repo.updateDefaultRate(6000, actorStaffId: 'staff-9');
-      await repo.updateDefaultRate(7000, actorStaffId: 'staff-9');
-      // No extra SELECT for the singleton id on either save.
-      expect(fetchCalls, 1);
-    });
-
-    test('updateDefaultRate fetches once for the id when nothing is cached',
-        () async {
-      var fetchCalls = 0;
-      String? updatedId;
-      final repo = PricingSettingsRepository.forTest(
-        fetchRows: () async {
-          fetchCalls++;
-          return singletonRow();
-        },
-        updateRow: (id, _) async => updatedId = id,
-      );
-      await repo.updateDefaultRate(6000, actorStaffId: 'staff-9');
-      expect(fetchCalls, 1);
-      expect(updatedId, 'p1');
-    });
-
-    test('updateSettings writes rate, delivery fee and express surcharge',
+    test('updateSettings writes rate, delivery fee, express, actor and time',
         () async {
       String? updatedId;
       Map<String, dynamic>? values;
@@ -108,6 +55,55 @@ void main() {
       expect(values!['express_surcharge_pct'], 30);
       expect(values!['updated_by'], 'staff-9');
       expect(values!.containsKey('updated_at'), isTrue);
+    });
+
+    test('updateSettings reuses the cached id and does not re-read', () async {
+      var fetchCalls = 0;
+      final repo = PricingSettingsRepository.forTest(
+        fetchRows: () async {
+          fetchCalls++;
+          return singletonRow();
+        },
+        updateRow: (_, __) async {},
+      );
+      // The settings screen always loads before saving — prime the cache.
+      await repo.fetch();
+      expect(fetchCalls, 1);
+      await repo.updateSettings(
+          ratePerKgUgx: 6000,
+          deliveryFeeUgx: 0,
+          expressFlatUgx: 0,
+          expressPct: 0,
+          actorStaffId: 'staff-9');
+      await repo.updateSettings(
+          ratePerKgUgx: 7000,
+          deliveryFeeUgx: 0,
+          expressFlatUgx: 0,
+          expressPct: 0,
+          actorStaffId: 'staff-9');
+      // No extra SELECT for the singleton id on either save.
+      expect(fetchCalls, 1);
+    });
+
+    test('updateSettings fetches once for the id when nothing is cached',
+        () async {
+      var fetchCalls = 0;
+      String? updatedId;
+      final repo = PricingSettingsRepository.forTest(
+        fetchRows: () async {
+          fetchCalls++;
+          return singletonRow();
+        },
+        updateRow: (id, _) async => updatedId = id,
+      );
+      await repo.updateSettings(
+          ratePerKgUgx: 6000,
+          deliveryFeeUgx: 0,
+          expressFlatUgx: 0,
+          expressPct: 0,
+          actorStaffId: 'staff-9');
+      expect(fetchCalls, 1);
+      expect(updatedId, 'p1');
     });
   });
 }

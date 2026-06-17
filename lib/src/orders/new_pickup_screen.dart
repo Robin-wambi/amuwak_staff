@@ -628,8 +628,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               key: const Key('np_delivery_toggle'),
               contentPadding: EdgeInsets.zero,
               title: const Text('Include delivery'),
-              subtitle: Text(
-                  'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'),
+              subtitle: Text(widget.deliveryFeeUgx > 0
+                  ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
+                  : 'No delivery fee configured'),
               value: _includeDelivery,
               onChanged: (v) => setState(() => _includeDelivery = v),
             ),

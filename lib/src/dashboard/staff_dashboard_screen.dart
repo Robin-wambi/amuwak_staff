@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -288,9 +290,13 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // Warm the catalog for the "Add item" picker. Best-effort: a failed/slow
     // read just falls back to free-form line entry.
     final catalogItems = ref.read(pricingCatalogProvider).valueOrNull ??
-        await ref
-            .read(pricingCatalogProvider.future)
-            .catchError((_) => const <CatalogItem>[]);
+        await ref.read(pricingCatalogProvider.future).catchError(
+          (Object e, StackTrace st) {
+            developer.log('Catalog load failed; using free-form entry only.',
+                name: 'StaffDashboard', error: e, stackTrace: st);
+            return const <CatalogItem>[];
+          },
+        );
     if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(

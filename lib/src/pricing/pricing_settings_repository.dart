@@ -58,28 +58,10 @@ class PricingSettingsRepository {
     return settings;
   }
 
-  /// Updates the global default rate on the singleton row. Reuses the cached id
-  /// when known (the settings screen always reads before it can save), so a save
-  /// doesn't pay for an extra SELECT just to learn the singleton's id.
-  Future<void> updateDefaultRate(double ratePerKgUgx,
-      {required String actorStaffId}) async {
-    final id = _cachedId ?? (await fetch()).id;
-    final values = {
-      'default_rate_per_kg_ugx': ratePerKgUgx,
-      'updated_at': _clock().toUtc().toIso8601String(),
-      'updated_by': actorStaffId,
-    };
-    final override = _updateRowOverride;
-    if (override != null) {
-      await override(id, values);
-      return;
-    }
-    await _supabase!.from('pricing_settings').update(values).eq('id', id);
-  }
-
   /// Updates the full pricing configuration on the singleton row: the default
   /// rate plus the delivery fee and express surcharge (flat + percentage).
-  /// Reuses the cached id like [updateDefaultRate].
+  /// Reuses the cached id when known (the settings screen always reads before it
+  /// can save), so a save doesn't pay for an extra SELECT for the singleton id.
   Future<void> updateSettings({
     required double ratePerKgUgx,
     required int deliveryFeeUgx,

@@ -464,7 +464,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   labelText: 'Manual adjustment (UGX, +/-)'),
                               onChanged: (_) => setState(() {}),
                             ),
-                            if (_order.isExpress) ...[
+                            if (_order.isExpress &&
+                                _pricingTotal.expressSurcharge > 0) ...[
                               const SizedBox(height: AppSpacing.sm),
                               _DetailRow(
                                 icon: Icons.bolt_outlined,
