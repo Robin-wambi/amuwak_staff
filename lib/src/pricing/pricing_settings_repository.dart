@@ -76,4 +76,31 @@ class PricingSettingsRepository {
     }
     await _supabase!.from('pricing_settings').update(values).eq('id', id);
   }
+
+  /// Updates the full pricing configuration on the singleton row: the default
+  /// rate plus the delivery fee and express surcharge (flat + percentage).
+  /// Reuses the cached id like [updateDefaultRate].
+  Future<void> updateSettings({
+    required double ratePerKgUgx,
+    required int deliveryFeeUgx,
+    required int expressFlatUgx,
+    required double expressPct,
+    required String actorStaffId,
+  }) async {
+    final id = _cachedId ?? (await fetch()).id;
+    final values = {
+      'default_rate_per_kg_ugx': ratePerKgUgx,
+      'delivery_fee_ugx': deliveryFeeUgx,
+      'express_surcharge_flat_ugx': expressFlatUgx,
+      'express_surcharge_pct': expressPct,
+      'updated_at': _clock().toUtc().toIso8601String(),
+      'updated_by': actorStaffId,
+    };
+    final override = _updateRowOverride;
+    if (override != null) {
+      await override(id, values);
+      return;
+    }
+    await _supabase!.from('pricing_settings').update(values).eq('id', id);
+  }
 }
