@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../shared/theme/app_spacing.dart';
 import '../shared/uuid.dart';
@@ -109,6 +110,10 @@ class _ExpenseEntryScreenState extends State<ExpenseEntryScreen> {
               key: const Key('expense_amount'),
               controller: _amountController,
               keyboardType: TextInputType.number,
+              // TextInputType.number is advisory on Android; the formatter keeps
+              // out pasted non-digits (e.g. "1,500", "15k") so the rejection
+              // happens inline rather than as a SnackBar on save.
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(border: OutlineInputBorder()),
             ),
             const SizedBox(height: AppSpacing.lg),

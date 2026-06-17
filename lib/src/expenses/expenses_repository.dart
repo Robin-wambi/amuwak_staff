@@ -69,7 +69,7 @@ class ExpensesRepository {
   }
 
   /// Soft-deletes an expense (back-office tombstone) so it drops off the report.
-  Future<void> softDelete(String id, {required String actorStaffId}) async {
+  Future<void> softDelete(String id) async {
     final now = _clock();
     final values = <String, dynamic>{
       'deleted_at': now.toUtc().toIso8601String(),

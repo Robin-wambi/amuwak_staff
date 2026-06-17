@@ -93,8 +93,11 @@ class DailyReportView extends StatelessWidget {
 
     final totalExpenses = expenses.totalExpenseUgx;
     final expensesByCategory = expenses.byCategory;
-    // Net profit is earned (recognised) revenue minus what was spent today —
-    // computed here, not in the widget, mirroring the revenue derivations above.
+    // Net = earned (recognised) revenue minus total spend. Nets against
+    // earnedRevenue, NOT totalRevenue — expected/outstanding revenue isn't money
+    // in hand. Computed here, not in the widget, mirroring the revenue
+    // derivations above. (Like the revenue figures, this is cumulative over the
+    // streamed orders/expenses, not scoped to a single calendar day.)
     final netUgx = earnedRevenue - totalExpenses;
     // Show the Expenses section once there's something to show or a way to add:
     // keeps the standalone/test render path (no expenses, no callback) unchanged.

@@ -48,7 +48,7 @@ void main() {
         },
       );
 
-      await repo.softDelete('e1', actorStaffId: 'staff-7');
+      await repo.softDelete('e1');
 
       expect(deletedId, 'e1');
       expect(values!['deleted_at'], '2026-06-17T10:30:00.000Z');
