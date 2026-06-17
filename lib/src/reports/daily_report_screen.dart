@@ -12,6 +12,7 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
+import 'report_period.dart';
 
 class DailyReportScreen extends StatelessWidget {
   const DailyReportScreen({
@@ -41,7 +42,7 @@ class DailyReportScreen extends StatelessWidget {
   }
 }
 
-class DailyReportView extends StatelessWidget {
+class DailyReportView extends StatefulWidget {
   const DailyReportView({
     super.key,
     required this.orders,
@@ -50,12 +51,14 @@ class DailyReportView extends StatelessWidget {
     this.onOpenItems,
     this.onAddExpense,
     this.onOpenExpenses,
+    this.initialPeriod = ReportPeriod.daily,
+    this.now,
   });
 
   final List<LaundryOrder> orders;
 
-  /// Today's recorded expenses, netted against earned revenue. Defaults to empty
-  /// so the standalone/test render path stays valid.
+  /// Recorded expenses, netted against earned revenue within the selected
+  /// period. Defaults to empty so the standalone/test render path stays valid.
   final List<Expense> expenses;
 
   /// Opens the read-only list behind a tappable metric card. Null in the
@@ -66,14 +69,38 @@ class DailyReportView extends StatelessWidget {
   final VoidCallback? onOpenItems;
 
   /// Opens the "record an expense" form. When non-null the Expenses card always
-  /// renders (with an Add action) even before any expense is logged today.
+  /// renders (with an Add action) even before any expense is logged.
   final VoidCallback? onAddExpense;
 
   /// Opens the full expenses list (tap target on the Expenses card). Optional.
   final VoidCallback? onOpenExpenses;
 
+  /// The period the report opens on. Defaults to [ReportPeriod.daily].
+  final ReportPeriod initialPeriod;
+
+  /// Injectable clock for the current-period window. Defaults to the wall clock;
+  /// tests pass a fixed value so the window is deterministic.
+  final DateTime Function()? now;
+
+  @override
+  State<DailyReportView> createState() => _DailyReportViewState();
+}
+
+class _DailyReportViewState extends State<DailyReportView> {
+  late ReportPeriod _period = widget.initialPeriod;
+
   @override
   Widget build(BuildContext context) {
+    // Scope both orders and expenses to the selected period's window so every
+    // figure below — revenue, spend, Net, counts, status — covers the same span.
+    final window = _period.currentWindow((widget.now ?? DateTime.now)());
+    final orders = widget.orders.inPeriod(window);
+    final expenses = widget.expenses.inPeriod(window);
+    final onOpenFiltered = widget.onOpenFiltered;
+    final onOpenItems = widget.onOpenItems;
+    final onAddExpense = widget.onAddExpense;
+    final onOpenExpenses = widget.onOpenExpenses;
+
     final totalOrders = orders.length;
     final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
     final inProgress = orders.countByStatus(OrderStatus.inProgress);
@@ -93,11 +120,9 @@ class DailyReportView extends StatelessWidget {
 
     final totalExpenses = expenses.totalExpenseUgx;
     final expensesByCategory = expenses.byCategory;
-    // Net = earned (recognised) revenue minus total spend. Nets against
-    // earnedRevenue, NOT totalRevenue — expected/outstanding revenue isn't money
-    // in hand. Computed here, not in the widget, mirroring the revenue
-    // derivations above. (Like the revenue figures, this is cumulative over the
-    // streamed orders/expenses, not scoped to a single calendar day.)
+    // Net = earned (recognised) revenue minus total spend, both over the
+    // selected period's window. Nets against earnedRevenue, NOT totalRevenue —
+    // expected/outstanding revenue isn't money in hand.
     final netUgx = earnedRevenue - totalExpenses;
     // Show the Expenses section once there's something to show or a way to add:
     // keeps the standalone/test render path (no expenses, no callback) unchanged.
@@ -115,6 +140,17 @@ class DailyReportView extends StatelessWidget {
           AppSpacing.xxl,
         ),
         children: [
+          SegmentedButton<ReportPeriod>(
+            segments: [
+              for (final p in ReportPeriod.values)
+                ButtonSegment<ReportPeriod>(value: p, label: Text(p.label)),
+            ],
+            selected: {_period},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                setState(() => _period = selection.first),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg2),
             decoration: BoxDecoration(
@@ -138,7 +174,7 @@ class DailyReportView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Today's report",
+                        "${_period.headingLabel}'s report",
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onPrimaryContainer,
                           fontSize: 23,

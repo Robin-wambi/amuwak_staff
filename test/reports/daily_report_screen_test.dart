@@ -9,13 +9,19 @@ import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
 
-Expense _expense(ExpenseCategory category, int amountUgx) => Expense(
-      id: '$category-$amountUgx',
+// Default spend date is local Wed 2026-06-17 — matches [_fixedNow] so the
+// daily window contains it. Pass [on] to place an expense on another day.
+Expense _expense(ExpenseCategory category, int amountUgx, {DateTime? on}) =>
+    Expense(
+      id: '$category-$amountUgx-${on ?? ''}',
       category: category,
       amountUgx: amountUgx,
       note: '',
-      spentAt: DateTime.utc(2026, 6, 17, 8),
+      spentAt: on ?? DateTime(2026, 6, 17, 8),
     );
+
+// Fixed reference clock so the report's period window is deterministic in tests.
+DateTime _fixedNow() => DateTime(2026, 6, 17, 12);
 
 LaundryOrder _order(String id, OrderStatus status, int totalUgx) => LaundryOrder(
       orderId: id,
@@ -169,7 +175,10 @@ void main() {
     ];
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: DailyReportView(orders: orders, expenses: expenses)),
+      home: Scaffold(
+        body: DailyReportView(
+            orders: orders, expenses: expenses, now: _fixedNow),
+      ),
     ));
 
     expect(find.text('Expenses'), findsOneWidget);
@@ -190,7 +199,10 @@ void main() {
     final expenses = [_expense(ExpenseCategory.fuel, 18000)]; // spent 18,000
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: DailyReportView(orders: orders, expenses: expenses)),
+      home: Scaffold(
+        body: DailyReportView(
+            orders: orders, expenses: expenses, now: _fixedNow),
+      ),
     ));
 
     // Net = 10,000 − 18,000 = −8,000.
@@ -215,5 +227,39 @@ void main() {
     expect(find.text('Expenses'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.add));
     expect(addTaps, 1);
+  });
+
+  testWidgets('switching Daily→Weekly rescopes the period and its spend',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // now = Wed 2026-06-17. Its week starts Mon 2026-06-15. Two expenses fall
+    // today and one on Monday; the Monday one is in the week but not the day.
+    final expenses = [
+      _expense(ExpenseCategory.detergent, 6000), // today (06-17)
+      _expense(ExpenseCategory.packaging, 2000), // today (06-17)
+      _expense(ExpenseCategory.fuel, 9000,
+          on: DateTime(2026, 6, 15, 8)), // Monday — same week, not today
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: DailyReportView(
+            orders: const [], expenses: expenses, now: _fixedNow),
+      ),
+    ));
+
+    // Daily: header says Today; only today's spend (6,000 + 2,000) counts.
+    expect(find.text("Today's report"), findsOneWidget);
+    expect(find.text('USh 8,000'), findsOneWidget); // total spent (daily)
+
+    await tester.tap(find.text('Weekly'));
+    await tester.pumpAndSettle();
+
+    // Weekly: header updates and Monday's 9,000 folds in (8,000 + 9,000).
+    expect(find.text("This week's report"), findsOneWidget);
+    expect(find.text('USh 17,000'), findsOneWidget); // total spent (weekly)
   });
 }
