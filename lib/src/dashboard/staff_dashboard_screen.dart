@@ -33,6 +33,7 @@ import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
 import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings_screen.dart';
+import '../pricing/pricing_catalog_screen.dart';
 import '../shared/uuid.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
@@ -328,9 +329,23 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
             expressPct: expressPct,
             actorStaffId: staffId,
           ),
+          onManageCatalog: _openPricingCatalog,
         ),
       ),
     ).then((_) => ref.invalidate(pricingSettingsProvider));
+  }
+
+  void _openPricingCatalog() {
+    final catalogRepo = ref.read(pricingCatalogRepositoryProvider);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PricingCatalogScreen(
+          load: catalogRepo.fetchAll,
+          save: catalogRepo.upsertItem,
+          idGenerator: defaultUuidV7,
+        ),
+      ),
+    ).then((_) => ref.invalidate(pricingCatalogProvider));
   }
 
   /// Opens the "record an expense" form. Writes go straight to Supabase; the
