@@ -129,7 +129,7 @@ class _DailyReportViewState extends State<DailyReportView> {
     final showExpenses = expenses.isNotEmpty || onAddExpense != null;
 
     VoidCallback? openFilter(OrderFilter filter, String title) =>
-        onOpenFiltered == null ? null : () => onOpenFiltered!(filter, title: title);
+        onOpenFiltered == null ? null : () => onOpenFiltered(filter, title: title);
 
     return SafeArea(
       child: ListView(
