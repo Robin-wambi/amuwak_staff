@@ -41,6 +41,10 @@ drift.Order _orderRow({
     lineItems: '[]',
     manualAdjustmentUgx: 0,
     totalUgx: 0,
+    deliveryFeeSnapshotUgx: 0,
+    isExpress: false,
+    expressFlatSnapshotUgx: 0,
+    expressPctSnapshot: 0,
   );
 }
 

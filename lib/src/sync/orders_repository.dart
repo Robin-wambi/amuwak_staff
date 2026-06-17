@@ -129,6 +129,10 @@ class OrdersRepository {
       finalWeightKg: order.finalWeightKg,
       lineItems: order.lineItems,
       manualAdjustmentUgx: order.manualAdjustmentUgx,
+      deliveryFeeUgx: order.deliveryFeeSnapshotUgx,
+      isExpress: order.isExpress,
+      expressFlatUgx: order.expressFlatSnapshotUgx,
+      expressPct: order.expressPctSnapshot,
     ));
     return order.copyWith(totalUgx: t.total);
   }
@@ -182,6 +186,10 @@ class OrdersRepository {
       'final_weight_kg': priced.finalWeightKg,
       'line_items': priced.lineItems.map((i) => i.toJson()).toList(),
       'manual_adjustment_ugx': priced.manualAdjustmentUgx,
+      'delivery_fee_snapshot_ugx': priced.deliveryFeeSnapshotUgx,
+      'is_express': priced.isExpress,
+      'express_flat_snapshot_ugx': priced.expressFlatSnapshotUgx,
+      'express_pct_snapshot': priced.expressPctSnapshot,
       'total_ugx': priced.totalUgx,
       'updated_at': _clock().toUtc().toIso8601String(),
     }).eq('id', priced.orderId).select('id');

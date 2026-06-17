@@ -174,6 +174,10 @@ void main() {
       lineItems: [LineItem(name: 'Blanket', amountUgx: 8000)],
       manualAdjustmentUgx: -1000,
       totalUgx: 19500,
+      deliveryFeeSnapshotUgx: 3000,
+      isExpress: true,
+      expressFlatSnapshotUgx: 2000,
+      expressPctSnapshot: 30,
     );
     final p = orderUpsertPayload(order,
         actorStaffId: 's1', now: DateTime.utc(2026, 6, 6));
@@ -184,6 +188,10 @@ void main() {
       {'name': 'Blanket', 'amount_ugx': 8000}
     ]);
     expect(p['manual_adjustment_ugx'], -1000);
+    expect(p['delivery_fee_snapshot_ugx'], 3000);
+    expect(p['is_express'], true);
+    expect(p['express_flat_snapshot_ugx'], 2000);
+    expect(p['express_pct_snapshot'], 30);
     expect(p['total_ugx'], 19500);
   });
 }
