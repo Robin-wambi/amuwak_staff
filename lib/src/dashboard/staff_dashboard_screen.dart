@@ -32,6 +32,7 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
 import '../pricing/pricing_providers.dart';
+import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../pricing/pricing_catalog_screen.dart';
 import '../shared/uuid.dart';
@@ -186,14 +187,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
-    final double defaultRate;
+    final PricingSettings settings;
     try {
-      defaultRate =
-          ref.read(defaultRatePerKgUgxProvider).valueOrNull ??
-              await ref
-                  .read(pricingSettingsRepositoryProvider)
-                  .fetch()
-                  .then((s) => s.defaultRatePerKgUgx);
+      settings = ref.read(pricingSettingsProvider).valueOrNull ??
+          await ref.read(pricingSettingsRepositoryProvider).fetch();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,7 +212,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           customerIdGenerator: defaultUuidV7,
           geolocate: createDefaultGeolocate(),
           reverseGeocode: createDefaultReverseGeocode(),
-          defaultRatePerKgUgx: defaultRate,
+          defaultRatePerKgUgx: settings.defaultRatePerKgUgx,
+          deliveryFeeUgx: settings.deliveryFeeUgx,
+          expressFlatUgx: settings.expressFlatUgx,
+          expressPct: settings.expressPct,
         ),
       ),
     );
