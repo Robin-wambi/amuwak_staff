@@ -9,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
+import 'package:amuwak_staff/src/expenses/expense.dart';
+import 'package:amuwak_staff/src/expenses/expense_entry_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
@@ -101,6 +103,9 @@ Future<void> pumpDashboardWithDb(
             .overrideWith((ref) => const Stream<DateTime?>.empty()),
         ordersStreamProvider
             .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
+        // The report tab watches expenses; keep it off the Supabase mock.
+        expensesStreamProvider
+            .overrideWith((ref) => Stream<List<Expense>>.value(const [])),
         outboxDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
@@ -961,6 +966,49 @@ void main() {
 
       expect(find.byType(ItemsBreakdownScreen), findsOneWidget);
       expect(find.text('Total items handled today: 4'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping Add opens the expense entry screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Record an expense'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseEntryScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab: tapping Add with a null staffId shows a session-expired '
+    'SnackBar instead of opening the entry screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Record an expense'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExpenseEntryScreen), findsNothing);
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
     },
   );
 

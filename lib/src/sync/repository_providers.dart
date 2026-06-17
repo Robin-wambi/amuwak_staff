@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../expenses/expense.dart';
+import '../expenses/expenses_repository.dart';
 import '../orders/order.dart';
 import 'customers_repository.dart';
 import 'orders_repository.dart';
@@ -32,7 +34,7 @@ import 'sync_status.dart';
 ///
 ///   alter publication supabase_realtime add table
 ///     public.orders, public.customers, public.proof_events,
-///     public.staff, public.order_status_events;
+///     public.staff, public.order_status_events, public.expenses;
 ///
 /// See docs/online-only-mode.md for the full ops checklist.
 final supabaseClientProvider =
@@ -72,4 +74,12 @@ final pullDeadLetterRepositoryProvider =
 
 final ordersStreamProvider = StreamProvider<List<LaundryOrder>>(
   (ref) => ref.watch(ordersRepositoryProvider).watchAll(),
+);
+
+final expensesRepositoryProvider = Provider<ExpensesRepository>(
+  (ref) => ExpensesRepository(ref.watch(supabaseClientProvider)),
+);
+
+final expensesStreamProvider = StreamProvider<List<Expense>>(
+  (ref) => ref.watch(expensesRepositoryProvider).watchAll(),
 );

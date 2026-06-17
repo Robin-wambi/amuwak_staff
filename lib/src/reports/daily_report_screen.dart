@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../expenses/expense.dart';
+import '../expenses/expense_list_extensions.dart';
 import '../orders/order.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
@@ -10,11 +12,17 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
+import 'report_period.dart';
 
 class DailyReportScreen extends StatelessWidget {
-  const DailyReportScreen({super.key, required this.orders});
+  const DailyReportScreen({
+    super.key,
+    required this.orders,
+    this.expenses = const [],
+  });
 
   final List<LaundryOrder> orders;
+  final List<Expense> expenses;
 
   @override
   Widget build(BuildContext context) {
@@ -29,20 +37,29 @@ class DailyReportScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: DailyReportView(orders: orders),
+      body: DailyReportView(orders: orders, expenses: expenses),
     );
   }
 }
 
-class DailyReportView extends StatelessWidget {
+class DailyReportView extends StatefulWidget {
   const DailyReportView({
     super.key,
     required this.orders,
+    this.expenses = const [],
     this.onOpenFiltered,
     this.onOpenItems,
+    this.onAddExpense,
+    this.onOpenExpenses,
+    this.initialPeriod = ReportPeriod.daily,
+    this.now,
   });
 
   final List<LaundryOrder> orders;
+
+  /// Recorded expenses, netted against earned revenue within the selected
+  /// period. Defaults to empty so the standalone/test render path stays valid.
+  final List<Expense> expenses;
 
   /// Opens the read-only list behind a tappable metric card. Null in the
   /// standalone/test render path, which leaves the cards inert.
@@ -51,8 +68,39 @@ class DailyReportView extends StatelessWidget {
   /// Opens the items breakdown page behind the "Items" card.
   final VoidCallback? onOpenItems;
 
+  /// Opens the "record an expense" form. When non-null the Expenses card always
+  /// renders (with an Add action) even before any expense is logged.
+  final VoidCallback? onAddExpense;
+
+  /// Opens the full expenses list (tap target on the Expenses card). Optional.
+  final VoidCallback? onOpenExpenses;
+
+  /// The period the report opens on. Defaults to [ReportPeriod.daily].
+  final ReportPeriod initialPeriod;
+
+  /// Injectable clock for the current-period window. Defaults to the wall clock;
+  /// tests pass a fixed value so the window is deterministic.
+  final DateTime Function()? now;
+
+  @override
+  State<DailyReportView> createState() => _DailyReportViewState();
+}
+
+class _DailyReportViewState extends State<DailyReportView> {
+  late ReportPeriod _period = widget.initialPeriod;
+
   @override
   Widget build(BuildContext context) {
+    // Scope both orders and expenses to the selected period's window so every
+    // figure below — revenue, spend, Net, counts, status — covers the same span.
+    final window = _period.currentWindow((widget.now ?? DateTime.now)());
+    final orders = widget.orders.inPeriod(window);
+    final expenses = widget.expenses.inPeriod(window);
+    final onOpenFiltered = widget.onOpenFiltered;
+    final onOpenItems = widget.onOpenItems;
+    final onAddExpense = widget.onAddExpense;
+    final onOpenExpenses = widget.onOpenExpenses;
+
     final totalOrders = orders.length;
     final pendingPickup = orders.countByStatus(OrderStatus.pendingPickup);
     final inProgress = orders.countByStatus(OrderStatus.inProgress);
@@ -70,8 +118,18 @@ class DailyReportView extends StatelessWidget {
     // completed or not), so add them rather than make a third list pass.
     final totalRevenue = earnedRevenue + expectedRevenue;
 
+    final totalExpenses = expenses.totalExpenseUgx;
+    final expensesByCategory = expenses.byCategory;
+    // Net = earned (recognised) revenue minus total spend, both over the
+    // selected period's window. Nets against earnedRevenue, NOT totalRevenue —
+    // expected/outstanding revenue isn't money in hand.
+    final netUgx = earnedRevenue - totalExpenses;
+    // Show the Expenses section once there's something to show or a way to add:
+    // keeps the standalone/test render path (no expenses, no callback) unchanged.
+    final showExpenses = expenses.isNotEmpty || onAddExpense != null;
+
     VoidCallback? openFilter(OrderFilter filter, String title) =>
-        onOpenFiltered == null ? null : () => onOpenFiltered!(filter, title: title);
+        onOpenFiltered == null ? null : () => onOpenFiltered(filter, title: title);
 
     return SafeArea(
       child: ListView(
@@ -82,6 +140,17 @@ class DailyReportView extends StatelessWidget {
           AppSpacing.xxl,
         ),
         children: [
+          SegmentedButton<ReportPeriod>(
+            segments: [
+              for (final p in ReportPeriod.values)
+                ButtonSegment<ReportPeriod>(value: p, label: Text(p.label)),
+            ],
+            selected: {_period},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                setState(() => _period = selection.first),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg2),
             decoration: BoxDecoration(
@@ -105,7 +174,7 @@ class DailyReportView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Today's report",
+                        "${_period.headingLabel}'s report",
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onPrimaryContainer,
                           fontSize: 23,
@@ -139,6 +208,33 @@ class DailyReportView extends StatelessWidget {
             completed: completed,
             pendingWork: pendingWork,
           ),
+          if (showExpenses) ...[
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Expenses',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                if (onAddExpense != null)
+                  IconButton(
+                    onPressed: onAddExpense,
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Record an expense',
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ExpensesCard(
+              byCategory: expensesByCategory,
+              totalSpent: totalExpenses,
+              net: netUgx,
+              periodLabel: _period.headingLabel,
+              onTap: onOpenExpenses,
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
@@ -207,6 +303,7 @@ class DailyReportView extends StatelessWidget {
             completed: completed,
             pendingWork: pendingWork,
             totalItems: totalItems,
+            periodLabel: _period.headingLabel,
           ),
         ],
       ),
@@ -366,6 +463,92 @@ class _RevenueRow extends StatelessWidget {
   }
 }
 
+class _ExpensesCard extends StatelessWidget {
+  const _ExpensesCard({
+    required this.byCategory,
+    required this.totalSpent,
+    required this.net,
+    required this.periodLabel,
+    this.onTap,
+  });
+
+  final Map<ExpenseCategory, int> byCategory;
+  final int totalSpent;
+  final int net;
+
+  /// The current period's noun ("Today" / "This week" / "This month"), used in
+  /// the empty-state line so it tracks the selector.
+  final String periodLabel;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Iterate the enum so categories always render in a stable, defined order;
+    // skip any with no spend today.
+    final rows = <Widget>[];
+    for (final category in ExpenseCategory.values) {
+      final amount = byCategory[category];
+      if (amount == null) continue;
+      if (rows.isNotEmpty) {
+        rows.add(const SizedBox(height: AppSpacing.lg - 2));
+      }
+      rows.add(_RevenueRow(label: category.label, amountUgx: amount));
+    }
+
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rows.isEmpty)
+            Text(
+              'No expenses recorded yet for ${periodLabel.toLowerCase()}.',
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            ...rows,
+          const Divider(height: AppSpacing.xl),
+          _RevenueRow(
+            label: 'Total spent',
+            amountUgx: totalSpent,
+            emphasized: true,
+          ),
+          const SizedBox(height: AppSpacing.lg - 2),
+          // Net = earned revenue − total spent. Green-tinted when in the black,
+          // error-tinted when spend has outrun earnings, both from the theme.
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Net',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Text(
+                formatUgx(net),
+                style: TextStyle(
+                  color: net < 0 ? colorScheme.error : colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusBreakdownCard extends StatelessWidget {
   const _StatusBreakdownCard({
     required this.pendingPickup,
@@ -482,6 +665,7 @@ class _WorkSummaryCard extends StatelessWidget {
     required this.completed,
     required this.pendingWork,
     required this.totalItems,
+    required this.periodLabel,
   });
 
   final int totalOrders;
@@ -489,11 +673,16 @@ class _WorkSummaryCard extends StatelessWidget {
   final int pendingWork;
   final int totalItems;
 
+  /// The current period's noun ("Today" / "This week" / "This month") so the
+  /// copy follows the selector instead of always reading "today".
+  final String periodLabel;
+
   @override
   Widget build(BuildContext context) {
+    final lower = periodLabel.toLowerCase();
     final message = completed == totalOrders && totalOrders > 0
-        ? 'All assigned laundry orders are completed for today.'
-        : '$pendingWork orders still need attention before the day is closed.';
+        ? 'All assigned laundry orders are completed for $lower.'
+        : '$pendingWork orders still need attention before $lower is closed.';
 
     return AppCard(
       child: Column(
@@ -505,7 +694,7 @@ class _WorkSummaryCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: AppSpacing.sm),
               Text(
-                "Today's progress",
+                "$periodLabel's progress",
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
@@ -521,7 +710,7 @@ class _WorkSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Total items handled today: $totalItems',
+            'Total items handled $lower: $totalItems',
             style: const TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w700,
