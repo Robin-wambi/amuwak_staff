@@ -23,5 +23,47 @@ void main() {
       });
       expect(s.defaultRatePerKgUgx, 4500.0);
     });
+
+    test('reads delivery fee and express surcharge fields', () {
+      final s = PricingSettings.fromSupabase({
+        'id': 'p1',
+        'default_rate_per_kg_ugx': 5000,
+        'updated_at': '2026-06-06T10:00:00Z',
+        'updated_by': null,
+        'delivery_fee_ugx': 3000,
+        'express_surcharge_flat_ugx': 2000,
+        'express_surcharge_pct': 30,
+      });
+      expect(s.deliveryFeeUgx, 3000);
+      expect(s.expressFlatUgx, 2000);
+      expect(s.expressPct, 30.0);
+    });
+
+    test('degrades missing delivery/express columns to zero', () {
+      final s = PricingSettings.fromSupabase({
+        'id': 'p1',
+        'default_rate_per_kg_ugx': 5000,
+        'updated_at': '2026-06-06T10:00:00Z',
+        'updated_by': null,
+      });
+      expect(s.deliveryFeeUgx, 0);
+      expect(s.expressFlatUgx, 0);
+      expect(s.expressPct, 0);
+    });
+
+    test('copyWith overrides only the given fields', () {
+      final s = PricingSettings.fromSupabase({
+        'id': 'p1',
+        'default_rate_per_kg_ugx': 5000,
+        'updated_at': '2026-06-06T10:00:00Z',
+        'updated_by': null,
+        'delivery_fee_ugx': 3000,
+        'express_surcharge_flat_ugx': 2000,
+        'express_surcharge_pct': 30,
+      }).copyWith(deliveryFeeUgx: 4000);
+      expect(s.deliveryFeeUgx, 4000);
+      expect(s.expressFlatUgx, 2000);
+      expect(s.defaultRatePerKgUgx, 5000);
+    });
   });
 }
