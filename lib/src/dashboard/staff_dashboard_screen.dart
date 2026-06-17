@@ -31,6 +31,7 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
+import '../pricing/catalog_item.dart';
 import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
@@ -284,6 +285,13 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    // Warm the catalog for the "Add item" picker. Best-effort: a failed/slow
+    // read just falls back to free-form line entry.
+    final catalogItems = ref.read(pricingCatalogProvider).valueOrNull ??
+        await ref
+            .read(pricingCatalogProvider.future)
+            .catchError((_) => const <CatalogItem>[]);
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OrderDetailsScreen(
@@ -296,6 +304,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
           printerStore: ref.read(printerStoreProvider),
+          catalogItems: catalogItems,
         ),
       ),
     );
