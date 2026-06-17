@@ -315,11 +315,22 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       MaterialPageRoute(
         builder: (_) => PricingSettingsScreen(
           load: repo.fetch,
-          save: (rate) =>
-              repo.updateDefaultRate(rate, actorStaffId: staffId),
+          save: ({
+            required ratePerKgUgx,
+            required deliveryFeeUgx,
+            required expressFlatUgx,
+            required expressPct,
+          }) =>
+              repo.updateSettings(
+            ratePerKgUgx: ratePerKgUgx,
+            deliveryFeeUgx: deliveryFeeUgx,
+            expressFlatUgx: expressFlatUgx,
+            expressPct: expressPct,
+            actorStaffId: staffId,
+          ),
         ),
       ),
-    ).then((_) => ref.invalidate(defaultRatePerKgUgxProvider));
+    ).then((_) => ref.invalidate(pricingSettingsProvider));
   }
 
   /// Opens the "record an expense" form. Writes go straight to Supabase; the
