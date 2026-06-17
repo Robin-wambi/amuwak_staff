@@ -231,6 +231,7 @@ class _DailyReportViewState extends State<DailyReportView> {
               byCategory: expensesByCategory,
               totalSpent: totalExpenses,
               net: netUgx,
+              periodLabel: _period.headingLabel,
               onTap: onOpenExpenses,
             ),
           ],
@@ -302,6 +303,7 @@ class _DailyReportViewState extends State<DailyReportView> {
             completed: completed,
             pendingWork: pendingWork,
             totalItems: totalItems,
+            periodLabel: _period.headingLabel,
           ),
         ],
       ),
@@ -466,12 +468,17 @@ class _ExpensesCard extends StatelessWidget {
     required this.byCategory,
     required this.totalSpent,
     required this.net,
+    required this.periodLabel,
     this.onTap,
   });
 
   final Map<ExpenseCategory, int> byCategory;
   final int totalSpent;
   final int net;
+
+  /// The current period's noun ("Today" / "This week" / "This month"), used in
+  /// the empty-state line so it tracks the selector.
+  final String periodLabel;
   final VoidCallback? onTap;
 
   @override
@@ -495,9 +502,9 @@ class _ExpensesCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (rows.isEmpty)
-            const Text(
-              'No expenses recorded yet today.',
-              style: TextStyle(
+            Text(
+              'No expenses recorded yet for ${periodLabel.toLowerCase()}.',
+              style: const TextStyle(
                 color: AppColors.secondaryText,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -658,6 +665,7 @@ class _WorkSummaryCard extends StatelessWidget {
     required this.completed,
     required this.pendingWork,
     required this.totalItems,
+    required this.periodLabel,
   });
 
   final int totalOrders;
@@ -665,11 +673,16 @@ class _WorkSummaryCard extends StatelessWidget {
   final int pendingWork;
   final int totalItems;
 
+  /// The current period's noun ("Today" / "This week" / "This month") so the
+  /// copy follows the selector instead of always reading "today".
+  final String periodLabel;
+
   @override
   Widget build(BuildContext context) {
+    final lower = periodLabel.toLowerCase();
     final message = completed == totalOrders && totalOrders > 0
-        ? 'All assigned laundry orders are completed for today.'
-        : '$pendingWork orders still need attention before the day is closed.';
+        ? 'All assigned laundry orders are completed for $lower.'
+        : '$pendingWork orders still need attention before $lower is closed.';
 
     return AppCard(
       child: Column(
@@ -681,7 +694,7 @@ class _WorkSummaryCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: AppSpacing.sm),
               Text(
-                "Today's progress",
+                "$periodLabel's progress",
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
@@ -697,7 +710,7 @@ class _WorkSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Total items handled today: $totalItems',
+            'Total items handled $lower: $totalItems',
             style: const TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w700,

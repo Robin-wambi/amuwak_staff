@@ -468,6 +468,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 onOpenFiltered: _openFilteredOrders,
                 onOpenItems: _openItemsBreakdown,
                 onAddExpense: _openAddExpense,
+                // TODO(v2): pass onOpenExpenses once an expenses list screen
+                // exists — until then the Expenses card has no tap target.
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => _ErrorRetry(

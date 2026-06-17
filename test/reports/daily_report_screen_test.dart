@@ -251,15 +251,17 @@ void main() {
       ),
     ));
 
-    // Daily: header says Today; only today's spend (6,000 + 2,000) counts.
+    // Daily: header + work-summary heading say Today; only today's spend counts.
     expect(find.text("Today's report"), findsOneWidget);
+    expect(find.text("Today's progress"), findsOneWidget);
     expect(find.text('USh 8,000'), findsOneWidget); // total spent (daily)
 
     await tester.tap(find.text('Weekly'));
     await tester.pumpAndSettle();
 
-    // Weekly: header updates and Monday's 9,000 folds in (8,000 + 9,000).
+    // Weekly: labels follow the period and Monday's 9,000 folds in (8,000 + 9,000).
     expect(find.text("This week's report"), findsOneWidget);
+    expect(find.text("This week's progress"), findsOneWidget);
     expect(find.text('USh 17,000'), findsOneWidget); // total spent (weekly)
   });
 }
