@@ -121,4 +121,16 @@ void main() {
     expect(saved.called, isFalse);
     expect(find.text('Fees and percentage must be 0 or more.'), findsOneWidget);
   });
+
+  testWidgets('rejects an express percentage of 1000 or more', (tester) async {
+    final saved = _Saved();
+    await tester.pumpWidget(_screen(saved));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const Key('settings_express_pct')), '1000');
+    await tester.tap(find.byKey(const Key('settings_save')));
+    await tester.pump();
+    expect(saved.called, isFalse);
+    expect(find.text('Express percentage must be below 1000.'), findsOneWidget);
+  });
 }
