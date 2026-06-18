@@ -148,13 +148,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     final parts = <String>[
       if (widget.expressFlatUgx > 0) '+${formatUgx(widget.expressFlatUgx)}',
       if (widget.expressPct > 0)
-        '+${_trimPct(widget.expressPct)}% of weight + items',
+        '+${formatPct(widget.expressPct)}% of weight + items',
     ];
     return parts.isEmpty ? 'No surcharge configured' : parts.join(', ');
   }
-
-  static String _trimPct(double pct) =>
-      pct == pct.roundToDouble() ? pct.round().toString() : pct.toString();
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
     setState(() {

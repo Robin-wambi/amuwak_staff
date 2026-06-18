@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../shared/format_ugx.dart';
 import '../shared/theme/app_spacing.dart';
 import 'pricing_settings.dart';
 
@@ -53,7 +54,7 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
         _rateController.text = s.defaultRatePerKgUgx.round().toString();
         _deliveryController.text = s.deliveryFeeUgx.toString();
         _expressFlatController.text = s.expressFlatUgx.toString();
-        _expressPctController.text = _trimPct(s.expressPct);
+        _expressPctController.text = formatPct(s.expressPct);
         _loading = false;
       });
     } catch (_) {
@@ -64,11 +65,6 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
       });
     }
   }
-
-  /// Shows a percentage without a trailing ".0" (e.g. 30, not 30.0) but keeps a
-  /// real fraction (e.g. 12.5).
-  static String _trimPct(double pct) =>
-      pct == pct.roundToDouble() ? pct.round().toString() : pct.toString();
 
   /// Parses a non-negative whole-UGX amount; blank reads as 0. Returns null if
   /// the input is non-numeric or negative.
@@ -103,6 +99,12 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
     final expressPct = _parseNonNegPct(_expressPctController.text);
     if (deliveryFee == null || expressFlat == null || expressPct == null) {
       _snack('Fees and percentage must be 0 or more.');
+      return;
+    }
+    // The column is numeric(5,2) (max 999.99); also guards a fat-fingered extra
+    // digit from producing a wildly inflated bill.
+    if (expressPct >= 1000) {
+      _snack('Express percentage must be below 1000.');
       return;
     }
     setState(() => _saving = true);
@@ -161,6 +163,7 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
                         controller: _deliveryController,
                         fieldKey: const Key('settings_delivery_fee'),
                         helper: 'Added to an order when delivery is included.',
+                        wholeNumber: true,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       Text('Express surcharge',
@@ -170,6 +173,7 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
                         label: 'Express flat add-on (UGX)',
                         controller: _expressFlatController,
                         fieldKey: const Key('settings_express_flat'),
+                        wholeNumber: true,
                       ),
                       const SizedBox(height: AppSpacing.md),
                       _field(
@@ -209,6 +213,7 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
     required TextEditingController controller,
     required Key fieldKey,
     String? helper,
+    bool wholeNumber = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +223,9 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
         TextField(
           key: fieldKey,
           controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: wholeNumber
+              ? TextInputType.number
+              : const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             helperText: helper,
