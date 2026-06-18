@@ -530,6 +530,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           3 => _AccountTab(
               onSignOut: _onSignOutPressed,
               onOpenPricingSettings: _openPricingSettings,
+              // Pricing writes are gated to in_shop + manager (migration 0024),
+              // so drivers don't get the entry point — saving would only fail.
+              canManagePricing: const {'in_shop', 'manager'}
+                  .contains(ref.watch(currentRoleProvider)),
             ),
           // Home tab. Loading and data share one `_HomeTab` widget (orders ==
           // null means loading) so the header and quick actions stay mounted
@@ -719,10 +723,15 @@ class _AccountTab extends StatelessWidget {
   const _AccountTab({
     required this.onSignOut,
     required this.onOpenPricingSettings,
+    required this.canManagePricing,
   });
 
   final VoidCallback onSignOut;
   final VoidCallback onOpenPricingSettings;
+
+  /// Whether to show the Pricing settings entry. False for drivers, whose
+  /// pricing writes are blocked server-side (migration 0024).
+  final bool canManagePricing;
 
   @override
   Widget build(BuildContext context) {
@@ -782,18 +791,20 @@ class _AccountTab extends StatelessWidget {
           value: 'Today',
         ),
         const SizedBox(height: AppSpacing.lg2),
-        AppCard(
-          onTap: onOpenPricingSettings,
-          child: Row(
-            children: [
-              Icon(Icons.payments_outlined, color: colorScheme.primary),
-              const SizedBox(width: AppSpacing.md),
-              const Expanded(child: Text('Pricing settings')),
-              const Icon(Icons.chevron_right_rounded),
-            ],
+        if (canManagePricing) ...[
+          AppCard(
+            onTap: onOpenPricingSettings,
+            child: Row(
+              children: [
+                Icon(Icons.payments_outlined, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(child: Text('Pricing settings')),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.lg2),
+          const SizedBox(height: AppSpacing.lg2),
+        ],
         OutlinedButton.icon(
           onPressed: onSignOut,
           icon: const Icon(Icons.logout_rounded),
