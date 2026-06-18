@@ -12,6 +12,7 @@ import '../../sync/proof_events_repository.dart';
 import '../order.dart';
 import '../order_status.dart';
 import '../proof_event.dart';
+import '../../pricing/catalog_item.dart';
 import '../pricing/line_item.dart';
 import '../pricing/pricing_calculator.dart';
 import '../pricing/pricing_inputs.dart';
@@ -40,6 +41,7 @@ class PickupCaptureScreen extends StatefulWidget {
     this.labelPrinter,
     this.printerStore,
     this.captureTag = captureTagPng,
+    this.catalogItems = const [],
   });
 
   final LaundryOrder order;
@@ -61,6 +63,10 @@ class PickupCaptureScreen extends StatefulWidget {
 
   /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
   final TagCapturer captureTag;
+
+  /// Active catalog items offered in the special-items "Add item" picker. Empty
+  /// falls back to the free-form entry sheet.
+  final List<CatalogItem> catalogItems;
 
   @override
   State<PickupCaptureScreen> createState() => _PickupCaptureScreenState();
@@ -430,7 +436,8 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
         LineItemsEditor(
           items: _lineItems,
           onAdd: () async {
-            final item = await showAddLineItemSheet(context);
+            final item =
+                await showPickLineItemSheet(context, widget.catalogItems);
             if (item != null) {
               setState(() => _lineItems = [..._lineItems, item]);
             }
