@@ -4,8 +4,8 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
+import 'package:amuwak_staff/src/pricing/catalog_item.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
@@ -320,6 +320,52 @@ void main() {
         findsOneWidget,
         reason: 'rider must be told pricing data needs re-entry on the order',
       );
+    },
+  );
+
+  testWidgets(
+    'Add item offers catalog items and adding one updates the total',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _pricedOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [1, 2, 3],
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+            ordersRepo: _okOrdersRepo(),
+            proofEventsRepo: _okProofRepo(),
+            actorStaffId: 's-test',
+            catalogItems: [
+              CatalogItem(id: 'c1', name: 'Blanket', amountUgx: 8000),
+            ],
+          ),
+        ),
+      );
+
+      await tester.enterText(
+          find.byKey(const Key('pickup_estimated_weight')), '2');
+      await tester.pump();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('add_line_item')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('add_line_item')));
+      await tester.pumpAndSettle();
+
+      // The catalog item appears in the picker; tapping it adds the line.
+      await tester.tap(find.byKey(const Key('pick_catalog_item_0')));
+      await tester.pumpAndSettle();
+
+      // 2 kg × 5000 = 10,000 + Blanket 8,000 = 18,000.
+      await tester.scrollUntilVisible(
+        find.text('USh 18,000'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('USh 18,000'), findsOneWidget);
     },
   );
 

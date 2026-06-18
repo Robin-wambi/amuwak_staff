@@ -182,6 +182,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           proofEventsRepo: widget.proofEventsRepo,
           actorStaffId: widget.actorStaffId,
           labelPrinter: widget.labelPrinter,
+          catalogItems: widget.catalogItems,
         ),
       ),
     );

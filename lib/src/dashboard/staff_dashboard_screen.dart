@@ -256,6 +256,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    final catalogItems = await _loadCatalogItems();
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PickupCaptureScreen(
@@ -267,6 +269,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
           printerStore: ref.read(printerStoreProvider),
+          catalogItems: catalogItems,
         ),
       ),
     );
@@ -289,14 +292,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     }
     // Warm the catalog for the "Add item" picker. Best-effort: a failed/slow
     // read just falls back to free-form line entry.
-    final catalogItems = ref.read(pricingCatalogProvider).valueOrNull ??
-        await ref.read(pricingCatalogProvider.future).catchError(
-          (Object e, StackTrace st) {
-            developer.log('Catalog load failed; using free-form entry only.',
-                name: 'StaffDashboard', error: e, stackTrace: st);
-            return const <CatalogItem>[];
-          },
-        );
+    final catalogItems = await _loadCatalogItems();
     if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -348,6 +344,20 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         ),
       ),
     ).then((_) => ref.invalidate(pricingSettingsProvider));
+  }
+
+  /// Loads the active catalog for the "Add item" pickers (pickup capture +
+  /// order details). Best-effort: a failed/slow read just falls back to
+  /// free-form line entry. Callers must re-check `mounted` after awaiting.
+  Future<List<CatalogItem>> _loadCatalogItems() async {
+    return ref.read(pricingCatalogProvider).valueOrNull ??
+        await ref.read(pricingCatalogProvider.future).catchError(
+          (Object e, StackTrace st) {
+            developer.log('Catalog load failed; using free-form entry only.',
+                name: 'StaffDashboard', error: e, stackTrace: st);
+            return const <CatalogItem>[];
+          },
+        );
   }
 
   void _openPricingCatalog() {
