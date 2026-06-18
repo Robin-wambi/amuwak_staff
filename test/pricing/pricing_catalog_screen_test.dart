@@ -39,6 +39,21 @@ void main() {
     expect(find.text('No service items yet.'), findsOneWidget);
   });
 
+  testWidgets('shows an error state when the load fails', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: PricingCatalogScreen(
+        load: () async => throw Exception('boom'),
+        save: (_) async {},
+        idGenerator: () => 'x',
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load the catalog — please retry.'),
+        findsOneWidget);
+    // The add FAB is hidden in the error state.
+    expect(find.byKey(const Key('catalog_add')), findsNothing);
+  });
+
   testWidgets('adds a new active item with a generated id', (tester) async {
     CatalogItem? saved;
     await tester.pumpWidget(screen(
