@@ -29,6 +29,10 @@ class LaundryOrder {
     this.lineItems = const [],
     this.manualAdjustmentUgx = 0,
     this.totalUgx = 0,
+    this.deliveryFeeSnapshotUgx = 0,
+    this.isExpress = false,
+    this.expressFlatSnapshotUgx = 0,
+    this.expressPctSnapshot = 0,
   }) : orderCode = orderCode ?? orderId;
 
   final String orderId;
@@ -52,6 +56,17 @@ class LaundryOrder {
   final List<LineItem> lineItems;
   final int manualAdjustmentUgx;
   final int totalUgx;
+
+  /// Flat delivery fee frozen onto the order (0 when delivery not included).
+  final int deliveryFeeSnapshotUgx;
+
+  /// Whether the express surcharge applies to this order.
+  final bool isExpress;
+
+  /// Express flat add-on and percentage frozen at creation, so the surcharge
+  /// recomputes correctly once the final weight is recorded.
+  final int expressFlatSnapshotUgx;
+  final double expressPctSnapshot;
 
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
   ProofEvent? get deliveryProof => _firstOfType(ProofEventType.delivery);
@@ -124,6 +139,10 @@ class LaundryOrder {
       lineItems: _parseLineItems(jsonDecode(row.lineItems)),
       manualAdjustmentUgx: row.manualAdjustmentUgx,
       totalUgx: row.totalUgx,
+      deliveryFeeSnapshotUgx: row.deliveryFeeSnapshotUgx,
+      isExpress: row.isExpress,
+      expressFlatSnapshotUgx: row.expressFlatSnapshotUgx,
+      expressPctSnapshot: row.expressPctSnapshot,
     );
   }
 
@@ -178,6 +197,15 @@ class LaundryOrder {
       lineItems: _parseLineItems(row['line_items']),
       manualAdjustmentUgx: (row['manual_adjustment_ugx'] as num?)?.toInt() ?? 0,
       totalUgx: (row['total_ugx'] as num?)?.toInt() ?? 0,
+      // Like the rate snapshot: a row predating these columns degrades to
+      // 0/false (no delivery, not express) rather than erroring the stream.
+      deliveryFeeSnapshotUgx:
+          (row['delivery_fee_snapshot_ugx'] as num?)?.toInt() ?? 0,
+      isExpress: (row['is_express'] as bool?) ?? false,
+      expressFlatSnapshotUgx:
+          (row['express_flat_snapshot_ugx'] as num?)?.toInt() ?? 0,
+      expressPctSnapshot:
+          (row['express_pct_snapshot'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -281,6 +309,10 @@ class LaundryOrder {
     List<LineItem>? lineItems,
     int? manualAdjustmentUgx,
     int? totalUgx,
+    int? deliveryFeeSnapshotUgx,
+    bool? isExpress,
+    int? expressFlatSnapshotUgx,
+    double? expressPctSnapshot,
     bool clearEstimatedWeight = false,
     bool clearFinalWeight = false,
   }) {
@@ -310,6 +342,12 @@ class LaundryOrder {
       lineItems: lineItems ?? this.lineItems,
       manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
       totalUgx: totalUgx ?? this.totalUgx,
+      deliveryFeeSnapshotUgx:
+          deliveryFeeSnapshotUgx ?? this.deliveryFeeSnapshotUgx,
+      isExpress: isExpress ?? this.isExpress,
+      expressFlatSnapshotUgx:
+          expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
+      expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
     );
   }
 
@@ -335,7 +373,11 @@ class LaundryOrder {
         other.estimatedWeightKg != estimatedWeightKg ||
         other.finalWeightKg != finalWeightKg ||
         other.manualAdjustmentUgx != manualAdjustmentUgx ||
-        other.totalUgx != totalUgx) {
+        other.totalUgx != totalUgx ||
+        other.deliveryFeeSnapshotUgx != deliveryFeeSnapshotUgx ||
+        other.isExpress != isExpress ||
+        other.expressFlatSnapshotUgx != expressFlatSnapshotUgx ||
+        other.expressPctSnapshot != expressPctSnapshot) {
       return false;
     }
     if (lineItems.length != other.lineItems.length) return false;
@@ -375,6 +417,10 @@ class LaundryOrder {
           Object.hashAll(lineItems),
           manualAdjustmentUgx,
           totalUgx,
+          deliveryFeeSnapshotUgx,
+          isExpress,
+          expressFlatSnapshotUgx,
+          expressPctSnapshot,
         ),
       );
 }

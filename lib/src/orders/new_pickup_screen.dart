@@ -41,6 +41,9 @@ class NewPickupScreen extends StatefulWidget {
     required this.geolocate,
     required this.reverseGeocode,
     required this.defaultRatePerKgUgx,
+    this.deliveryFeeUgx = 0,
+    this.expressFlatUgx = 0,
+    this.expressPct = 0,
   });
 
   final CustomersRepository customersRepo;
@@ -52,6 +55,12 @@ class NewPickupScreen extends StatefulWidget {
   final GeolocateFn geolocate;
   final ReverseGeocodeFn reverseGeocode;
   final double defaultRatePerKgUgx;
+
+  /// Pricing config frozen onto the order if the rider includes delivery / marks
+  /// the order express. From the global settings.
+  final int deliveryFeeUgx;
+  final int expressFlatUgx;
+  final double expressPct;
 
   @override
   State<NewPickupScreen> createState() => _NewPickupScreenState();
@@ -85,6 +94,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // _scheduledFor changes via a different path (e.g. Custom… picker).
   _ScheduleChip? _selectedChip;
   bool _optionalExpanded = false;
+  // Delivery is included by default (the common case); express is opt-in.
+  bool _includeDelivery = true;
+  bool _isExpress = false;
   int _count = 0;
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
@@ -130,6 +142,19 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     if (typed != null && typed > 0) return typed;
     return _matchedCustomerRate ?? widget.defaultRatePerKgUgx;
   }
+
+  /// Describes the express surcharge so the rider sees what enabling it costs.
+  String get _expressSubtitle {
+    final parts = <String>[
+      if (widget.expressFlatUgx > 0) '+${formatUgx(widget.expressFlatUgx)}',
+      if (widget.expressPct > 0)
+        '+${_trimPct(widget.expressPct)}% of weight + items',
+    ];
+    return parts.isEmpty ? 'No surcharge configured' : parts.join(', ');
+  }
+
+  static String _trimPct(double pct) =>
+      pct == pct.roundToDouble() ? pct.round().toString() : pct.toString();
 
   void _setQuickSchedule(_ScheduleChip chip, DateTime when) {
     setState(() {
@@ -442,6 +467,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       notes: _notesController.text.trim(),
       scheduledFor: scheduled,
       ratePerKgSnapshotUgx: customRate ?? _resolvedRate,
+      // Freeze the pricing config in force now. When not express, the flat/pct
+      // snapshots stay 0 (isExpress gates them anyway).
+      deliveryFeeSnapshotUgx: _includeDelivery ? widget.deliveryFeeUgx : 0,
+      isExpress: _isExpress,
+      expressFlatSnapshotUgx: _isExpress ? widget.expressFlatUgx : 0,
+      expressPctSnapshot: _isExpress ? widget.expressPct : 0,
     );
     try {
       await widget.ordersRepo
@@ -764,6 +795,24 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   helperText:
                       'Leave blank to use the default — ${formatUgx(widget.defaultRatePerKgUgx.round())}/kg',
                 ),
+              ),
+              SwitchListTile(
+                key: const Key('np_delivery_toggle'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Include delivery'),
+                subtitle: Text(widget.deliveryFeeUgx > 0
+                    ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
+                    : 'No delivery fee configured'),
+                value: _includeDelivery,
+                onChanged: (v) => setState(() => _includeDelivery = v),
+              ),
+              SwitchListTile(
+                key: const Key('np_express_toggle'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Express'),
+                subtitle: Text(_expressSubtitle),
+                value: _isExpress,
+                onChanged: (v) => setState(() => _isExpress = v),
               ),
             ],
             const SizedBox(height: 24),

@@ -6,6 +6,7 @@ import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import '../shared/theme/app_spacing.dart';
 import '../shared/theme/status_colors.dart';
+import '../pricing/catalog_item.dart';
 import '../printing/label_printer.dart';
 import '../printing/printer_store.dart';
 import '../sync/orders_repository.dart';
@@ -41,6 +42,7 @@ class OrderDetailsScreen extends StatefulWidget {
     this.labelPrinter,
     this.printerStore,
     this.captureTag = captureTagPng,
+    this.catalogItems = const [],
   });
 
   final LaundryOrder order;
@@ -61,6 +63,10 @@ class OrderDetailsScreen extends StatefulWidget {
 
   /// Rasterises the printable tag. Injectable so tests skip real PNG encoding.
   final TagCapturer captureTag;
+
+  /// Active catalog items offered in the "Add item" picker. Empty falls back to
+  /// the free-form entry sheet.
+  final List<CatalogItem> catalogItems;
 
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
@@ -103,6 +109,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         lineItems: _lineItems,
         manualAdjustmentUgx:
             int.tryParse(_manualAdjustmentController.text.trim()) ?? 0,
+        deliveryFeeUgx: _order.deliveryFeeSnapshotUgx,
+        isExpress: _order.isExpress,
+        expressFlatUgx: _order.expressFlatSnapshotUgx,
+        expressPct: _order.expressPctSnapshot,
       ));
 
   Future<void> _savePricing() async {
@@ -435,7 +445,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             LineItemsEditor(
                               items: _lineItems,
                               onAdd: () async {
-                                final item = await showAddLineItemSheet(context);
+                                final item = await showPickLineItemSheet(
+                                    context, widget.catalogItems);
                                 if (item != null) {
                                   setState(() => _lineItems = [..._lineItems, item]);
                                 }
@@ -453,6 +464,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   labelText: 'Manual adjustment (UGX, +/-)'),
                               onChanged: (_) => setState(() {}),
                             ),
+                            if (_order.isExpress &&
+                                _pricingTotal.expressSurcharge > 0) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              _DetailRow(
+                                icon: Icons.bolt_outlined,
+                                label: 'Express',
+                                value:
+                                    formatUgx(_pricingTotal.expressSurcharge),
+                              ),
+                            ],
+                            if (_pricingTotal.deliveryFee > 0) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              _DetailRow(
+                                icon: Icons.local_shipping_outlined,
+                                label: 'Delivery',
+                                value: formatUgx(_pricingTotal.deliveryFee),
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.md),
                             TotalCard(
                               totalUgx: _pricingTotal.total,

@@ -43,6 +43,10 @@ drift.Order _orderRow({
     lineItems: '[]',
     manualAdjustmentUgx: 0,
     totalUgx: 0,
+    deliveryFeeSnapshotUgx: 0,
+    isExpress: false,
+    expressFlatSnapshotUgx: 0,
+    expressPctSnapshot: 0,
   );
 }
 
@@ -225,6 +229,10 @@ void main() {
         lineItems: '[]',
         manualAdjustmentUgx: 0,
         totalUgx: 0,
+        deliveryFeeSnapshotUgx: 0,
+        isExpress: false,
+        expressFlatSnapshotUgx: 0,
+        expressPctSnapshot: 0,
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
       expect(mapped.orderCode, equals(row.orderCode));

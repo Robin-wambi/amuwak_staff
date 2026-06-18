@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,8 +33,11 @@ import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_motion.dart';
 import '../shared/theme/app_spacing.dart';
+import '../pricing/catalog_item.dart';
 import '../pricing/pricing_providers.dart';
+import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
+import '../pricing/pricing_catalog_screen.dart';
 import '../shared/uuid.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
@@ -185,14 +190,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
-    final double defaultRate;
+    final PricingSettings settings;
     try {
-      defaultRate =
-          ref.read(defaultRatePerKgUgxProvider).valueOrNull ??
-              await ref
-                  .read(pricingSettingsRepositoryProvider)
-                  .fetch()
-                  .then((s) => s.defaultRatePerKgUgx);
+      settings = ref.read(pricingSettingsProvider).valueOrNull ??
+          await ref.read(pricingSettingsRepositoryProvider).fetch();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +215,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           customerIdGenerator: defaultUuidV7,
           geolocate: createDefaultGeolocate(),
           reverseGeocode: createDefaultReverseGeocode(),
-          defaultRatePerKgUgx: defaultRate,
+          defaultRatePerKgUgx: settings.defaultRatePerKgUgx,
+          deliveryFeeUgx: settings.deliveryFeeUgx,
+          expressFlatUgx: settings.expressFlatUgx,
+          expressPct: settings.expressPct,
         ),
       ),
     );
@@ -283,6 +287,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    // Warm the catalog for the "Add item" picker. Best-effort: a failed/slow
+    // read just falls back to free-form line entry.
+    final catalogItems = ref.read(pricingCatalogProvider).valueOrNull ??
+        await ref.read(pricingCatalogProvider.future).catchError(
+          (Object e, StackTrace st) {
+            developer.log('Catalog load failed; using free-form entry only.',
+                name: 'StaffDashboard', error: e, stackTrace: st);
+            return const <CatalogItem>[];
+          },
+        );
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OrderDetailsScreen(
@@ -295,6 +310,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
           printerStore: ref.read(printerStoreProvider),
+          catalogItems: catalogItems,
         ),
       ),
     );
@@ -315,11 +331,36 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       MaterialPageRoute(
         builder: (_) => PricingSettingsScreen(
           load: repo.fetch,
-          save: (rate) =>
-              repo.updateDefaultRate(rate, actorStaffId: staffId),
+          save: ({
+            required ratePerKgUgx,
+            required deliveryFeeUgx,
+            required expressFlatUgx,
+            required expressPct,
+          }) =>
+              repo.updateSettings(
+            ratePerKgUgx: ratePerKgUgx,
+            deliveryFeeUgx: deliveryFeeUgx,
+            expressFlatUgx: expressFlatUgx,
+            expressPct: expressPct,
+            actorStaffId: staffId,
+          ),
+          onManageCatalog: _openPricingCatalog,
         ),
       ),
-    ).then((_) => ref.invalidate(defaultRatePerKgUgxProvider));
+    ).then((_) => ref.invalidate(pricingSettingsProvider));
+  }
+
+  void _openPricingCatalog() {
+    final catalogRepo = ref.read(pricingCatalogRepositoryProvider);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PricingCatalogScreen(
+          load: catalogRepo.fetchAll,
+          save: catalogRepo.upsertItem,
+          idGenerator: defaultUuidV7,
+        ),
+      ),
+    ).then((_) => ref.invalidate(pricingCatalogProvider));
   }
 
   /// Opens the "record an expense" form. Writes go straight to Supabase; the

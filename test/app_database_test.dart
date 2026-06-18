@@ -50,8 +50,8 @@ void main() {
     expect(rows.first.orderCode, 'AMW-1');
   });
 
-  test('schemaVersion is 3', () {
-    expect(db.schemaVersion, 3);
+  test('schemaVersion is 4', () {
+    expect(db.schemaVersion, 4);
   });
 
   test('orders table exposes the pricing columns', () async {

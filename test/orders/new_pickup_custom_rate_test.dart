@@ -130,6 +130,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Leave custom rate blank (do not expand optional details or leave field empty).
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
@@ -172,6 +177,11 @@ void main() {
 
     // Leave the custom-rate field blank (do not expand optional details).
     // Submit.
+    await tester.dragUntilVisible(
+      find.widgetWithText(ElevatedButton, 'Create pickup'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 

@@ -116,5 +116,72 @@ void main() {
     test('equality includes pricing fields', () {
       expect(_base().copyWith(totalUgx: 1) == _base(), isFalse);
     });
+
+    test('defaults: no delivery, not express', () {
+      final o = _base();
+      expect(o.deliveryFeeSnapshotUgx, 0);
+      expect(o.isExpress, isFalse);
+      expect(o.expressFlatSnapshotUgx, 0);
+      expect(o.expressPctSnapshot, 0);
+    });
+
+    test('copyWith updates delivery/express snapshots', () {
+      final o = _base().copyWith(
+        deliveryFeeSnapshotUgx: 3000,
+        isExpress: true,
+        expressFlatSnapshotUgx: 2000,
+        expressPctSnapshot: 30,
+      );
+      expect(o.deliveryFeeSnapshotUgx, 3000);
+      expect(o.isExpress, isTrue);
+      expect(o.expressFlatSnapshotUgx, 2000);
+      expect(o.expressPctSnapshot, 30);
+    });
+
+    test('fromSupabase reads delivery/express snapshots', () {
+      final o = LaundryOrder.fromSupabase({
+        'id': 'o5',
+        'order_code': 'AMW-2026-0005',
+        'customer_id': null,
+        'customer_name': 'Eve',
+        'phone': '+256 700000004',
+        'address': 'Mukono',
+        'service_type': 'Wash only',
+        'status': 'pending_pickup',
+        'item_count': 0,
+        'notes': null,
+        'scheduled_for': null,
+        'rate_per_kg_snapshot_ugx': 5000,
+        'delivery_fee_snapshot_ugx': 3000,
+        'is_express': true,
+        'express_flat_snapshot_ugx': 2000,
+        'express_pct_snapshot': 30,
+      }, const []);
+      expect(o.deliveryFeeSnapshotUgx, 3000);
+      expect(o.isExpress, isTrue);
+      expect(o.expressFlatSnapshotUgx, 2000);
+      expect(o.expressPctSnapshot, 30);
+    });
+
+    test('fromSupabase degrades missing delivery/express to 0/false', () {
+      final o = LaundryOrder.fromSupabase({
+        'id': 'o6',
+        'order_code': 'AMW-2026-0006',
+        'customer_id': null,
+        'customer_name': 'Frank',
+        'phone': '+256 700000005',
+        'address': 'Entebbe',
+        'service_type': 'Wash only',
+        'status': 'pending_pickup',
+        'item_count': 0,
+        'notes': null,
+        'scheduled_for': null,
+        'rate_per_kg_snapshot_ugx': 5000,
+      }, const []);
+      expect(o.deliveryFeeSnapshotUgx, 0);
+      expect(o.isExpress, isFalse);
+      expect(o.expressFlatSnapshotUgx, 0);
+      expect(o.expressPctSnapshot, 0);
+    });
   });
 }

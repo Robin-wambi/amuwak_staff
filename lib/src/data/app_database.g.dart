@@ -1468,6 +1468,55 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _deliveryFeeSnapshotUgxMeta =
+      const VerificationMeta('deliveryFeeSnapshotUgx');
+  @override
+  late final GeneratedColumn<int> deliveryFeeSnapshotUgx = GeneratedColumn<int>(
+    'delivery_fee_snapshot_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isExpressMeta = const VerificationMeta(
+    'isExpress',
+  );
+  @override
+  late final GeneratedColumn<bool> isExpress = GeneratedColumn<bool>(
+    'is_express',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_express" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _expressFlatSnapshotUgxMeta =
+      const VerificationMeta('expressFlatSnapshotUgx');
+  @override
+  late final GeneratedColumn<int> expressFlatSnapshotUgx = GeneratedColumn<int>(
+    'express_flat_snapshot_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _expressPctSnapshotMeta =
+      const VerificationMeta('expressPctSnapshot');
+  @override
+  late final GeneratedColumn<double> expressPctSnapshot =
+      GeneratedColumn<double>(
+        'express_pct_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1495,6 +1544,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     lineItems,
     manualAdjustmentUgx,
     totalUgx,
+    deliveryFeeSnapshotUgx,
+    isExpress,
+    expressFlatSnapshotUgx,
+    expressPctSnapshot,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1712,6 +1765,39 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         totalUgx.isAcceptableOrUnknown(data['total_ugx']!, _totalUgxMeta),
       );
     }
+    if (data.containsKey('delivery_fee_snapshot_ugx')) {
+      context.handle(
+        _deliveryFeeSnapshotUgxMeta,
+        deliveryFeeSnapshotUgx.isAcceptableOrUnknown(
+          data['delivery_fee_snapshot_ugx']!,
+          _deliveryFeeSnapshotUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_express')) {
+      context.handle(
+        _isExpressMeta,
+        isExpress.isAcceptableOrUnknown(data['is_express']!, _isExpressMeta),
+      );
+    }
+    if (data.containsKey('express_flat_snapshot_ugx')) {
+      context.handle(
+        _expressFlatSnapshotUgxMeta,
+        expressFlatSnapshotUgx.isAcceptableOrUnknown(
+          data['express_flat_snapshot_ugx']!,
+          _expressFlatSnapshotUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('express_pct_snapshot')) {
+      context.handle(
+        _expressPctSnapshotMeta,
+        expressPctSnapshot.isAcceptableOrUnknown(
+          data['express_pct_snapshot']!,
+          _expressPctSnapshotMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1821,6 +1907,22 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.int,
         data['${effectivePrefix}total_ugx'],
       )!,
+      deliveryFeeSnapshotUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delivery_fee_snapshot_ugx'],
+      )!,
+      isExpress: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_express'],
+      )!,
+      expressFlatSnapshotUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}express_flat_snapshot_ugx'],
+      )!,
+      expressPctSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}express_pct_snapshot'],
+      )!,
     );
   }
 
@@ -1856,6 +1958,10 @@ class Order extends DataClass implements Insertable<Order> {
   final String lineItems;
   final int manualAdjustmentUgx;
   final int totalUgx;
+  final int deliveryFeeSnapshotUgx;
+  final bool isExpress;
+  final int expressFlatSnapshotUgx;
+  final double expressPctSnapshot;
   const Order({
     required this.id,
     required this.orderCode,
@@ -1882,6 +1988,10 @@ class Order extends DataClass implements Insertable<Order> {
     required this.lineItems,
     required this.manualAdjustmentUgx,
     required this.totalUgx,
+    required this.deliveryFeeSnapshotUgx,
+    required this.isExpress,
+    required this.expressFlatSnapshotUgx,
+    required this.expressPctSnapshot,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1923,6 +2033,10 @@ class Order extends DataClass implements Insertable<Order> {
     map['line_items'] = Variable<String>(lineItems);
     map['manual_adjustment_ugx'] = Variable<int>(manualAdjustmentUgx);
     map['total_ugx'] = Variable<int>(totalUgx);
+    map['delivery_fee_snapshot_ugx'] = Variable<int>(deliveryFeeSnapshotUgx);
+    map['is_express'] = Variable<bool>(isExpress);
+    map['express_flat_snapshot_ugx'] = Variable<int>(expressFlatSnapshotUgx);
+    map['express_pct_snapshot'] = Variable<double>(expressPctSnapshot);
     return map;
   }
 
@@ -1965,6 +2079,10 @@ class Order extends DataClass implements Insertable<Order> {
       lineItems: Value(lineItems),
       manualAdjustmentUgx: Value(manualAdjustmentUgx),
       totalUgx: Value(totalUgx),
+      deliveryFeeSnapshotUgx: Value(deliveryFeeSnapshotUgx),
+      isExpress: Value(isExpress),
+      expressFlatSnapshotUgx: Value(expressFlatSnapshotUgx),
+      expressPctSnapshot: Value(expressPctSnapshot),
     );
   }
 
@@ -2005,6 +2123,16 @@ class Order extends DataClass implements Insertable<Order> {
         json['manualAdjustmentUgx'],
       ),
       totalUgx: serializer.fromJson<int>(json['totalUgx']),
+      deliveryFeeSnapshotUgx: serializer.fromJson<int>(
+        json['deliveryFeeSnapshotUgx'],
+      ),
+      isExpress: serializer.fromJson<bool>(json['isExpress']),
+      expressFlatSnapshotUgx: serializer.fromJson<int>(
+        json['expressFlatSnapshotUgx'],
+      ),
+      expressPctSnapshot: serializer.fromJson<double>(
+        json['expressPctSnapshot'],
+      ),
     );
   }
   @override
@@ -2036,6 +2164,10 @@ class Order extends DataClass implements Insertable<Order> {
       'lineItems': serializer.toJson<String>(lineItems),
       'manualAdjustmentUgx': serializer.toJson<int>(manualAdjustmentUgx),
       'totalUgx': serializer.toJson<int>(totalUgx),
+      'deliveryFeeSnapshotUgx': serializer.toJson<int>(deliveryFeeSnapshotUgx),
+      'isExpress': serializer.toJson<bool>(isExpress),
+      'expressFlatSnapshotUgx': serializer.toJson<int>(expressFlatSnapshotUgx),
+      'expressPctSnapshot': serializer.toJson<double>(expressPctSnapshot),
     };
   }
 
@@ -2065,6 +2197,10 @@ class Order extends DataClass implements Insertable<Order> {
     String? lineItems,
     int? manualAdjustmentUgx,
     int? totalUgx,
+    int? deliveryFeeSnapshotUgx,
+    bool? isExpress,
+    int? expressFlatSnapshotUgx,
+    double? expressPctSnapshot,
   }) => Order(
     id: id ?? this.id,
     orderCode: orderCode ?? this.orderCode,
@@ -2097,6 +2233,12 @@ class Order extends DataClass implements Insertable<Order> {
     lineItems: lineItems ?? this.lineItems,
     manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
     totalUgx: totalUgx ?? this.totalUgx,
+    deliveryFeeSnapshotUgx:
+        deliveryFeeSnapshotUgx ?? this.deliveryFeeSnapshotUgx,
+    isExpress: isExpress ?? this.isExpress,
+    expressFlatSnapshotUgx:
+        expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
+    expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
   );
   Order copyWithCompanion(OrdersCompanion data) {
     return Order(
@@ -2149,6 +2291,16 @@ class Order extends DataClass implements Insertable<Order> {
           ? data.manualAdjustmentUgx.value
           : this.manualAdjustmentUgx,
       totalUgx: data.totalUgx.present ? data.totalUgx.value : this.totalUgx,
+      deliveryFeeSnapshotUgx: data.deliveryFeeSnapshotUgx.present
+          ? data.deliveryFeeSnapshotUgx.value
+          : this.deliveryFeeSnapshotUgx,
+      isExpress: data.isExpress.present ? data.isExpress.value : this.isExpress,
+      expressFlatSnapshotUgx: data.expressFlatSnapshotUgx.present
+          ? data.expressFlatSnapshotUgx.value
+          : this.expressFlatSnapshotUgx,
+      expressPctSnapshot: data.expressPctSnapshot.present
+          ? data.expressPctSnapshot.value
+          : this.expressPctSnapshot,
     );
   }
 
@@ -2179,7 +2331,11 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('finalWeightKg: $finalWeightKg, ')
           ..write('lineItems: $lineItems, ')
           ..write('manualAdjustmentUgx: $manualAdjustmentUgx, ')
-          ..write('totalUgx: $totalUgx')
+          ..write('totalUgx: $totalUgx, ')
+          ..write('deliveryFeeSnapshotUgx: $deliveryFeeSnapshotUgx, ')
+          ..write('isExpress: $isExpress, ')
+          ..write('expressFlatSnapshotUgx: $expressFlatSnapshotUgx, ')
+          ..write('expressPctSnapshot: $expressPctSnapshot')
           ..write(')'))
         .toString();
   }
@@ -2211,6 +2367,10 @@ class Order extends DataClass implements Insertable<Order> {
     lineItems,
     manualAdjustmentUgx,
     totalUgx,
+    deliveryFeeSnapshotUgx,
+    isExpress,
+    expressFlatSnapshotUgx,
+    expressPctSnapshot,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2240,7 +2400,11 @@ class Order extends DataClass implements Insertable<Order> {
           other.finalWeightKg == this.finalWeightKg &&
           other.lineItems == this.lineItems &&
           other.manualAdjustmentUgx == this.manualAdjustmentUgx &&
-          other.totalUgx == this.totalUgx);
+          other.totalUgx == this.totalUgx &&
+          other.deliveryFeeSnapshotUgx == this.deliveryFeeSnapshotUgx &&
+          other.isExpress == this.isExpress &&
+          other.expressFlatSnapshotUgx == this.expressFlatSnapshotUgx &&
+          other.expressPctSnapshot == this.expressPctSnapshot);
 }
 
 class OrdersCompanion extends UpdateCompanion<Order> {
@@ -2269,6 +2433,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<String> lineItems;
   final Value<int> manualAdjustmentUgx;
   final Value<int> totalUgx;
+  final Value<int> deliveryFeeSnapshotUgx;
+  final Value<bool> isExpress;
+  final Value<int> expressFlatSnapshotUgx;
+  final Value<double> expressPctSnapshot;
   final Value<int> rowid;
   const OrdersCompanion({
     this.id = const Value.absent(),
@@ -2296,6 +2464,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.lineItems = const Value.absent(),
     this.manualAdjustmentUgx = const Value.absent(),
     this.totalUgx = const Value.absent(),
+    this.deliveryFeeSnapshotUgx = const Value.absent(),
+    this.isExpress = const Value.absent(),
+    this.expressFlatSnapshotUgx = const Value.absent(),
+    this.expressPctSnapshot = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OrdersCompanion.insert({
@@ -2324,6 +2496,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.lineItems = const Value.absent(),
     this.manualAdjustmentUgx = const Value.absent(),
     this.totalUgx = const Value.absent(),
+    this.deliveryFeeSnapshotUgx = const Value.absent(),
+    this.isExpress = const Value.absent(),
+    this.expressFlatSnapshotUgx = const Value.absent(),
+    this.expressPctSnapshot = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        orderCode = Value(orderCode),
@@ -2363,6 +2539,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<String>? lineItems,
     Expression<int>? manualAdjustmentUgx,
     Expression<int>? totalUgx,
+    Expression<int>? deliveryFeeSnapshotUgx,
+    Expression<bool>? isExpress,
+    Expression<int>? expressFlatSnapshotUgx,
+    Expression<double>? expressPctSnapshot,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2393,6 +2573,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (manualAdjustmentUgx != null)
         'manual_adjustment_ugx': manualAdjustmentUgx,
       if (totalUgx != null) 'total_ugx': totalUgx,
+      if (deliveryFeeSnapshotUgx != null)
+        'delivery_fee_snapshot_ugx': deliveryFeeSnapshotUgx,
+      if (isExpress != null) 'is_express': isExpress,
+      if (expressFlatSnapshotUgx != null)
+        'express_flat_snapshot_ugx': expressFlatSnapshotUgx,
+      if (expressPctSnapshot != null)
+        'express_pct_snapshot': expressPctSnapshot,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2423,6 +2610,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<String>? lineItems,
     Value<int>? manualAdjustmentUgx,
     Value<int>? totalUgx,
+    Value<int>? deliveryFeeSnapshotUgx,
+    Value<bool>? isExpress,
+    Value<int>? expressFlatSnapshotUgx,
+    Value<double>? expressPctSnapshot,
     Value<int>? rowid,
   }) {
     return OrdersCompanion(
@@ -2451,6 +2642,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       lineItems: lineItems ?? this.lineItems,
       manualAdjustmentUgx: manualAdjustmentUgx ?? this.manualAdjustmentUgx,
       totalUgx: totalUgx ?? this.totalUgx,
+      deliveryFeeSnapshotUgx:
+          deliveryFeeSnapshotUgx ?? this.deliveryFeeSnapshotUgx,
+      isExpress: isExpress ?? this.isExpress,
+      expressFlatSnapshotUgx:
+          expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
+      expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2535,6 +2732,22 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (totalUgx.present) {
       map['total_ugx'] = Variable<int>(totalUgx.value);
     }
+    if (deliveryFeeSnapshotUgx.present) {
+      map['delivery_fee_snapshot_ugx'] = Variable<int>(
+        deliveryFeeSnapshotUgx.value,
+      );
+    }
+    if (isExpress.present) {
+      map['is_express'] = Variable<bool>(isExpress.value);
+    }
+    if (expressFlatSnapshotUgx.present) {
+      map['express_flat_snapshot_ugx'] = Variable<int>(
+        expressFlatSnapshotUgx.value,
+      );
+    }
+    if (expressPctSnapshot.present) {
+      map['express_pct_snapshot'] = Variable<double>(expressPctSnapshot.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2569,6 +2782,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('lineItems: $lineItems, ')
           ..write('manualAdjustmentUgx: $manualAdjustmentUgx, ')
           ..write('totalUgx: $totalUgx, ')
+          ..write('deliveryFeeSnapshotUgx: $deliveryFeeSnapshotUgx, ')
+          ..write('isExpress: $isExpress, ')
+          ..write('expressFlatSnapshotUgx: $expressFlatSnapshotUgx, ')
+          ..write('expressPctSnapshot: $expressPctSnapshot, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6900,12 +7117,51 @@ class $PricingSettingsTable extends PricingSettings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deliveryFeeUgxMeta = const VerificationMeta(
+    'deliveryFeeUgx',
+  );
+  @override
+  late final GeneratedColumn<int> deliveryFeeUgx = GeneratedColumn<int>(
+    'delivery_fee_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _expressSurchargeFlatUgxMeta =
+      const VerificationMeta('expressSurchargeFlatUgx');
+  @override
+  late final GeneratedColumn<int> expressSurchargeFlatUgx =
+      GeneratedColumn<int>(
+        'express_surcharge_flat_ugx',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  static const VerificationMeta _expressSurchargePctMeta =
+      const VerificationMeta('expressSurchargePct');
+  @override
+  late final GeneratedColumn<double> expressSurchargePct =
+      GeneratedColumn<double>(
+        'express_surcharge_pct',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     defaultRatePerKgUgx,
     updatedAt,
     updatedBy,
+    deliveryFeeUgx,
+    expressSurchargeFlatUgx,
+    expressSurchargePct,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6949,6 +7205,33 @@ class $PricingSettingsTable extends PricingSettings
         updatedBy.isAcceptableOrUnknown(data['updated_by']!, _updatedByMeta),
       );
     }
+    if (data.containsKey('delivery_fee_ugx')) {
+      context.handle(
+        _deliveryFeeUgxMeta,
+        deliveryFeeUgx.isAcceptableOrUnknown(
+          data['delivery_fee_ugx']!,
+          _deliveryFeeUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('express_surcharge_flat_ugx')) {
+      context.handle(
+        _expressSurchargeFlatUgxMeta,
+        expressSurchargeFlatUgx.isAcceptableOrUnknown(
+          data['express_surcharge_flat_ugx']!,
+          _expressSurchargeFlatUgxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('express_surcharge_pct')) {
+      context.handle(
+        _expressSurchargePctMeta,
+        expressSurchargePct.isAcceptableOrUnknown(
+          data['express_surcharge_pct']!,
+          _expressSurchargePctMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -6974,6 +7257,18 @@ class $PricingSettingsTable extends PricingSettings
         DriftSqlType.string,
         data['${effectivePrefix}updated_by'],
       ),
+      deliveryFeeUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delivery_fee_ugx'],
+      )!,
+      expressSurchargeFlatUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}express_surcharge_flat_ugx'],
+      )!,
+      expressSurchargePct: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}express_surcharge_pct'],
+      )!,
     );
   }
 
@@ -6988,11 +7283,17 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
   final double defaultRatePerKgUgx;
   final DateTime updatedAt;
   final String? updatedBy;
+  final int deliveryFeeUgx;
+  final int expressSurchargeFlatUgx;
+  final double expressSurchargePct;
   const PricingSetting({
     required this.id,
     required this.defaultRatePerKgUgx,
     required this.updatedAt,
     this.updatedBy,
+    required this.deliveryFeeUgx,
+    required this.expressSurchargeFlatUgx,
+    required this.expressSurchargePct,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7003,6 +7304,9 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
     if (!nullToAbsent || updatedBy != null) {
       map['updated_by'] = Variable<String>(updatedBy);
     }
+    map['delivery_fee_ugx'] = Variable<int>(deliveryFeeUgx);
+    map['express_surcharge_flat_ugx'] = Variable<int>(expressSurchargeFlatUgx);
+    map['express_surcharge_pct'] = Variable<double>(expressSurchargePct);
     return map;
   }
 
@@ -7014,6 +7318,9 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
       updatedBy: updatedBy == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedBy),
+      deliveryFeeUgx: Value(deliveryFeeUgx),
+      expressSurchargeFlatUgx: Value(expressSurchargeFlatUgx),
+      expressSurchargePct: Value(expressSurchargePct),
     );
   }
 
@@ -7029,6 +7336,13 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
       ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       updatedBy: serializer.fromJson<String?>(json['updatedBy']),
+      deliveryFeeUgx: serializer.fromJson<int>(json['deliveryFeeUgx']),
+      expressSurchargeFlatUgx: serializer.fromJson<int>(
+        json['expressSurchargeFlatUgx'],
+      ),
+      expressSurchargePct: serializer.fromJson<double>(
+        json['expressSurchargePct'],
+      ),
     );
   }
   @override
@@ -7039,6 +7353,11 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
       'defaultRatePerKgUgx': serializer.toJson<double>(defaultRatePerKgUgx),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'updatedBy': serializer.toJson<String?>(updatedBy),
+      'deliveryFeeUgx': serializer.toJson<int>(deliveryFeeUgx),
+      'expressSurchargeFlatUgx': serializer.toJson<int>(
+        expressSurchargeFlatUgx,
+      ),
+      'expressSurchargePct': serializer.toJson<double>(expressSurchargePct),
     };
   }
 
@@ -7047,11 +7366,18 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
     double? defaultRatePerKgUgx,
     DateTime? updatedAt,
     Value<String?> updatedBy = const Value.absent(),
+    int? deliveryFeeUgx,
+    int? expressSurchargeFlatUgx,
+    double? expressSurchargePct,
   }) => PricingSetting(
     id: id ?? this.id,
     defaultRatePerKgUgx: defaultRatePerKgUgx ?? this.defaultRatePerKgUgx,
     updatedAt: updatedAt ?? this.updatedAt,
     updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
+    deliveryFeeUgx: deliveryFeeUgx ?? this.deliveryFeeUgx,
+    expressSurchargeFlatUgx:
+        expressSurchargeFlatUgx ?? this.expressSurchargeFlatUgx,
+    expressSurchargePct: expressSurchargePct ?? this.expressSurchargePct,
   );
   PricingSetting copyWithCompanion(PricingSettingsCompanion data) {
     return PricingSetting(
@@ -7061,6 +7387,15 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
           : this.defaultRatePerKgUgx,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
+      deliveryFeeUgx: data.deliveryFeeUgx.present
+          ? data.deliveryFeeUgx.value
+          : this.deliveryFeeUgx,
+      expressSurchargeFlatUgx: data.expressSurchargeFlatUgx.present
+          ? data.expressSurchargeFlatUgx.value
+          : this.expressSurchargeFlatUgx,
+      expressSurchargePct: data.expressSurchargePct.present
+          ? data.expressSurchargePct.value
+          : this.expressSurchargePct,
     );
   }
 
@@ -7070,14 +7405,24 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
           ..write('id: $id, ')
           ..write('defaultRatePerKgUgx: $defaultRatePerKgUgx, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('updatedBy: $updatedBy')
+          ..write('updatedBy: $updatedBy, ')
+          ..write('deliveryFeeUgx: $deliveryFeeUgx, ')
+          ..write('expressSurchargeFlatUgx: $expressSurchargeFlatUgx, ')
+          ..write('expressSurchargePct: $expressSurchargePct')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, defaultRatePerKgUgx, updatedAt, updatedBy);
+  int get hashCode => Object.hash(
+    id,
+    defaultRatePerKgUgx,
+    updatedAt,
+    updatedBy,
+    deliveryFeeUgx,
+    expressSurchargeFlatUgx,
+    expressSurchargePct,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7085,7 +7430,10 @@ class PricingSetting extends DataClass implements Insertable<PricingSetting> {
           other.id == this.id &&
           other.defaultRatePerKgUgx == this.defaultRatePerKgUgx &&
           other.updatedAt == this.updatedAt &&
-          other.updatedBy == this.updatedBy);
+          other.updatedBy == this.updatedBy &&
+          other.deliveryFeeUgx == this.deliveryFeeUgx &&
+          other.expressSurchargeFlatUgx == this.expressSurchargeFlatUgx &&
+          other.expressSurchargePct == this.expressSurchargePct);
 }
 
 class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
@@ -7093,12 +7441,18 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
   final Value<double> defaultRatePerKgUgx;
   final Value<DateTime> updatedAt;
   final Value<String?> updatedBy;
+  final Value<int> deliveryFeeUgx;
+  final Value<int> expressSurchargeFlatUgx;
+  final Value<double> expressSurchargePct;
   final Value<int> rowid;
   const PricingSettingsCompanion({
     this.id = const Value.absent(),
     this.defaultRatePerKgUgx = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.updatedBy = const Value.absent(),
+    this.deliveryFeeUgx = const Value.absent(),
+    this.expressSurchargeFlatUgx = const Value.absent(),
+    this.expressSurchargePct = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PricingSettingsCompanion.insert({
@@ -7106,6 +7460,9 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
     required double defaultRatePerKgUgx,
     required DateTime updatedAt,
     this.updatedBy = const Value.absent(),
+    this.deliveryFeeUgx = const Value.absent(),
+    this.expressSurchargeFlatUgx = const Value.absent(),
+    this.expressSurchargePct = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        defaultRatePerKgUgx = Value(defaultRatePerKgUgx),
@@ -7115,6 +7472,9 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
     Expression<double>? defaultRatePerKgUgx,
     Expression<DateTime>? updatedAt,
     Expression<String>? updatedBy,
+    Expression<int>? deliveryFeeUgx,
+    Expression<int>? expressSurchargeFlatUgx,
+    Expression<double>? expressSurchargePct,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -7123,6 +7483,11 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
         'default_rate_per_kg_ugx': defaultRatePerKgUgx,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (updatedBy != null) 'updated_by': updatedBy,
+      if (deliveryFeeUgx != null) 'delivery_fee_ugx': deliveryFeeUgx,
+      if (expressSurchargeFlatUgx != null)
+        'express_surcharge_flat_ugx': expressSurchargeFlatUgx,
+      if (expressSurchargePct != null)
+        'express_surcharge_pct': expressSurchargePct,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7132,6 +7497,9 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
     Value<double>? defaultRatePerKgUgx,
     Value<DateTime>? updatedAt,
     Value<String?>? updatedBy,
+    Value<int>? deliveryFeeUgx,
+    Value<int>? expressSurchargeFlatUgx,
+    Value<double>? expressSurchargePct,
     Value<int>? rowid,
   }) {
     return PricingSettingsCompanion(
@@ -7139,6 +7507,10 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
       defaultRatePerKgUgx: defaultRatePerKgUgx ?? this.defaultRatePerKgUgx,
       updatedAt: updatedAt ?? this.updatedAt,
       updatedBy: updatedBy ?? this.updatedBy,
+      deliveryFeeUgx: deliveryFeeUgx ?? this.deliveryFeeUgx,
+      expressSurchargeFlatUgx:
+          expressSurchargeFlatUgx ?? this.expressSurchargeFlatUgx,
+      expressSurchargePct: expressSurchargePct ?? this.expressSurchargePct,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -7160,6 +7532,19 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
     if (updatedBy.present) {
       map['updated_by'] = Variable<String>(updatedBy.value);
     }
+    if (deliveryFeeUgx.present) {
+      map['delivery_fee_ugx'] = Variable<int>(deliveryFeeUgx.value);
+    }
+    if (expressSurchargeFlatUgx.present) {
+      map['express_surcharge_flat_ugx'] = Variable<int>(
+        expressSurchargeFlatUgx.value,
+      );
+    }
+    if (expressSurchargePct.present) {
+      map['express_surcharge_pct'] = Variable<double>(
+        expressSurchargePct.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -7173,6 +7558,367 @@ class PricingSettingsCompanion extends UpdateCompanion<PricingSetting> {
           ..write('defaultRatePerKgUgx: $defaultRatePerKgUgx, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('updatedBy: $updatedBy, ')
+          ..write('deliveryFeeUgx: $deliveryFeeUgx, ')
+          ..write('expressSurchargeFlatUgx: $expressSurchargeFlatUgx, ')
+          ..write('expressSurchargePct: $expressSurchargePct, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PricingCatalogItemsTable extends PricingCatalogItems
+    with TableInfo<$PricingCatalogItemsTable, PricingCatalogItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PricingCatalogItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountUgxMeta = const VerificationMeta(
+    'amountUgx',
+  );
+  @override
+  late final GeneratedColumn<int> amountUgx = GeneratedColumn<int>(
+    'amount_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    amountUgx,
+    active,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pricing_catalog_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PricingCatalogItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('amount_ugx')) {
+      context.handle(
+        _amountUgxMeta,
+        amountUgx.isAcceptableOrUnknown(data['amount_ugx']!, _amountUgxMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountUgxMeta);
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PricingCatalogItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PricingCatalogItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      amountUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_ugx'],
+      )!,
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $PricingCatalogItemsTable createAlias(String alias) {
+    return $PricingCatalogItemsTable(attachedDatabase, alias);
+  }
+}
+
+class PricingCatalogItem extends DataClass
+    implements Insertable<PricingCatalogItem> {
+  final String id;
+  final String name;
+  final int amountUgx;
+  final bool active;
+  final int sortOrder;
+  const PricingCatalogItem({
+    required this.id,
+    required this.name,
+    required this.amountUgx,
+    required this.active,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['amount_ugx'] = Variable<int>(amountUgx);
+    map['active'] = Variable<bool>(active);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  PricingCatalogItemsCompanion toCompanion(bool nullToAbsent) {
+    return PricingCatalogItemsCompanion(
+      id: Value(id),
+      name: Value(name),
+      amountUgx: Value(amountUgx),
+      active: Value(active),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory PricingCatalogItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PricingCatalogItem(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      amountUgx: serializer.fromJson<int>(json['amountUgx']),
+      active: serializer.fromJson<bool>(json['active']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'amountUgx': serializer.toJson<int>(amountUgx),
+      'active': serializer.toJson<bool>(active),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  PricingCatalogItem copyWith({
+    String? id,
+    String? name,
+    int? amountUgx,
+    bool? active,
+    int? sortOrder,
+  }) => PricingCatalogItem(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    amountUgx: amountUgx ?? this.amountUgx,
+    active: active ?? this.active,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  PricingCatalogItem copyWithCompanion(PricingCatalogItemsCompanion data) {
+    return PricingCatalogItem(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      amountUgx: data.amountUgx.present ? data.amountUgx.value : this.amountUgx,
+      active: data.active.present ? data.active.value : this.active,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PricingCatalogItem(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('amountUgx: $amountUgx, ')
+          ..write('active: $active, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, amountUgx, active, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PricingCatalogItem &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.amountUgx == this.amountUgx &&
+          other.active == this.active &&
+          other.sortOrder == this.sortOrder);
+}
+
+class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> amountUgx;
+  final Value<bool> active;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const PricingCatalogItemsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.amountUgx = const Value.absent(),
+    this.active = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PricingCatalogItemsCompanion.insert({
+    required String id,
+    required String name,
+    required int amountUgx,
+    this.active = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       amountUgx = Value(amountUgx);
+  static Insertable<PricingCatalogItem> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? amountUgx,
+    Expression<bool>? active,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (amountUgx != null) 'amount_ugx': amountUgx,
+      if (active != null) 'active': active,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PricingCatalogItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? amountUgx,
+    Value<bool>? active,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return PricingCatalogItemsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      amountUgx: amountUgx ?? this.amountUgx,
+      active: active ?? this.active,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (amountUgx.present) {
+      map['amount_ugx'] = Variable<int>(amountUgx.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PricingCatalogItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('amountUgx: $amountUgx, ')
+          ..write('active: $active, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7200,6 +7946,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PricingSettingsTable pricingSettings = $PricingSettingsTable(
     this,
   );
+  late final $PricingCatalogItemsTable pricingCatalogItems =
+      $PricingCatalogItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7218,6 +7966,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncWatermarks,
     pullDeadLetter,
     pricingSettings,
+    pricingCatalogItems,
   ];
   @override
   DriftDatabaseOptions get options =>
@@ -7815,6 +8564,10 @@ typedef $$OrdersTableCreateCompanionBuilder =
       Value<String> lineItems,
       Value<int> manualAdjustmentUgx,
       Value<int> totalUgx,
+      Value<int> deliveryFeeSnapshotUgx,
+      Value<bool> isExpress,
+      Value<int> expressFlatSnapshotUgx,
+      Value<double> expressPctSnapshot,
       Value<int> rowid,
     });
 typedef $$OrdersTableUpdateCompanionBuilder =
@@ -7844,6 +8597,10 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<String> lineItems,
       Value<int> manualAdjustmentUgx,
       Value<int> totalUgx,
+      Value<int> deliveryFeeSnapshotUgx,
+      Value<bool> isExpress,
+      Value<int> expressFlatSnapshotUgx,
+      Value<double> expressPctSnapshot,
       Value<int> rowid,
     });
 
@@ -7978,6 +8735,26 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<int> get totalUgx => $composableBuilder(
     column: $table.totalUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deliveryFeeSnapshotUgx => $composableBuilder(
+    column: $table.deliveryFeeSnapshotUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isExpress => $composableBuilder(
+    column: $table.isExpress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expressFlatSnapshotUgx => $composableBuilder(
+    column: $table.expressFlatSnapshotUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get expressPctSnapshot => $composableBuilder(
+    column: $table.expressPctSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8115,6 +8892,26 @@ class $$OrdersTableOrderingComposer
     column: $table.totalUgx,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get deliveryFeeSnapshotUgx => $composableBuilder(
+    column: $table.deliveryFeeSnapshotUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isExpress => $composableBuilder(
+    column: $table.isExpress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expressFlatSnapshotUgx => $composableBuilder(
+    column: $table.expressFlatSnapshotUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get expressPctSnapshot => $composableBuilder(
+    column: $table.expressPctSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$OrdersTableAnnotationComposer
@@ -8224,6 +9021,24 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<int> get totalUgx =>
       $composableBuilder(column: $table.totalUgx, builder: (column) => column);
+
+  GeneratedColumn<int> get deliveryFeeSnapshotUgx => $composableBuilder(
+    column: $table.deliveryFeeSnapshotUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isExpress =>
+      $composableBuilder(column: $table.isExpress, builder: (column) => column);
+
+  GeneratedColumn<int> get expressFlatSnapshotUgx => $composableBuilder(
+    column: $table.expressFlatSnapshotUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get expressPctSnapshot => $composableBuilder(
+    column: $table.expressPctSnapshot,
+    builder: (column) => column,
+  );
 }
 
 class $$OrdersTableTableManager
@@ -8279,6 +9094,10 @@ class $$OrdersTableTableManager
                 Value<String> lineItems = const Value.absent(),
                 Value<int> manualAdjustmentUgx = const Value.absent(),
                 Value<int> totalUgx = const Value.absent(),
+                Value<int> deliveryFeeSnapshotUgx = const Value.absent(),
+                Value<bool> isExpress = const Value.absent(),
+                Value<int> expressFlatSnapshotUgx = const Value.absent(),
+                Value<double> expressPctSnapshot = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion(
                 id: id,
@@ -8306,6 +9125,10 @@ class $$OrdersTableTableManager
                 lineItems: lineItems,
                 manualAdjustmentUgx: manualAdjustmentUgx,
                 totalUgx: totalUgx,
+                deliveryFeeSnapshotUgx: deliveryFeeSnapshotUgx,
+                isExpress: isExpress,
+                expressFlatSnapshotUgx: expressFlatSnapshotUgx,
+                expressPctSnapshot: expressPctSnapshot,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8335,6 +9158,10 @@ class $$OrdersTableTableManager
                 Value<String> lineItems = const Value.absent(),
                 Value<int> manualAdjustmentUgx = const Value.absent(),
                 Value<int> totalUgx = const Value.absent(),
+                Value<int> deliveryFeeSnapshotUgx = const Value.absent(),
+                Value<bool> isExpress = const Value.absent(),
+                Value<int> expressFlatSnapshotUgx = const Value.absent(),
+                Value<double> expressPctSnapshot = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion.insert(
                 id: id,
@@ -8362,6 +9189,10 @@ class $$OrdersTableTableManager
                 lineItems: lineItems,
                 manualAdjustmentUgx: manualAdjustmentUgx,
                 totalUgx: totalUgx,
+                deliveryFeeSnapshotUgx: deliveryFeeSnapshotUgx,
+                isExpress: isExpress,
+                expressFlatSnapshotUgx: expressFlatSnapshotUgx,
+                expressPctSnapshot: expressPctSnapshot,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10608,6 +11439,9 @@ typedef $$PricingSettingsTableCreateCompanionBuilder =
       required double defaultRatePerKgUgx,
       required DateTime updatedAt,
       Value<String?> updatedBy,
+      Value<int> deliveryFeeUgx,
+      Value<int> expressSurchargeFlatUgx,
+      Value<double> expressSurchargePct,
       Value<int> rowid,
     });
 typedef $$PricingSettingsTableUpdateCompanionBuilder =
@@ -10616,6 +11450,9 @@ typedef $$PricingSettingsTableUpdateCompanionBuilder =
       Value<double> defaultRatePerKgUgx,
       Value<DateTime> updatedAt,
       Value<String?> updatedBy,
+      Value<int> deliveryFeeUgx,
+      Value<int> expressSurchargeFlatUgx,
+      Value<double> expressSurchargePct,
       Value<int> rowid,
     });
 
@@ -10645,6 +11482,21 @@ class $$PricingSettingsTableFilterComposer
 
   ColumnFilters<String> get updatedBy => $composableBuilder(
     column: $table.updatedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deliveryFeeUgx => $composableBuilder(
+    column: $table.deliveryFeeUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expressSurchargeFlatUgx => $composableBuilder(
+    column: $table.expressSurchargeFlatUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get expressSurchargePct => $composableBuilder(
+    column: $table.expressSurchargePct,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -10677,6 +11529,21 @@ class $$PricingSettingsTableOrderingComposer
     column: $table.updatedBy,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get deliveryFeeUgx => $composableBuilder(
+    column: $table.deliveryFeeUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expressSurchargeFlatUgx => $composableBuilder(
+    column: $table.expressSurchargeFlatUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get expressSurchargePct => $composableBuilder(
+    column: $table.expressSurchargePct,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PricingSettingsTableAnnotationComposer
@@ -10701,6 +11568,21 @@ class $$PricingSettingsTableAnnotationComposer
 
   GeneratedColumn<String> get updatedBy =>
       $composableBuilder(column: $table.updatedBy, builder: (column) => column);
+
+  GeneratedColumn<int> get deliveryFeeUgx => $composableBuilder(
+    column: $table.deliveryFeeUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get expressSurchargeFlatUgx => $composableBuilder(
+    column: $table.expressSurchargeFlatUgx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get expressSurchargePct => $composableBuilder(
+    column: $table.expressSurchargePct,
+    builder: (column) => column,
+  );
 }
 
 class $$PricingSettingsTableTableManager
@@ -10744,12 +11626,18 @@ class $$PricingSettingsTableTableManager
                 Value<double> defaultRatePerKgUgx = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<String?> updatedBy = const Value.absent(),
+                Value<int> deliveryFeeUgx = const Value.absent(),
+                Value<int> expressSurchargeFlatUgx = const Value.absent(),
+                Value<double> expressSurchargePct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PricingSettingsCompanion(
                 id: id,
                 defaultRatePerKgUgx: defaultRatePerKgUgx,
                 updatedAt: updatedAt,
                 updatedBy: updatedBy,
+                deliveryFeeUgx: deliveryFeeUgx,
+                expressSurchargeFlatUgx: expressSurchargeFlatUgx,
+                expressSurchargePct: expressSurchargePct,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10758,12 +11646,18 @@ class $$PricingSettingsTableTableManager
                 required double defaultRatePerKgUgx,
                 required DateTime updatedAt,
                 Value<String?> updatedBy = const Value.absent(),
+                Value<int> deliveryFeeUgx = const Value.absent(),
+                Value<int> expressSurchargeFlatUgx = const Value.absent(),
+                Value<double> expressSurchargePct = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PricingSettingsCompanion.insert(
                 id: id,
                 defaultRatePerKgUgx: defaultRatePerKgUgx,
                 updatedAt: updatedAt,
                 updatedBy: updatedBy,
+                deliveryFeeUgx: deliveryFeeUgx,
+                expressSurchargeFlatUgx: expressSurchargeFlatUgx,
+                expressSurchargePct: expressSurchargePct,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10789,6 +11683,222 @@ typedef $$PricingSettingsTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $PricingSettingsTable, PricingSetting>,
       ),
       PricingSetting,
+      PrefetchHooks Function()
+    >;
+typedef $$PricingCatalogItemsTableCreateCompanionBuilder =
+    PricingCatalogItemsCompanion Function({
+      required String id,
+      required String name,
+      required int amountUgx,
+      Value<bool> active,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$PricingCatalogItemsTableUpdateCompanionBuilder =
+    PricingCatalogItemsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> amountUgx,
+      Value<bool> active,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$PricingCatalogItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $PricingCatalogItemsTable> {
+  $$PricingCatalogItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountUgx => $composableBuilder(
+    column: $table.amountUgx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PricingCatalogItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PricingCatalogItemsTable> {
+  $$PricingCatalogItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountUgx => $composableBuilder(
+    column: $table.amountUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PricingCatalogItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PricingCatalogItemsTable> {
+  $$PricingCatalogItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get amountUgx =>
+      $composableBuilder(column: $table.amountUgx, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$PricingCatalogItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PricingCatalogItemsTable,
+          PricingCatalogItem,
+          $$PricingCatalogItemsTableFilterComposer,
+          $$PricingCatalogItemsTableOrderingComposer,
+          $$PricingCatalogItemsTableAnnotationComposer,
+          $$PricingCatalogItemsTableCreateCompanionBuilder,
+          $$PricingCatalogItemsTableUpdateCompanionBuilder,
+          (
+            PricingCatalogItem,
+            BaseReferences<
+              _$AppDatabase,
+              $PricingCatalogItemsTable,
+              PricingCatalogItem
+            >,
+          ),
+          PricingCatalogItem,
+          PrefetchHooks Function()
+        > {
+  $$PricingCatalogItemsTableTableManager(
+    _$AppDatabase db,
+    $PricingCatalogItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PricingCatalogItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PricingCatalogItemsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PricingCatalogItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> amountUgx = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PricingCatalogItemsCompanion(
+                id: id,
+                name: name,
+                amountUgx: amountUgx,
+                active: active,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required int amountUgx,
+                Value<bool> active = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PricingCatalogItemsCompanion.insert(
+                id: id,
+                name: name,
+                amountUgx: amountUgx,
+                active: active,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PricingCatalogItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PricingCatalogItemsTable,
+      PricingCatalogItem,
+      $$PricingCatalogItemsTableFilterComposer,
+      $$PricingCatalogItemsTableOrderingComposer,
+      $$PricingCatalogItemsTableAnnotationComposer,
+      $$PricingCatalogItemsTableCreateCompanionBuilder,
+      $$PricingCatalogItemsTableUpdateCompanionBuilder,
+      (
+        PricingCatalogItem,
+        BaseReferences<
+          _$AppDatabase,
+          $PricingCatalogItemsTable,
+          PricingCatalogItem
+        >,
+      ),
+      PricingCatalogItem,
       PrefetchHooks Function()
     >;
 
@@ -10821,4 +11931,6 @@ class $AppDatabaseManager {
       $$PullDeadLetterTableTableManager(_db, _db.pullDeadLetter);
   $$PricingSettingsTableTableManager get pricingSettings =>
       $$PricingSettingsTableTableManager(_db, _db.pricingSettings);
+  $$PricingCatalogItemsTableTableManager get pricingCatalogItems =>
+      $$PricingCatalogItemsTableTableManager(_db, _db.pricingCatalogItems);
 }

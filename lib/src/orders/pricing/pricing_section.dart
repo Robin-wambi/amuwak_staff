@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../pricing/catalog_item.dart';
 import '../../shared/format_ugx.dart';
 import '../../shared/theme/app_card.dart';
 import '../../shared/theme/app_colors.dart';
@@ -89,6 +90,60 @@ class TotalCard extends StatelessWidget {
               ),
               child: const Text('Provisional'),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows the line-item picker: tap a catalog item to add it, or choose "Custom
+/// item" for a free-form entry. Falls back straight to the free-form sheet when
+/// the catalog is empty. Returns the chosen [LineItem], or null if dismissed.
+Future<LineItem?> showPickLineItemSheet(
+    BuildContext context, List<CatalogItem> catalog) {
+  if (catalog.isEmpty) return showAddLineItemSheet(context);
+  return showModalBottomSheet<LineItem>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => _PickLineItemSheet(catalog: catalog),
+  );
+}
+
+class _PickLineItemSheet extends StatelessWidget {
+  const _PickLineItemSheet({required this.catalog});
+
+  final List<CatalogItem> catalog;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        children: [
+          for (var i = 0; i < catalog.length; i++)
+            ListTile(
+              key: Key('pick_catalog_item_$i'),
+              title: Text(catalog[i].name),
+              trailing: Text(formatUgx(catalog[i].amountUgx)),
+              onTap: () => Navigator.pop(
+                context,
+                LineItem(
+                    name: catalog[i].name, amountUgx: catalog[i].amountUgx),
+              ),
+            ),
+          const Divider(height: 1),
+          ListTile(
+            key: const Key('pick_custom_item'),
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Custom item'),
+            onTap: () async {
+              final item = await showAddLineItemSheet(context);
+              if (item != null && context.mounted) {
+                Navigator.pop(context, item);
+              }
+            },
+          ),
         ],
       ),
     );

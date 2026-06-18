@@ -14,6 +14,7 @@ import 'tables/outbox_table.dart';
 import 'tables/sync_watermarks_table.dart';
 import 'tables/pull_dead_letter_table.dart';
 import 'tables/pricing_settings_table.dart';
+import 'tables/pricing_catalog_items_table.dart';
 
 part 'app_database.g.dart';
 
@@ -21,14 +22,14 @@ part 'app_database.g.dart';
   Staff, Customers, Orders, OrderStatusEvents,
   ProofEvents, ProofPhotos, Issues, Shifts,
   ValidTransitions, Outbox, SyncWatermarks,
-  PullDeadLetter, PricingSettings,
+  PullDeadLetter, PricingSettings, PricingCatalogItems,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -46,6 +47,18 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(orders, orders.totalUgx);
             await m.addColumn(customers, customers.customRatePerKgUgx);
             await m.createTable(pricingSettings);
+          }
+          if (from < 4) {
+            await m.addColumn(orders, orders.deliveryFeeSnapshotUgx);
+            await m.addColumn(orders, orders.isExpress);
+            await m.addColumn(orders, orders.expressFlatSnapshotUgx);
+            await m.addColumn(orders, orders.expressPctSnapshot);
+            await m.addColumn(pricingSettings, pricingSettings.deliveryFeeUgx);
+            await m.addColumn(
+                pricingSettings, pricingSettings.expressSurchargeFlatUgx);
+            await m.addColumn(
+                pricingSettings, pricingSettings.expressSurchargePct);
+            await m.createTable(pricingCatalogItems);
           }
         },
       );

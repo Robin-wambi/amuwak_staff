@@ -28,6 +28,11 @@ class Orders extends Table {
   IntColumn      get manualAdjustmentUgx  => integer().named('manual_adjustment_ugx').withDefault(const Constant(0))();
   IntColumn      get totalUgx             => integer().named('total_ugx').withDefault(const Constant(0))();
 
+  IntColumn      get deliveryFeeSnapshotUgx => integer().named('delivery_fee_snapshot_ugx').withDefault(const Constant(0))();
+  BoolColumn     get isExpress             => boolean().named('is_express').withDefault(const Constant(false))();
+  IntColumn      get expressFlatSnapshotUgx => integer().named('express_flat_snapshot_ugx').withDefault(const Constant(0))();
+  RealColumn     get expressPctSnapshot     => real().named('express_pct_snapshot').withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
