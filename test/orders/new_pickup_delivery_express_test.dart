@@ -119,6 +119,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // The delivery/express toggles live under "Add optional details".
+  Future<void> tapToggle(WidgetTester tester, Key key) async {
+    await tester.dragUntilVisible(
+      find.text('Add optional details'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.text('Add optional details'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(key),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(find.byKey(key));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('defaults: delivery included, not express', (tester) async {
     await pumpAndOpen(tester);
     await fillRequiredFields(tester);
@@ -135,8 +153,7 @@ void main() {
       (tester) async {
     await pumpAndOpen(tester);
     await fillRequiredFields(tester);
-    await tester.tap(find.byKey(const Key('np_delivery_toggle')));
-    await tester.pumpAndSettle();
+    await tapToggle(tester, const Key('np_delivery_toggle'));
     await submit(tester);
 
     expect(capturedOrder().deliveryFeeSnapshotUgx, 0);
@@ -146,8 +163,7 @@ void main() {
       (tester) async {
     await pumpAndOpen(tester);
     await fillRequiredFields(tester);
-    await tester.tap(find.byKey(const Key('np_express_toggle')));
-    await tester.pumpAndSettle();
+    await tapToggle(tester, const Key('np_express_toggle'));
     await submit(tester);
 
     final order = capturedOrder();

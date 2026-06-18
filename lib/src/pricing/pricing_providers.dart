@@ -12,16 +12,10 @@ final pricingSettingsRepositoryProvider =
 );
 
 /// The full singleton pricing config (rate + delivery fee + express surcharge).
-/// Re-read on invalidation (e.g. after the settings screen saves).
+/// Re-read on invalidation (e.g. after the settings screen saves). The dashboard
+/// reads this to seed the new-pickup screen with the rate + fee config.
 final pricingSettingsProvider = FutureProvider<PricingSettings>(
   (ref) async => ref.watch(pricingSettingsRepositoryProvider).fetch(),
-);
-
-/// The resolved global default rate, used by the new-pickup rate display when a
-/// customer has no override. Derived from [pricingSettingsProvider].
-final defaultRatePerKgUgxProvider = FutureProvider<double>(
-  (ref) async =>
-      (await ref.watch(pricingSettingsProvider.future)).defaultRatePerKgUgx,
 );
 
 final pricingCatalogRepositoryProvider = Provider<PricingCatalogRepository>(

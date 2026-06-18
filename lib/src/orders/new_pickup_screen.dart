@@ -624,24 +624,6 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
-            SwitchListTile(
-              key: const Key('np_delivery_toggle'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Include delivery'),
-              subtitle: Text(widget.deliveryFeeUgx > 0
-                  ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
-                  : 'No delivery fee configured'),
-              value: _includeDelivery,
-              onChanged: (v) => setState(() => _includeDelivery = v),
-            ),
-            SwitchListTile(
-              key: const Key('np_express_toggle'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Express'),
-              subtitle: Text(_expressSubtitle),
-              value: _isExpress,
-              onChanged: (v) => setState(() => _isExpress = v),
-            ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ServiceType>(
               key: const Key('np_service_type'),
@@ -813,6 +795,24 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   helperText:
                       'Leave blank to use the default — ${formatUgx(widget.defaultRatePerKgUgx.round())}/kg',
                 ),
+              ),
+              SwitchListTile(
+                key: const Key('np_delivery_toggle'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Include delivery'),
+                subtitle: Text(widget.deliveryFeeUgx > 0
+                    ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
+                    : 'No delivery fee configured'),
+                value: _includeDelivery,
+                onChanged: (v) => setState(() => _includeDelivery = v),
+              ),
+              SwitchListTile(
+                key: const Key('np_express_toggle'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Express'),
+                subtitle: Text(_expressSubtitle),
+                value: _isExpress,
+                onChanged: (v) => setState(() => _isExpress = v),
               ),
             ],
             const SizedBox(height: 24),
