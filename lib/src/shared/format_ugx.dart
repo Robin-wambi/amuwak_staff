@@ -12,3 +12,9 @@ String formatUgx(int amountUgx) {
   }
   return 'USh ${negative ? '-' : ''}$buffer';
 }
+
+/// Formats a percentage without a trailing ".0" (e.g. `30`, not `30.0`) while
+/// keeping a real fraction (e.g. `12.5`). Shared by the pricing settings and
+/// new-pickup screens so the express-percentage display never drifts.
+String formatPct(double pct) =>
+    pct == pct.roundToDouble() ? pct.round().toString() : pct.toString();

@@ -256,6 +256,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
+    final catalogItems = await _loadCatalogItems();
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PickupCaptureScreen(
@@ -267,6 +269,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           actorStaffId: staffId,
           labelPrinter: ref.read(labelPrinterProvider),
           printerStore: ref.read(printerStoreProvider),
+          catalogItems: catalogItems,
         ),
       ),
     );
@@ -289,14 +292,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     }
     // Warm the catalog for the "Add item" picker. Best-effort: a failed/slow
     // read just falls back to free-form line entry.
-    final catalogItems = ref.read(pricingCatalogProvider).valueOrNull ??
-        await ref.read(pricingCatalogProvider.future).catchError(
-          (Object e, StackTrace st) {
-            developer.log('Catalog load failed; using free-form entry only.',
-                name: 'StaffDashboard', error: e, stackTrace: st);
-            return const <CatalogItem>[];
-          },
-        );
+    final catalogItems = await _loadCatalogItems();
     if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -348,6 +344,20 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         ),
       ),
     ).then((_) => ref.invalidate(pricingSettingsProvider));
+  }
+
+  /// Loads the active catalog for the "Add item" pickers (pickup capture +
+  /// order details). Best-effort: a failed/slow read just falls back to
+  /// free-form line entry. Callers must re-check `mounted` after awaiting.
+  Future<List<CatalogItem>> _loadCatalogItems() async {
+    return ref.read(pricingCatalogProvider).valueOrNull ??
+        await ref.read(pricingCatalogProvider.future).catchError(
+          (Object e, StackTrace st) {
+            developer.log('Catalog load failed; using free-form entry only.',
+                name: 'StaffDashboard', error: e, stackTrace: st);
+            return const <CatalogItem>[];
+          },
+        );
   }
 
   void _openPricingCatalog() {
@@ -520,6 +530,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           3 => _AccountTab(
               onSignOut: _onSignOutPressed,
               onOpenPricingSettings: _openPricingSettings,
+              // Pricing writes are gated to in_shop + manager (migration 0024),
+              // so drivers don't get the entry point — saving would only fail.
+              canManagePricing: const {'in_shop', 'manager'}
+                  .contains(ref.watch(currentRoleProvider)),
             ),
           // Home tab. Loading and data share one `_HomeTab` widget (orders ==
           // null means loading) so the header and quick actions stay mounted
@@ -709,10 +723,15 @@ class _AccountTab extends StatelessWidget {
   const _AccountTab({
     required this.onSignOut,
     required this.onOpenPricingSettings,
+    required this.canManagePricing,
   });
 
   final VoidCallback onSignOut;
   final VoidCallback onOpenPricingSettings;
+
+  /// Whether to show the Pricing settings entry. False for drivers, whose
+  /// pricing writes are blocked server-side (migration 0024).
+  final bool canManagePricing;
 
   @override
   Widget build(BuildContext context) {
@@ -772,18 +791,20 @@ class _AccountTab extends StatelessWidget {
           value: 'Today',
         ),
         const SizedBox(height: AppSpacing.lg2),
-        AppCard(
-          onTap: onOpenPricingSettings,
-          child: Row(
-            children: [
-              Icon(Icons.payments_outlined, color: colorScheme.primary),
-              const SizedBox(width: AppSpacing.md),
-              const Expanded(child: Text('Pricing settings')),
-              const Icon(Icons.chevron_right_rounded),
-            ],
+        if (canManagePricing) ...[
+          AppCard(
+            onTap: onOpenPricingSettings,
+            child: Row(
+              children: [
+                Icon(Icons.payments_outlined, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(child: Text('Pricing settings')),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.lg2),
+          const SizedBox(height: AppSpacing.lg2),
+        ],
         OutlinedButton.icon(
           onPressed: onSignOut,
           icon: const Icon(Icons.logout_rounded),
