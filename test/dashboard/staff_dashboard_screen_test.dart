@@ -8,7 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
+import 'package:amuwak_staff/src/dashboard/current_staff_provider.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
+import 'package:amuwak_staff/src/shared/motion/animated_gradient_header.dart';
 import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/expenses/expense_entry_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
@@ -114,6 +116,10 @@ Future<void> pumpDashboardWithDb(
         // NewPickupScreen without hitting the real Supabase client.
         pricingSettingsRepositoryProvider
             .overrideWithValue(_FakePricingSettingsRepository()),
+        // The header greets the signed-in staff member; keep it off the
+        // Supabase mock and deterministic (no name) in tests.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
         ...extraOverrides,
       ],
       child: MaterialApp(
@@ -301,7 +307,7 @@ void main() {
       ]);
 
       final bannerTop = tester.getTopLeft(find.byType(SyncStatusBanner));
-      final headerTop = tester.getTopLeft(find.text('Welcome back'));
+      final headerTop = tester.getTopLeft(find.byType(AnimatedGradientHeader));
       expect(bannerTop.dy, lessThan(headerTop.dy));
     });
   },
@@ -366,6 +372,10 @@ void main() {
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
@@ -384,7 +394,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
 
     // Chrome stays rendered so staff can tap straight into a new pickup.
-    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.byType(AnimatedGradientHeader), findsOneWidget);
     expect(find.text('New pickup'), findsOneWidget);
 
     // No zero-count flicker: neither the summary "Assigned" tile nor the
@@ -412,6 +422,10 @@ void main() {
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
@@ -457,6 +471,8 @@ void main() {
               .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
           pullDeadLetteredProvider.overrideWith(
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
         ],
         child: MaterialApp(
           home: Builder(
@@ -528,6 +544,8 @@ void main() {
               .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
           pullDeadLetteredProvider.overrideWith(
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
         ],
         child: MaterialApp(
           home: Builder(
@@ -566,10 +584,9 @@ void main() {
       (tester) async {
     await pumpDashboardWithDb(tester);
 
-    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.byType(AnimatedGradientHeader), findsOneWidget);
     expect(find.text('Assigned'), findsOneWidget);
-    // The garment strip makes the header taller, so the quick actions now sit
-    // just below the fold on the test viewport — assert they're mounted.
+    // Quick actions are chrome; assert they're mounted regardless of the fold.
     expect(find.text('Quick actions', skipOffstage: false), findsOneWidget);
   });
 
@@ -593,6 +610,10 @@ void main() {
             .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
@@ -607,14 +628,14 @@ void main() {
     // Loading frame: header chrome + quick actions are up, progress is shown,
     // and there is no summary "Assigned" tile yet.
     await tester.pump();
-    expect(find.text('Staff Workspace'), findsOneWidget);
-    // Quick actions stay mounted as chrome; on the data frame the taller header
-    // pushes them just below the fold, so assert on mount, not on-screen.
+    expect(find.byType(AnimatedGradientHeader), findsOneWidget);
+    // Quick actions stay mounted as chrome across the swap; assert on mount,
+    // not on-screen (they may sit below the fold on the test viewport).
     expect(find.text('New pickup', skipOffstage: false), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('Assigned'), findsNothing);
 
-    final headerElement = tester.element(find.text('Staff Workspace'));
+    final headerElement = tester.element(find.byType(AnimatedGradientHeader));
 
     // Data arrives.
     controller.add(const []);
@@ -623,11 +644,11 @@ void main() {
 
     // Chrome stayed mounted (same Element), progress was replaced by the
     // summary grid.
-    expect(find.text('Staff Workspace'), findsOneWidget);
+    expect(find.byType(AnimatedGradientHeader), findsOneWidget);
     expect(find.text('New pickup', skipOffstage: false), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('Assigned'), findsOneWidget);
-    expect(tester.element(find.text('Staff Workspace')), same(headerElement));
+    expect(tester.element(find.byType(AnimatedGradientHeader)), same(headerElement));
   });
 
   testWidgets(
@@ -1108,6 +1129,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Pricing settings'), findsOneWidget);
+      // The Role row now reflects the real role, not a hardcoded string.
+      expect(find.text('Manager'), findsOneWidget);
     },
   );
 

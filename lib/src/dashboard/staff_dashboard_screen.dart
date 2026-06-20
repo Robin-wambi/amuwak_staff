@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
+import 'current_staff_provider.dart';
+import 'dashboard_header_content.dart';
 import '../notifications/notification_summary.dart';
 import '../notifications/notifications_screen.dart';
 import '../expenses/expense.dart';
@@ -27,7 +29,6 @@ import '../reports/daily_report_screen.dart';
 import '../reports/items_breakdown_screen.dart';
 import '../shared/motion/animated_gradient_header.dart';
 import '../shared/motion/count_up_text.dart';
-import '../shared/motion/garment_strip.dart';
 import '../shared/motion/reveal_on_mount.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
@@ -530,6 +531,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           3 => _AccountTab(
               onSignOut: _onSignOutPressed,
               onOpenPricingSettings: _openPricingSettings,
+              roleText:
+                  roleLabel(ref.watch(currentRoleProvider)) ?? 'Operations staff',
               // Pricing writes are gated to in_shop + manager (migration 0024),
               // so drivers don't get the entry point — saving would only fail.
               canManagePricing: const {'in_shop', 'manager'}
@@ -662,7 +665,7 @@ class _HomeTab extends StatelessWidget {
         AppSpacing.xxl,
       ),
       children: [
-        reveal(const _DashboardHeader()),
+        reveal(_DashboardHeader(orders: orders)),
         const SizedBox(height: AppSpacing.xl),
         reveal(middle),
         const SizedBox(height: AppSpacing.xxl),
@@ -723,11 +726,16 @@ class _AccountTab extends StatelessWidget {
   const _AccountTab({
     required this.onSignOut,
     required this.onOpenPricingSettings,
+    required this.roleText,
     required this.canManagePricing,
   });
 
   final VoidCallback onSignOut;
   final VoidCallback onOpenPricingSettings;
+
+  /// Human label for the signed-in staff member's role, mirroring the header
+  /// chip (falls back to a generic label when there's no role claim).
+  final String roleText;
 
   /// Whether to show the Pricing settings entry. False for drivers, whose
   /// pricing writes are blocked server-side (migration 0024).
@@ -782,7 +790,7 @@ class _AccountTab extends StatelessWidget {
         _AccountDetailRow(
           icon: Icons.badge_outlined,
           label: 'Role',
-          value: 'Laundry operations staff',
+          value: roleText,
         ),
         const SizedBox(height: AppSpacing.sm + 2),
         _AccountDetailRow(
@@ -879,64 +887,106 @@ class _ErrorRetry extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Unchanged private widgets (header, grid, cards, chips, actions)
+// Private dashboard widgets (header, grid, cards, chips, actions)
 // ---------------------------------------------------------------------------
 
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader();
+/// The home greeting card: a time-aware, personalised greeting with the staff
+/// member's first name and role, over a live status line (or today's date while
+/// orders load). Sits on the animated brand gradient.
+class _DashboardHeader extends ConsumerWidget {
+  const _DashboardHeader({required this.orders});
+
+  /// Null while the orders stream is still loading — the header then shows the
+  /// date instead of a status line.
+  final List<LaundryOrder>? orders;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final now = DateTime.now();
+
+    final staff = ref.watch(currentStaffProvider).valueOrNull;
+    final name = staff == null ? '' : firstName(staff.displayName);
+    final greeting = greetingForHour(now.hour);
+    final greetingLine = name.isEmpty ? greeting : '$greeting, $name';
+
+    final role = roleLabel(ref.watch(currentRoleProvider));
+    final secondLine = headerStatusLine(orders) ?? formatHeaderDate(now);
+
+    return AnimatedGradientHeader(
+      padding: const EdgeInsets.all(AppSpacing.lg2),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: AppColors.white,
+            // The brand mark is an orange rounded square; a white disc behind it
+            // gives contrast against the orange header. Sized to sit fully
+            // inside the circle (its corners stay within the 28px radius).
+            child: Image.asset(
+              'assets/branding/app_icon.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        greetingLine,
+                        style: textTheme.headlineMedium?.copyWith(
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                    if (role != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      _RoleChip(label: role),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  secondLine,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small translucent pill showing the staff member's role beside the greeting.
+class _RoleChip extends StatelessWidget {
+  const _RoleChip({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedGradientHeader(
-      padding: const EdgeInsets.all(AppSpacing.lg2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 28,
-                backgroundColor: AppColors.white,
-                child: Icon(
-                  Icons.local_laundry_service_rounded,
-                  color: AppColors.primary,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Staff Workspace',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(color: AppColors.white),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      "Today's laundry operations",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          // A slow, sliding strip of the garments the team launders — keeps the
-          // header feeling alive. Static under reduce-motion.
-          const SizedBox(height: 56, child: GarmentStrip()),
-        ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: AppColors.white,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
