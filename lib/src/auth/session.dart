@@ -13,16 +13,19 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return ref.watch(authStateProvider).valueOrNull?.session?.user.id;
 });
 
-/// The `role` claim is injected by the custom_access_token_hook in Supabase
-/// migration 0009. Read it from the access-token JWT payload.
+/// The staff role is injected by the custom_access_token_hook (Supabase
+/// migration 0009, fixed in 0025) under the `user_role` claim. It must NOT use
+/// the reserved `role` claim: PostgREST reads `role` to pick the Postgres role
+/// for each request (`SET ROLE`), so overwriting it with a staff role like
+/// 'manager' — which is not a real Postgres role — makes every data request
+/// fail. Read the staff role from `user_role` instead.
 ///
-/// Returns null if the token is missing, malformed, or already expired.
-/// The `exp` check guards against the narrow window where a background
-/// token refresh has rotated the JWT but `authStateProvider` has not yet
-/// emitted — without it we'd serve a stale `role` from the dead token
-/// until the StreamProvider catches up.
-final currentRoleProvider = Provider<String?>((ref) {
-  final token = ref.watch(authStateProvider).valueOrNull?.session?.accessToken;
+/// Returns null if the token is missing, malformed, already expired, or has no
+/// `user_role` claim. The `exp` check guards against the narrow window where a
+/// background token refresh has rotated the JWT but `authStateProvider` has not
+/// yet emitted — without it we'd serve a stale role from the dead token until
+/// the StreamProvider catches up.
+String? roleFromAccessToken(String? token) {
   if (token == null) return null;
   final parts = token.split('.');
   if (parts.length != 3) return null;
@@ -39,5 +42,10 @@ final currentRoleProvider = Provider<String?>((ref) {
     final expiresAt = DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
     if (DateTime.now().toUtc().isAfter(expiresAt)) return null;
   }
-  return payload['role'] as String?;
+  return payload['user_role'] as String?;
+}
+
+final currentRoleProvider = Provider<String?>((ref) {
+  final token = ref.watch(authStateProvider).valueOrNull?.session?.accessToken;
+  return roleFromAccessToken(token);
 });
