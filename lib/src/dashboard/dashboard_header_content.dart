@@ -30,7 +30,10 @@ String? roleLabel(String? role) {
     'manager' => 'Manager',
     'in_shop' => 'In-shop',
     'staff' => 'Staff',
-    _ => role[0].toUpperCase() + role.substring(1),
+    // Title-case via runes so a multi-byte first character (surrogate pair)
+    // isn't split — role[0] indexes UTF-16 code units, runes are code points.
+    _ => '${String.fromCharCodes(role.runes.take(1)).toUpperCase()}'
+        '${String.fromCharCodes(role.runes.skip(1))}',
   };
 }
 

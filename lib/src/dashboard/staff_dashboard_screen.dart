@@ -880,7 +880,7 @@ class _ErrorRetry extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Unchanged private widgets (header, grid, cards, chips, actions)
+// Private dashboard widgets (header, grid, cards, chips, actions)
 // ---------------------------------------------------------------------------
 
 /// The home greeting card: a time-aware, personalised greeting with the staff

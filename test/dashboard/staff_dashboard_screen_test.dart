@@ -372,6 +372,10 @@ void main() {
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
@@ -418,6 +422,10 @@ void main() {
             (ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
@@ -463,6 +471,8 @@ void main() {
               .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
           pullDeadLetteredProvider.overrideWith(
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
         ],
         child: MaterialApp(
           home: Builder(
@@ -534,6 +544,8 @@ void main() {
               .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
           pullDeadLetteredProvider.overrideWith(
               (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
         ],
         child: MaterialApp(
           home: Builder(
@@ -598,6 +610,10 @@ void main() {
             .overrideWith((ref) => Stream<List<OutboxData>>.value(const [])),
         pullDeadLetteredProvider.overrideWith(
             (ref) => Stream<List<PullDeadLetterData>>.value(const [])),
+        // Header greets the signed-in staff; stub it explicitly so the
+        // dependency is visible and never reaches the Supabase mock.
+        currentStaffProvider
+            .overrideWith((ref) => Stream<StaffData?>.value(null)),
       ],
       child: MaterialApp(
         home: Builder(
