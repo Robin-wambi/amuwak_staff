@@ -1129,6 +1129,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Pricing settings'), findsOneWidget);
+      // The Role row now reflects the real role, not a hardcoded string.
+      expect(find.text('Manager'), findsOneWidget);
     },
   );
 

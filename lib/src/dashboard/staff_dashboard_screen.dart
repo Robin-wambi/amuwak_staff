@@ -531,6 +531,8 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           3 => _AccountTab(
               onSignOut: _onSignOutPressed,
               onOpenPricingSettings: _openPricingSettings,
+              roleText:
+                  roleLabel(ref.watch(currentRoleProvider)) ?? 'Operations staff',
               // Pricing writes are gated to in_shop + manager (migration 0024),
               // so drivers don't get the entry point — saving would only fail.
               canManagePricing: const {'in_shop', 'manager'}
@@ -724,11 +726,16 @@ class _AccountTab extends StatelessWidget {
   const _AccountTab({
     required this.onSignOut,
     required this.onOpenPricingSettings,
+    required this.roleText,
     required this.canManagePricing,
   });
 
   final VoidCallback onSignOut;
   final VoidCallback onOpenPricingSettings;
+
+  /// Human label for the signed-in staff member's role, mirroring the header
+  /// chip (falls back to a generic label when there's no role claim).
+  final String roleText;
 
   /// Whether to show the Pricing settings entry. False for drivers, whose
   /// pricing writes are blocked server-side (migration 0024).
@@ -783,7 +790,7 @@ class _AccountTab extends StatelessWidget {
         _AccountDetailRow(
           icon: Icons.badge_outlined,
           label: 'Role',
-          value: 'Laundry operations staff',
+          value: roleText,
         ),
         const SizedBox(height: AppSpacing.sm + 2),
         _AccountDetailRow(
