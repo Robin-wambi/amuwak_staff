@@ -57,5 +57,17 @@ void main() {
       });
       expect(roleFromAccessToken(token), 'in_shop');
     });
+
+    test('honors a token expired within the clock-skew leeway', () {
+      // A device clock slightly ahead of the issuer can put `now` just past
+      // `exp`; a few seconds over must not reject an otherwise-valid token.
+      final justExpired =
+          DateTime.now().toUtc().subtract(const Duration(seconds: 5));
+      final token = _token({
+        'user_role': 'manager',
+        'exp': justExpired.millisecondsSinceEpoch ~/ 1000,
+      });
+      expect(roleFromAccessToken(token), 'manager');
+    });
   });
 }

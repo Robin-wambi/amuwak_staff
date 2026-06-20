@@ -16,5 +16,11 @@ String formatUgx(int amountUgx) {
 /// Formats a percentage without a trailing ".0" (e.g. `30`, not `30.0`) while
 /// keeping a real fraction (e.g. `12.5`). Shared by the pricing settings and
 /// new-pickup screens so the express-percentage display never drifts.
+///
+/// Uses an epsilon comparison rather than exact float equality so a value that
+/// is whole but carries tiny arithmetic noise (e.g. `30.000000000001`) still
+/// renders as `30` instead of leaking the float error.
 String formatPct(double pct) =>
-    pct == pct.roundToDouble() ? pct.round().toString() : pct.toString();
+    (pct - pct.roundToDouble()).abs() < 1e-9
+        ? pct.round().toString()
+        : pct.toString();
