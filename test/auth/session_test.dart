@@ -34,6 +34,13 @@ void main() {
       expect(roleFromAccessToken('not-a-jwt'), isNull);
     });
 
+    test('returns null when user_role is present but not a String', () {
+      // A misconfigured hook or other issuer could emit a non-String claim;
+      // it must degrade to null, not throw a TypeError.
+      final token = _token({'user_role': 0});
+      expect(roleFromAccessToken(token), isNull);
+    });
+
     test('returns null when the token is expired', () {
       final token = _token({
         'user_role': 'manager',

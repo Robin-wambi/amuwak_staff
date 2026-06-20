@@ -42,7 +42,8 @@ String? roleFromAccessToken(String? token) {
     final expiresAt = DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
     if (DateTime.now().toUtc().isAfter(expiresAt)) return null;
   }
-  return payload['user_role'] as String?;
+  final role = payload['user_role'];
+  return role is String ? role : null;
 }
 
 final currentRoleProvider = Provider<String?>((ref) {
