@@ -40,7 +40,10 @@ String? roleFromAccessToken(String? token) {
   final exp = payload['exp'];
   if (exp is int) {
     final expiresAt = DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
-    if (DateTime.now().toUtc().isAfter(expiresAt)) return null;
+    // Allow a small clock-skew leeway so a device whose clock runs slightly
+    // ahead of the token issuer doesn't reject an otherwise-valid token.
+    const leeway = Duration(seconds: 30);
+    if (DateTime.now().toUtc().isAfter(expiresAt.add(leeway))) return null;
   }
   final role = payload['user_role'];
   return role is String ? role : null;

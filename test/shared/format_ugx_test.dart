@@ -17,4 +17,21 @@ void main() {
       expect(formatUgx(-5000), 'USh -5,000');
     });
   });
+
+  group('formatPct', () {
+    test('renders a whole percentage without decimals', () {
+      expect(formatPct(30.0), '30');
+      expect(formatPct(0.0), '0');
+    });
+
+    test('keeps a real fraction', () {
+      expect(formatPct(12.5), '12.5');
+    });
+
+    test('treats float noise near a whole number as whole', () {
+      // A value that should be a whole 30 but carries tiny float error from
+      // upstream arithmetic must still render as "30", not "30.000000000001".
+      expect(formatPct(30.0 + 1e-12), '30');
+    });
+  });
 }
