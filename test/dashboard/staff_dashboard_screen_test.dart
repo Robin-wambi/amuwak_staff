@@ -1110,4 +1110,22 @@ void main() {
       expect(find.text('Pricing settings'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Account tab shows Pricing settings for the in_shop role',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'in_shop'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pricing settings'), findsOneWidget);
+    },
+  );
 }
