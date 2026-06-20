@@ -7,11 +7,12 @@
 BEGIN;
 SET search_path TO extensions, public;
 
-SELECT plan(5);
+SELECT plan(6);
 
 INSERT INTO public.staff (id, username, display_name, role) VALUES
   ('00000000-0000-0000-0000-000000000050', 'mgr_hook_test', 'Mgr 2', 'manager'),
-  ('00000000-0000-0000-0000-000000000051', 'shop_hook_test', 'Shop 1', 'in_shop');
+  ('00000000-0000-0000-0000-000000000051', 'shop_hook_test', 'Shop 1', 'in_shop'),
+  ('00000000-0000-0000-0000-000000000052', 'drv_hook_test', 'Driver 1', 'driver');
 
 SELECT has_function('public', 'custom_access_token_hook', ARRAY['jsonb']);
 
@@ -32,6 +33,15 @@ SELECT is(
    ))->'claims'->>'user_role')::text,
   'in_shop',
   'user_role claim is injected for an in_shop staff member');
+
+-- ...and a driver gets 'driver'
+SELECT is(
+  (public.custom_access_token_hook(jsonb_build_object(
+     'user_id', '00000000-0000-0000-0000-000000000052',
+     'claims',  jsonb_build_object('sub', '00000000-0000-0000-0000-000000000052')
+   ))->'claims'->>'user_role')::text,
+  'driver',
+  'user_role claim is injected for a driver');
 
 -- For an unknown user, the role falls back to 'none'
 SELECT is(
