@@ -57,6 +57,35 @@ Map<String, dynamic> orderStatusUpdatePayload(
       'updated_at': now.toUtc().toIso8601String(),
     };
 
+/// The descriptive columns an edit can change after creation — customer
+/// details, service, item count, notes, and schedule (+ updated_at). Mirrors
+/// [orderStatusUpdatePayload]'s narrow shape: it deliberately omits
+/// `created_at`/`created_by`, `status`, and every pricing snapshot so an edit
+/// can never clobber creation metadata or the frozen pricing (those flow
+/// through `upsertOrder` / `updatePricing` / `updateStatus` instead).
+Map<String, dynamic> orderDetailsUpdatePayload(
+  LaundryOrder order, {
+  required DateTime now,
+}) =>
+    {
+      'customer_name': order.customerName,
+      'phone': order.phone,
+      'address': order.address,
+      'service_type': order.serviceType.toDbString(),
+      'item_count': order.itemCount,
+      'notes': order.notes,
+      'scheduled_for': order.scheduledFor?.toUtc().toIso8601String(),
+      'updated_at': now.toUtc().toIso8601String(),
+    };
+
+/// Soft-deletes an order — a back-office tombstone that drops it off the
+/// rider's lists (`watchAll` filters `deleted_at != null` client-side). Mirrors
+/// `ExpensesRepository.softDelete`.
+Map<String, dynamic> orderSoftDeletePayload({required DateTime now}) => {
+      'deleted_at': now.toUtc().toIso8601String(),
+      'updated_at': now.toUtc().toIso8601String(),
+    };
+
 Map<String, dynamic> customerUpsertPayload(
   Customer customer, {
   required DateTime now,
