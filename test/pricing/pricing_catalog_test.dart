@@ -77,6 +77,18 @@ void main() {
       expect(c.category, isNull);
     });
 
+    test('category reads as null when the key is present but null', () {
+      // A real Supabase row for an item saved before categories existed has
+      // the column present with a null value (not a missing key).
+      final c = CatalogItem.fromSupabase({
+        'id': 'c1',
+        'name': 'Duvet',
+        'amount_ugx': 10000,
+        'category': null,
+      });
+      expect(c.category, isNull);
+    });
+
     test('blank category normalizes to null and trims', () {
       expect(CatalogItem(id: 'c1', name: 'X', amountUgx: 1, category: '   ')
           .category, isNull);

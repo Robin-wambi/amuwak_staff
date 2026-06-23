@@ -126,13 +126,13 @@ class _PickLineItemSheetState extends State<_PickLineItemSheet> {
   String _selected = _all;
 
   List<String> get _categories {
-    final set = widget.catalog
+    final sorted = widget.catalog
         .map((e) => e.category)
         .whereType<String>()
         .toSet()
         .toList()
       ..sort();
-    return set;
+    return sorted;
   }
 
   bool get _hasUncategorised =>
