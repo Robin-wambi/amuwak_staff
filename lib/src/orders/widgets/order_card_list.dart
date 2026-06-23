@@ -16,11 +16,20 @@ class OrderCardList extends StatelessWidget {
     super.key,
     required this.orders,
     required this.onOrderTap,
+    this.onEditOrder,
+    this.onDeleteOrder,
+    this.onAdvanceOrderStatus,
     this.padding = const EdgeInsets.all(AppSpacing.lg),
   });
 
   final List<LaundryOrder> orders;
   final void Function(LaundryOrder order) onOrderTap;
+
+  /// Optional per-card CRUD actions, forwarded to each [OrderCard]. Null leaves
+  /// the cards tap-only (the actions menu and swipe-to-delete stay hidden).
+  final void Function(LaundryOrder order)? onEditOrder;
+  final void Function(LaundryOrder order)? onDeleteOrder;
+  final void Function(LaundryOrder order)? onAdvanceOrderStatus;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -31,7 +40,15 @@ class OrderCardList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         final order = orders[index];
-        return OrderCard(order: order, onTap: () => onOrderTap(order));
+        return OrderCard(
+          order: order,
+          onTap: () => onOrderTap(order),
+          onEdit: onEditOrder == null ? null : () => onEditOrder!(order),
+          onDelete: onDeleteOrder == null ? null : () => onDeleteOrder!(order),
+          onAdvanceStatus: onAdvanceOrderStatus == null
+              ? null
+              : () => onAdvanceOrderStatus!(order),
+        );
       },
     );
   }

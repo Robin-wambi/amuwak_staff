@@ -28,12 +28,26 @@ class OrderFilterScreen extends ConsumerWidget {
     super.key,
     required this.filter,
     required this.onOrderTap,
+    this.onEditOrder,
+    this.onDeleteOrder,
+    this.onAdvanceOrderStatus,
+    this.onNewPickup,
     this.now,
     this.title,
   });
 
   final OrderFilter filter;
   final void Function(LaundryOrder order) onOrderTap;
+
+  /// Optional per-card CRUD actions (edit / soft-delete / advance status),
+  /// wired by the dashboard. Null leaves the cards tap-only.
+  final void Function(LaundryOrder order)? onEditOrder;
+  final void Function(LaundryOrder order)? onDeleteOrder;
+  final void Function(LaundryOrder order)? onAdvanceOrderStatus;
+
+  /// Opens the New Pickup flow from this list's FAB. Null hides the FAB (e.g.
+  /// in isolation tests). The dashboard passes its existing `_handleNewPickup`.
+  final VoidCallback? onNewPickup;
 
   /// Overrides the AppBar title. Defaults to [OrderFilter.label] when null —
   /// used so a caller (e.g. the daily report's "Orders" card) can title the
@@ -53,6 +67,13 @@ class OrderFilterScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: Text(title ?? filter.label)),
+      floatingActionButton: onNewPickup == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: onNewPickup,
+              icon: const Icon(Icons.add),
+              label: const Text('New pickup'),
+            ),
       body: ordersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const EmptyState(
@@ -115,7 +136,16 @@ class OrderFilterScreen extends ConsumerWidget {
         final order = (row as _OrderRow).order;
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: OrderCard(order: order, onTap: () => onOrderTap(order)),
+          child: OrderCard(
+            order: order,
+            onTap: () => onOrderTap(order),
+            onEdit: onEditOrder == null ? null : () => onEditOrder!(order),
+            onDelete:
+                onDeleteOrder == null ? null : () => onDeleteOrder!(order),
+            onAdvanceStatus: onAdvanceOrderStatus == null
+                ? null
+                : () => onAdvanceOrderStatus!(order),
+          ),
         );
       },
     );

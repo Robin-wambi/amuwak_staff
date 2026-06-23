@@ -72,11 +72,98 @@ void main() {
   });
 
   group('orderStatusUpdatePayload', () {
-    test('carries the folded status and a UTC updated_at', () {
+    test('carries the folded status, the actor, and a UTC updated_at', () {
       final now = DateTime(2026, 6, 2, 15, 30);
-      final p = orderStatusUpdatePayload(OrderStatus.readyForDelivery, now: now);
-      expect(p.keys, unorderedEquals(<String>['status', 'updated_at']));
+      final p = orderStatusUpdatePayload(OrderStatus.readyForDelivery,
+          actorStaffId: 's1', now: now);
+      expect(p.keys,
+          unorderedEquals(<String>['status', 'updated_by', 'updated_at']));
       expect(p['status'], OrderStatus.readyForDelivery.toDbString());
+      expect(p['updated_by'], 's1');
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+    });
+  });
+
+  group('orderDetailsUpdatePayload', () {
+    test('carries only the descriptive columns + UTC updated_at', () {
+      final order = LaundryOrder(
+        orderId: 'o1',
+        orderCode: 'AMW-1',
+        customerId: 'c1',
+        customerName: 'Ada',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.inProgress,
+        timeLabel: 'Today',
+        itemCount: 5,
+        phone: '0700',
+        address: '12 Kira Rd',
+        notes: 'handle with care',
+        scheduledFor: DateTime.utc(2026, 6, 3, 9),
+        // Pricing/snapshot fields must NOT leak into the descriptive update.
+        ratePerKgSnapshotUgx: 5000,
+        totalUgx: 19500,
+      );
+      final now = DateTime(2026, 6, 2, 12, 0);
+
+      final p = orderDetailsUpdatePayload(order, actorStaffId: 's1', now: now);
+
+      expect(
+        p.keys,
+        unorderedEquals(<String>[
+          'customer_name',
+          'phone',
+          'address',
+          'service_type',
+          'item_count',
+          'notes',
+          'scheduled_for',
+          'updated_by',
+          'updated_at',
+        ]),
+      );
+      expect(p['customer_name'], 'Ada');
+      expect(p['phone'], '0700');
+      expect(p['address'], '12 Kira Rd');
+      expect(p['service_type'], ServiceType.washAndIron.toDbString());
+      expect(p['item_count'], 5);
+      expect(p['notes'], 'handle with care');
+      expect(p['scheduled_for'], DateTime.utc(2026, 6, 3, 9).toIso8601String());
+      expect(p['updated_by'], 's1');
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+      // Never touches creation metadata, status, or pricing snapshots.
+      expect(p.containsKey('created_at'), isFalse);
+      expect(p.containsKey('created_by'), isFalse);
+      expect(p.containsKey('status'), isFalse);
+      expect(p.containsKey('total_ugx'), isFalse);
+      expect(p.containsKey('rate_per_kg_snapshot_ugx'), isFalse);
+    });
+
+    test('passes scheduled_for through as null for an immediate order', () {
+      const order = LaundryOrder(
+        orderId: 'o2',
+        customerName: 'Bob',
+        serviceType: ServiceType.washOnly,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 'Pickup: now',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      final p = orderDetailsUpdatePayload(order,
+          actorStaffId: 's1', now: DateTime(2026, 6, 2));
+      expect(p['scheduled_for'], isNull);
+    });
+  });
+
+  group('orderSoftDeletePayload', () {
+    test('tombstones with deleted_at/deleted_by and a matching updated_at', () {
+      final now = DateTime(2026, 6, 2, 18, 5);
+      final p = orderSoftDeletePayload(actorStaffId: 's1', now: now);
+      expect(p.keys,
+          unorderedEquals(<String>['deleted_at', 'deleted_by', 'updated_at']));
+      expect(p['deleted_at'], now.toUtc().toIso8601String());
+      expect(p['deleted_by'], 's1');
       expect(p['updated_at'], now.toUtc().toIso8601String());
     });
   });

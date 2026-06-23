@@ -18,9 +18,20 @@ import '../sync/repository_providers.dart';
 /// taps to [onOrderTap] (the dashboard's order-details opener, which carries the
 /// session check + repository wiring).
 class ItemsBreakdownScreen extends ConsumerWidget {
-  const ItemsBreakdownScreen({super.key, required this.onOrderTap});
+  const ItemsBreakdownScreen({
+    super.key,
+    required this.onOrderTap,
+    this.onEditOrder,
+    this.onDeleteOrder,
+    this.onAdvanceOrderStatus,
+  });
 
   final void Function(LaundryOrder order) onOrderTap;
+
+  /// Optional per-card CRUD actions, wired by the dashboard. Null = tap-only.
+  final void Function(LaundryOrder order)? onEditOrder;
+  final void Function(LaundryOrder order)? onDeleteOrder;
+  final void Function(LaundryOrder order)? onAdvanceOrderStatus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -85,7 +96,16 @@ class ItemsBreakdownScreen extends ConsumerWidget {
         final order = withItems[index - 1];
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: OrderCard(order: order, onTap: () => onOrderTap(order)),
+          child: OrderCard(
+            order: order,
+            onTap: () => onOrderTap(order),
+            onEdit: onEditOrder == null ? null : () => onEditOrder!(order),
+            onDelete:
+                onDeleteOrder == null ? null : () => onDeleteOrder!(order),
+            onAdvanceStatus: onAdvanceOrderStatus == null
+                ? null
+                : () => onAdvanceOrderStatus!(order),
+          ),
         );
       },
     );

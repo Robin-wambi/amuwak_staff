@@ -17,6 +17,7 @@ import '../orders/geo_services.dart';
 import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
+import '../orders/edit_order_screen.dart';
 import '../orders/order_details_screen.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_filter_screen.dart';
@@ -112,7 +113,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       return response.file != null ||
           (response.files?.isNotEmpty ?? false) ||
           response.exception != null;
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Lost-photo retrieval failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       return false;
     }
   }
@@ -157,7 +160,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     try {
       final signOut = widget.signOut ?? _defaultSignOut;
       await signOut(ref);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Sign-out failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -195,7 +200,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     try {
       settings = ref.read(pricingSettingsProvider).valueOrNull ??
           await ref.read(pricingSettingsRepositoryProvider).fetch();
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Pricing settings fetch failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -315,6 +322,93 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // wire writes through the repositories).
   }
 
+  /// Opens the descriptive-fields edit form for an order. Same session guard as
+  /// [_openOrderDetails]; the save is wired to `updateOrderDetails` (which can't
+  /// touch pricing/status). The orders stream re-emits the edited order on save.
+  Future<void> _editOrder(LaundryOrder order) async {
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      _showSessionExpired();
+      return;
+    }
+    final repo = ref.read(ordersRepositoryProvider);
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditOrderScreen(
+          order: order,
+          save: (updated) =>
+              repo.updateOrderDetails(updated, actorStaffId: staffId),
+        ),
+      ),
+    );
+  }
+
+  /// Soft-deletes an order. The card already confirmed the intent; here we just
+  /// run the write and surface the outcome. The stream re-emits without the
+  /// order, so the card disappears on its own.
+  Future<void> _deleteOrder(LaundryOrder order) async {
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      _showSessionExpired();
+      return;
+    }
+    try {
+      await ref
+          .read(ordersRepositoryProvider)
+          .softDelete(order.orderId, actorStaffId: staffId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text('Order ${order.orderCode} deleted.')),
+        );
+    } catch (e, st) {
+      developer.log('softDelete failed for order ${order.orderId}.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete — please retry.')),
+      );
+    }
+  }
+
+  /// Advances an order to its next status. The card only offers this for the
+  /// proof-less in-progress → ready step; pickup/delivery route into Details'
+  /// proof capture instead.
+  Future<void> _advanceOrderStatus(LaundryOrder order) async {
+    final next = order.status.nextStatus;
+    if (next == null) return;
+    final staffId = ref.read(currentUserIdProvider);
+    if (staffId == null) {
+      _showSessionExpired();
+      return;
+    }
+    try {
+      await ref
+          .read(ordersRepositoryProvider)
+          .updateStatus(order.orderId, next, actorStaffId: staffId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text('Order moved to ${next.label}.')),
+        );
+    } catch (e, st) {
+      developer.log('updateStatus failed for order ${order.orderId}.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update status — please retry.')),
+      );
+    }
+  }
+
+  void _showSessionExpired() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Session expired — please sign in again.')),
+    );
+  }
+
   void _openPricingSettings() {
     final staffId = ref.read(currentUserIdProvider);
     if (staffId == null) {
@@ -401,6 +495,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         builder: (_) => OrderSearchScreen(
           onOrderTap: _openOrderDetails,
           cameraViewBuilder: _cameraViewBuilder,
+          onEditOrder: _editOrder,
+          onDeleteOrder: _deleteOrder,
+          onAdvanceOrderStatus: _advanceOrderStatus,
         ),
       ),
     );
@@ -415,6 +512,10 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         builder: (_) => OrderFilterScreen(
           filter: filter,
           onOrderTap: _openOrderDetails,
+          onEditOrder: _editOrder,
+          onDeleteOrder: _deleteOrder,
+          onAdvanceOrderStatus: _advanceOrderStatus,
+          onNewPickup: _handleNewPickup,
           title: title,
         ),
       ),
@@ -427,7 +528,12 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   void _openItemsBreakdown() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => ItemsBreakdownScreen(onOrderTap: _openOrderDetails),
+        builder: (_) => ItemsBreakdownScreen(
+          onOrderTap: _openOrderDetails,
+          onEditOrder: _editOrder,
+          onDeleteOrder: _deleteOrder,
+          onAdvanceOrderStatus: _advanceOrderStatus,
+        ),
       ),
     );
   }
@@ -502,6 +608,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
               data: (orders) => _OrdersBody(
                 orders: orders,
                 onOrderTap: _openOrderDetails,
+                onEditOrder: _editOrder,
+                onDeleteOrder: _deleteOrder,
+                onAdvanceOrderStatus: _advanceOrderStatus,
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => _ErrorRetry(
@@ -555,6 +664,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
                 ),
         },
       ),
+      // A create entry point on the Orders tab (Home already has the "New
+      // pickup" quick action). Reuses the same flow, so there's one create path.
+      floatingActionButton: _selectedTabIndex == 1
+          ? FloatingActionButton.extended(
+              onPressed: _handleNewPickup,
+              icon: const Icon(Icons.add),
+              label: const Text('New pickup'),
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTabIndex,
         onDestinationSelected: _selectTab,
@@ -683,10 +801,16 @@ class _OrdersBody extends StatelessWidget {
   const _OrdersBody({
     required this.orders,
     required this.onOrderTap,
+    required this.onEditOrder,
+    required this.onDeleteOrder,
+    required this.onAdvanceOrderStatus,
   });
 
   final List<LaundryOrder> orders;
   final void Function(LaundryOrder) onOrderTap;
+  final void Function(LaundryOrder) onEditOrder;
+  final void Function(LaundryOrder) onDeleteOrder;
+  final void Function(LaundryOrder) onAdvanceOrderStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -709,6 +833,9 @@ class _OrdersBody extends StatelessWidget {
           child: OrderCardList(
             orders: orders,
             onOrderTap: onOrderTap,
+            onEditOrder: onEditOrder,
+            onDeleteOrder: onDeleteOrder,
+            onAdvanceOrderStatus: onAdvanceOrderStatus,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.xl,
               0,

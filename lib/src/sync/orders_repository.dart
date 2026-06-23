@@ -198,6 +198,47 @@ class OrdersRepository {
     }
   }
 
+  /// Updates only the descriptive columns (+ updated_at) — customer details,
+  /// service, item count, notes, schedule. Like [updatePricing] this never
+  /// touches created_at/created_by, and unlike [upsertOrder] it can't clobber
+  /// the frozen pricing snapshots or status. Backs the card "Edit details" flow.
+  ///
+  /// Throws a [StateError] when no order matched (e.g. soft-deleted server-side),
+  /// matching [updatePricing]/[updateStatus] so a no-op isn't treated as success.
+  ///
+  /// [actorStaffId] is recorded as the row's `updated_by` audit pointer.
+  Future<void> updateOrderDetails(LaundryOrder order,
+      {required String actorStaffId}) async {
+    final updated = await _supabase
+        .from('orders')
+        .update(orderDetailsUpdatePayload(order,
+            actorStaffId: actorStaffId, now: _clock()))
+        .eq('id', order.orderId)
+        .select('id');
+    if (updated.isEmpty) {
+      throw StateError(
+          'updateOrderDetails: no order with id "${order.orderId}"');
+    }
+  }
+
+  /// Soft-deletes an order (back-office tombstone) so it drops off the rider's
+  /// lists — [watchAll] filters `deleted_at != null` client-side. Mirrors
+  /// [ExpensesRepository.softDelete]; throws a [StateError] when no row matched.
+  ///
+  /// [actorStaffId] is recorded as the row's `deleted_by` audit pointer for this
+  /// destructive operation.
+  Future<void> softDelete(String orderId,
+      {required String actorStaffId}) async {
+    final updated = await _supabase
+        .from('orders')
+        .update(orderSoftDeletePayload(actorStaffId: actorStaffId, now: _clock()))
+        .eq('id', orderId)
+        .select('id');
+    if (updated.isEmpty) {
+      throw StateError('softDelete: no order with id "$orderId"');
+    }
+  }
+
   /// Updates an order's status. [updatedAt] is optional and kept for call-site
   /// compatibility with the offline path (where it stabilised the outbox dedup
   /// key); online it just sets the row's `updated_at`.
@@ -214,7 +255,8 @@ class OrdersRepository {
     final now = updatedAt ?? _clock();
     final updated = await _supabase
         .from('orders')
-        .update(orderStatusUpdatePayload(newStatus, now: now))
+        .update(orderStatusUpdatePayload(newStatus,
+            actorStaffId: actorStaffId, now: now))
         .eq('id', orderId)
         .select('id');
     if (updated.isEmpty) {
