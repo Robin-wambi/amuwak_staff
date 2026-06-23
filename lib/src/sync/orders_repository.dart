@@ -205,6 +205,10 @@ class OrdersRepository {
   ///
   /// Throws a [StateError] when no order matched (e.g. soft-deleted server-side),
   /// matching [updatePricing]/[updateStatus] so a no-op isn't treated as success.
+  ///
+  /// [actorStaffId] is kept for API symmetry with the other mutators but is not
+  /// yet written to the row (there's no `updated_by` column). Whether to record
+  /// an actor here is tracked in issue #71.
   Future<void> updateOrderDetails(LaundryOrder order,
       {required String actorStaffId}) async {
     final updated = await _supabase
@@ -221,6 +225,10 @@ class OrdersRepository {
   /// Soft-deletes an order (back-office tombstone) so it drops off the rider's
   /// lists — [watchAll] filters `deleted_at != null` client-side. Mirrors
   /// [ExpensesRepository.softDelete]; throws a [StateError] when no row matched.
+  ///
+  /// [actorStaffId] is kept for API symmetry with the other mutators but is not
+  /// yet written to the row (there's no `deleted_by` column). An audit trail for
+  /// this destructive op is tracked in issue #71.
   Future<void> softDelete(String orderId,
       {required String actorStaffId}) async {
     final updated = await _supabase

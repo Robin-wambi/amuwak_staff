@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -114,7 +116,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
         ..clearSnackBars()
         ..showSnackBar(const SnackBar(content: Text('Order updated.')));
       if (Navigator.of(context).canPop()) Navigator.of(context).pop(true);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Order save failed.',
+          name: 'EditOrderScreen', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not save — please retry.')),
