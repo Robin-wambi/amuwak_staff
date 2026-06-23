@@ -83,4 +83,22 @@ void main() {
 
     expect(saveCalled, isFalse);
   });
+
+  testWidgets('an empty item count is rejected before save', (tester) async {
+    // The field is digitsOnly, so a literal "-1" can't be typed; the reachable
+    // invalid path is an empty/non-numeric count, where int.tryParse returns
+    // null and the same guard (itemCount == null || itemCount < 0) fires.
+    var saveCalled = false;
+    await _pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (_) async => saveCalled = true),
+    );
+
+    await tester.enterText(find.byKey(const Key('edit_item_count')), '');
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saveCalled, isFalse);
+    expect(find.text('Enter a valid item count.'), findsOneWidget);
+  });
 }

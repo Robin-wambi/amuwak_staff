@@ -32,7 +32,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   late final TextEditingController _itemCountController;
   late final TextEditingController _notesController;
   late ServiceType _serviceType;
-  late DateTime? _scheduledFor;
+  DateTime? _scheduledFor;
   bool _saving = false;
 
   @override

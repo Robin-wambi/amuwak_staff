@@ -15,6 +15,7 @@ import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/expenses/expense_entry_screen.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
+import 'package:amuwak_staff/src/orders/edit_order_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_filter_screen.dart';
@@ -136,7 +137,23 @@ Future<void> pumpDashboardWithDb(
   await tester.pumpAndSettle();
 }
 
+/// A fallback so mocktail's `any()` matcher works for the LaundryOrder argument
+/// of `updateOrderDetails` in the CRUD-wiring tests below.
+const _fallbackOrder = LaundryOrder(
+  orderId: 'fallback',
+  customerName: 'fallback',
+  serviceType: ServiceType.washOnly,
+  status: OrderStatus.inProgress,
+  timeLabel: 't',
+  itemCount: 1,
+  phone: 'p',
+  address: 'a',
+  notes: '',
+);
+
 void main() {
+  setUpAll(() => registerFallbackValue(_fallbackOrder));
+
   testWidgets(
     'Surfaces a SnackBar on startup when an in-flight photo capture was lost',
     (tester) async {
@@ -263,6 +280,100 @@ void main() {
       expect(find.byType(NewPickupScreen), findsOneWidget);
     },
   );
+
+  group('Orders tab card CRUD wiring', () {
+    LaundryOrder inProgress(String name) => LaundryOrder(
+          orderId: 'o-$name',
+          orderCode: 'AMW-$name',
+          customerName: name,
+          serviceType: ServiceType.washAndIron,
+          status: OrderStatus.inProgress,
+          timeLabel: 't',
+          itemCount: 3,
+          phone: '0700',
+          address: 'Kira',
+          notes: '',
+        );
+
+    testWidgets(
+      'long-press → Edit details → save calls updateOrderDetails with the '
+      'edited order',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll())
+            .thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.updateOrderDetails(any(),
+            actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Zara')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('Zara'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Edit details'));
+        await tester.pumpAndSettle();
+        expect(find.byType(EditOrderScreen), findsOneWidget);
+
+        await tester.enterText(
+            find.byKey(const Key('edit_customer_name')), 'Zara Edited');
+        await tester.ensureVisible(find.byKey(const Key('edit_save')));
+        await tester.tap(find.byKey(const Key('edit_save')));
+        await tester.pumpAndSettle();
+
+        final captured = verify(() => repo.updateOrderDetails(
+            captureAny(), actorStaffId: 'staff-1')).captured.single;
+        expect((captured as LaundryOrder).customerName, 'Zara Edited');
+        expect(captured.orderId, 'o-Zara');
+      },
+    );
+
+    testWidgets(
+      'swipe-to-delete → confirm calls softDelete with the order id',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll())
+            .thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.softDelete(any(),
+            actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Zeta')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.drag(find.text('Zeta'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        verify(() => repo.softDelete('o-Zeta', actorStaffId: 'staff-1'))
+            .called(1);
+      },
+    );
+  });
 
   testWidgets(
     'Tapping "Check order" opens OrderSearchScreen',
