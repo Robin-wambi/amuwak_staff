@@ -59,5 +59,50 @@ void main() {
       expect(c.name, 'Shirt');
       expect(c.amountUgx, 1000);
     });
+
+    test('reads and writes category', () {
+      final c = CatalogItem(
+          id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning');
+      expect(c.category, 'Dry Cleaning');
+      expect(c.toSupabase()['category'], 'Dry Cleaning');
+      expect(CatalogItem.fromSupabase(c.toSupabase()), c);
+    });
+
+    test('category degrades to null when absent', () {
+      final c = CatalogItem.fromSupabase({
+        'id': 'c1',
+        'name': 'Duvet',
+        'amount_ugx': 10000,
+      });
+      expect(c.category, isNull);
+    });
+
+    test('category reads as null when the key is present but null', () {
+      // A real Supabase row for an item saved before categories existed has
+      // the column present with a null value (not a missing key).
+      final c = CatalogItem.fromSupabase({
+        'id': 'c1',
+        'name': 'Duvet',
+        'amount_ugx': 10000,
+        'category': null,
+      });
+      expect(c.category, isNull);
+    });
+
+    test('blank category normalizes to null and trims', () {
+      expect(CatalogItem(id: 'c1', name: 'X', amountUgx: 1, category: '   ')
+          .category, isNull);
+      expect(CatalogItem(id: 'c1', name: 'X', amountUgx: 1, category: ' Wash ')
+          .category, 'Wash');
+    });
+
+    test('copyWith can set and clear category', () {
+      final base = CatalogItem(id: 'c1', name: 'X', amountUgx: 1);
+      expect(base.copyWith(category: 'Ironing').category, 'Ironing');
+      final tagged = CatalogItem(
+          id: 'c1', name: 'X', amountUgx: 1, category: 'Ironing');
+      expect(tagged.copyWith(category: null).category, isNull);
+      expect(tagged.copyWith(name: 'Y').category, 'Ironing'); // untouched
+    });
   });
 }

@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -59,6 +59,13 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(
                 pricingSettings, pricingSettings.expressSurchargePct);
             await m.createTable(pricingCatalogItems);
+          }
+          // Only DBs created at v4 lack `category`: the `from < 4` branch above
+          // runs createTable(pricingCatalogItems) against the current (v5)
+          // schema, which already includes the column. Guarding on `from >= 4`
+          // avoids a duplicate-column error for v1–v3 → v5 upgrades.
+          if (from >= 4 && from < 5) {
+            await m.addColumn(pricingCatalogItems, pricingCatalogItems.category);
           }
         },
       );

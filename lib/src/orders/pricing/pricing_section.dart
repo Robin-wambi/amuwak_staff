@@ -109,27 +109,92 @@ Future<LineItem?> showPickLineItemSheet(
   );
 }
 
-class _PickLineItemSheet extends StatelessWidget {
+class _PickLineItemSheet extends StatefulWidget {
   const _PickLineItemSheet({required this.catalog});
 
   final List<CatalogItem> catalog;
 
   @override
+  State<_PickLineItemSheet> createState() => _PickLineItemSheetState();
+}
+
+class _PickLineItemSheetState extends State<_PickLineItemSheet> {
+  // Sentinel values that cannot collide with real category names (they start
+  // with a space, which is never a valid category name).
+  static const String _all = ' all';
+  static const String _other = ' other';
+  String _selected = _all;
+
+  List<String> get _categories {
+    final sorted = widget.catalog
+        .map((e) => e.category)
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    return sorted;
+  }
+
+  bool get _hasUncategorised =>
+      widget.catalog.any((e) => e.category == null);
+
+  List<CatalogItem> get _filtered {
+    if (_selected == _all) return widget.catalog;
+    if (_selected == _other) {
+      return widget.catalog.where((e) => e.category == null).toList();
+    }
+    return widget.catalog.where((e) => e.category == _selected).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final categories = _categories;
+    final showChips = categories.isNotEmpty;
+    final filtered = _filtered;
     return SafeArea(
       child: ListView(
         shrinkWrap: true,
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         children: [
-          for (var i = 0; i < catalog.length; i++)
+          if (showChips)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                children: [
+                  ChoiceChip(
+                    key: const Key('pick_category_all'),
+                    label: const Text('All'),
+                    selected: _selected == _all,
+                    onSelected: (_) => setState(() => _selected = _all),
+                  ),
+                  for (final c in categories)
+                    ChoiceChip(
+                      key: Key('pick_category_$c'),
+                      label: Text(c),
+                      selected: _selected == c,
+                      onSelected: (_) => setState(() => _selected = c),
+                    ),
+                  if (_hasUncategorised)
+                    ChoiceChip(
+                      key: const Key('pick_category_other'),
+                      label: const Text('Other'),
+                      selected: _selected == _other,
+                      onSelected: (_) => setState(() => _selected = _other),
+                    ),
+                ],
+              ),
+            ),
+          for (var i = 0; i < filtered.length; i++)
             ListTile(
               key: Key('pick_catalog_item_$i'),
-              title: Text(catalog[i].name),
-              trailing: Text(formatUgx(catalog[i].amountUgx)),
+              title: Text(filtered[i].name),
+              trailing: Text(formatUgx(filtered[i].amountUgx)),
               onTap: () => Navigator.pop(
                 context,
                 LineItem(
-                    name: catalog[i].name, amountUgx: catalog[i].amountUgx),
+                    name: filtered[i].name, amountUgx: filtered[i].amountUgx),
               ),
             ),
           const Divider(height: 1),

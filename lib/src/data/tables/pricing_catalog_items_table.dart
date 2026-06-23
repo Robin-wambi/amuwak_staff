@@ -12,6 +12,7 @@ class PricingCatalogItems extends Table {
   IntColumn      get amountUgx => integer().named('amount_ugx')();
   BoolColumn     get active    => boolean().withDefault(const Constant(true))();
   IntColumn      get sortOrder => integer().named('sort_order').withDefault(const Constant(0))();
+  TextColumn     get category  => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
