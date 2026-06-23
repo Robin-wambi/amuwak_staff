@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/pricing/pricing_section.dart';
+import 'package:amuwak_staff/src/pricing/catalog_item.dart';
 
 void main() {
   testWidgets('LineItemsEditor shows items and fires onRemove', (tester) async {
@@ -71,5 +72,73 @@ void main() {
     expect(result, isNotNull);
     expect(result!.name, 'Blanket');
     expect(result!.amountUgx, 8000);
+  });
+
+  testWidgets('filters picker items by category chip', (tester) async {
+    final catalog = [
+      CatalogItem(
+          id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning'),
+      CatalogItem(id: 'c2', name: 'Blanket', amountUgx: 8000, category: 'Bulky'),
+      CatalogItem(id: 'c3', name: 'Plain', amountUgx: 0), // uncategorised
+    ];
+    LineItem? picked;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () async =>
+                picked = await showPickLineItemSheet(context, catalog),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    // All shown by default.
+    expect(find.text('Suit'), findsOneWidget);
+    expect(find.text('Blanket'), findsOneWidget);
+    expect(find.text('Plain'), findsOneWidget);
+
+    // Filter to Dry Cleaning.
+    await tester.tap(find.byKey(const Key('pick_category_Dry Cleaning')));
+    await tester.pumpAndSettle();
+    expect(find.text('Suit'), findsOneWidget);
+    expect(find.text('Blanket'), findsNothing);
+    expect(find.text('Plain'), findsNothing);
+
+    // Uncategorised via the Other chip.
+    await tester.tap(find.byKey(const Key('pick_category_other')));
+    await tester.pumpAndSettle();
+    expect(find.text('Plain'), findsOneWidget);
+    expect(find.text('Suit'), findsNothing);
+
+    // Picking still returns a LineItem with name + amount.
+    await tester.tap(find.text('Plain'));
+    await tester.pumpAndSettle();
+    expect(picked, isNotNull);
+    expect(picked!.name, 'Plain');
+    expect(picked!.amountUgx, 0);
+  });
+
+  testWidgets('no category chips when nothing is categorised', (tester) async {
+    final catalog = [
+      CatalogItem(id: 'c1', name: 'Plain', amountUgx: 1000),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => showPickLineItemSheet(context, catalog),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pick_category_all')), findsNothing);
+    expect(find.text('Plain'), findsOneWidget);
   });
 }
