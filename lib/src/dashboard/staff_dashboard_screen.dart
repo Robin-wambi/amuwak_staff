@@ -113,7 +113,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       return response.file != null ||
           (response.files?.isNotEmpty ?? false) ||
           response.exception != null;
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Lost-photo retrieval failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       return false;
     }
   }
@@ -158,7 +160,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     try {
       final signOut = widget.signOut ?? _defaultSignOut;
       await signOut(ref);
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Sign-out failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -196,7 +200,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     try {
       settings = ref.read(pricingSettingsProvider).valueOrNull ??
           await ref.read(pricingSettingsRepositoryProvider).fetch();
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('Pricing settings fetch failed.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -356,7 +362,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         ..showSnackBar(
           SnackBar(content: Text('Order ${order.orderCode} deleted.')),
         );
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('softDelete failed for order ${order.orderId}.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not delete — please retry.')),
@@ -385,7 +393,9 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         ..showSnackBar(
           SnackBar(content: Text('Order moved to ${next.label}.')),
         );
-    } catch (_) {
+    } catch (e, st) {
+      developer.log('updateStatus failed for order ${order.orderId}.',
+          name: 'StaffDashboard', error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not update status — please retry.')),
