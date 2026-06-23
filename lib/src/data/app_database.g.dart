@@ -7627,6 +7627,17 @@ class $PricingCatalogItemsTable extends PricingCatalogItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -7634,6 +7645,7 @@ class $PricingCatalogItemsTable extends PricingCatalogItems
     amountUgx,
     active,
     sortOrder,
+    category,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7680,6 +7692,12 @@ class $PricingCatalogItemsTable extends PricingCatalogItems
         sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
     return context;
   }
 
@@ -7709,6 +7727,10 @@ class $PricingCatalogItemsTable extends PricingCatalogItems
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
       )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
     );
   }
 
@@ -7725,12 +7747,14 @@ class PricingCatalogItem extends DataClass
   final int amountUgx;
   final bool active;
   final int sortOrder;
+  final String? category;
   const PricingCatalogItem({
     required this.id,
     required this.name,
     required this.amountUgx,
     required this.active,
     required this.sortOrder,
+    this.category,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7740,6 +7764,9 @@ class PricingCatalogItem extends DataClass
     map['amount_ugx'] = Variable<int>(amountUgx);
     map['active'] = Variable<bool>(active);
     map['sort_order'] = Variable<int>(sortOrder);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
     return map;
   }
 
@@ -7750,6 +7777,9 @@ class PricingCatalogItem extends DataClass
       amountUgx: Value(amountUgx),
       active: Value(active),
       sortOrder: Value(sortOrder),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
     );
   }
 
@@ -7764,6 +7794,7 @@ class PricingCatalogItem extends DataClass
       amountUgx: serializer.fromJson<int>(json['amountUgx']),
       active: serializer.fromJson<bool>(json['active']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      category: serializer.fromJson<String?>(json['category']),
     );
   }
   @override
@@ -7775,6 +7806,7 @@ class PricingCatalogItem extends DataClass
       'amountUgx': serializer.toJson<int>(amountUgx),
       'active': serializer.toJson<bool>(active),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'category': serializer.toJson<String?>(category),
     };
   }
 
@@ -7784,12 +7816,14 @@ class PricingCatalogItem extends DataClass
     int? amountUgx,
     bool? active,
     int? sortOrder,
+    Value<String?> category = const Value.absent(),
   }) => PricingCatalogItem(
     id: id ?? this.id,
     name: name ?? this.name,
     amountUgx: amountUgx ?? this.amountUgx,
     active: active ?? this.active,
     sortOrder: sortOrder ?? this.sortOrder,
+    category: category.present ? category.value : this.category,
   );
   PricingCatalogItem copyWithCompanion(PricingCatalogItemsCompanion data) {
     return PricingCatalogItem(
@@ -7798,6 +7832,7 @@ class PricingCatalogItem extends DataClass
       amountUgx: data.amountUgx.present ? data.amountUgx.value : this.amountUgx,
       active: data.active.present ? data.active.value : this.active,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      category: data.category.present ? data.category.value : this.category,
     );
   }
 
@@ -7808,13 +7843,15 @@ class PricingCatalogItem extends DataClass
           ..write('name: $name, ')
           ..write('amountUgx: $amountUgx, ')
           ..write('active: $active, ')
-          ..write('sortOrder: $sortOrder')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('category: $category')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, amountUgx, active, sortOrder);
+  int get hashCode =>
+      Object.hash(id, name, amountUgx, active, sortOrder, category);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7823,7 +7860,8 @@ class PricingCatalogItem extends DataClass
           other.name == this.name &&
           other.amountUgx == this.amountUgx &&
           other.active == this.active &&
-          other.sortOrder == this.sortOrder);
+          other.sortOrder == this.sortOrder &&
+          other.category == this.category);
 }
 
 class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
@@ -7832,6 +7870,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
   final Value<int> amountUgx;
   final Value<bool> active;
   final Value<int> sortOrder;
+  final Value<String?> category;
   final Value<int> rowid;
   const PricingCatalogItemsCompanion({
     this.id = const Value.absent(),
@@ -7839,6 +7878,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
     this.amountUgx = const Value.absent(),
     this.active = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.category = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PricingCatalogItemsCompanion.insert({
@@ -7847,6 +7887,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
     required int amountUgx,
     this.active = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.category = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -7857,6 +7898,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
     Expression<int>? amountUgx,
     Expression<bool>? active,
     Expression<int>? sortOrder,
+    Expression<String>? category,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -7865,6 +7907,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
       if (amountUgx != null) 'amount_ugx': amountUgx,
       if (active != null) 'active': active,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (category != null) 'category': category,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7875,6 +7918,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
     Value<int>? amountUgx,
     Value<bool>? active,
     Value<int>? sortOrder,
+    Value<String?>? category,
     Value<int>? rowid,
   }) {
     return PricingCatalogItemsCompanion(
@@ -7883,6 +7927,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
       amountUgx: amountUgx ?? this.amountUgx,
       active: active ?? this.active,
       sortOrder: sortOrder ?? this.sortOrder,
+      category: category ?? this.category,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -7905,6 +7950,9 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -7919,6 +7967,7 @@ class PricingCatalogItemsCompanion extends UpdateCompanion<PricingCatalogItem> {
           ..write('amountUgx: $amountUgx, ')
           ..write('active: $active, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('category: $category, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11692,6 +11741,7 @@ typedef $$PricingCatalogItemsTableCreateCompanionBuilder =
       required int amountUgx,
       Value<bool> active,
       Value<int> sortOrder,
+      Value<String?> category,
       Value<int> rowid,
     });
 typedef $$PricingCatalogItemsTableUpdateCompanionBuilder =
@@ -11701,6 +11751,7 @@ typedef $$PricingCatalogItemsTableUpdateCompanionBuilder =
       Value<int> amountUgx,
       Value<bool> active,
       Value<int> sortOrder,
+      Value<String?> category,
       Value<int> rowid,
     });
 
@@ -11735,6 +11786,11 @@ class $$PricingCatalogItemsTableFilterComposer
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -11772,6 +11828,11 @@ class $$PricingCatalogItemsTableOrderingComposer
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PricingCatalogItemsTableAnnotationComposer
@@ -11797,6 +11858,9 @@ class $$PricingCatalogItemsTableAnnotationComposer
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
 }
 
 class $$PricingCatalogItemsTableTableManager
@@ -11847,6 +11911,7 @@ class $$PricingCatalogItemsTableTableManager
                 Value<int> amountUgx = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<String?> category = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PricingCatalogItemsCompanion(
                 id: id,
@@ -11854,6 +11919,7 @@ class $$PricingCatalogItemsTableTableManager
                 amountUgx: amountUgx,
                 active: active,
                 sortOrder: sortOrder,
+                category: category,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11863,6 +11929,7 @@ class $$PricingCatalogItemsTableTableManager
                 required int amountUgx,
                 Value<bool> active = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<String?> category = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PricingCatalogItemsCompanion.insert(
                 id: id,
@@ -11870,6 +11937,7 @@ class $$PricingCatalogItemsTableTableManager
                 amountUgx: amountUgx,
                 active: active,
                 sortOrder: sortOrder,
+                category: category,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
