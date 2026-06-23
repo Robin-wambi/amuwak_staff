@@ -26,10 +26,18 @@ class OrderSearchScreen extends ConsumerStatefulWidget {
     super.key,
     required this.onOrderTap,
     required this.cameraViewBuilder,
+    this.onEditOrder,
+    this.onDeleteOrder,
+    this.onAdvanceOrderStatus,
   });
 
   final void Function(LaundryOrder order) onOrderTap;
   final CameraViewBuilder cameraViewBuilder;
+
+  /// Optional per-card CRUD actions, wired by the dashboard. Null = tap-only.
+  final void Function(LaundryOrder order)? onEditOrder;
+  final void Function(LaundryOrder order)? onDeleteOrder;
+  final void Function(LaundryOrder order)? onAdvanceOrderStatus;
 
   @override
   ConsumerState<OrderSearchScreen> createState() => _OrderSearchScreenState();
@@ -178,6 +186,9 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
             child: OrderCardList(
               orders: active,
               onOrderTap: widget.onOrderTap,
+              onEditOrder: widget.onEditOrder,
+              onDeleteOrder: widget.onDeleteOrder,
+              onAdvanceOrderStatus: widget.onAdvanceOrderStatus,
               padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg),
             ),
@@ -194,6 +205,12 @@ class _OrderSearchScreenState extends ConsumerState<OrderSearchScreen> {
         subtitle: 'Nothing matches "$query".',
       );
     }
-    return OrderCardList(orders: matches, onOrderTap: widget.onOrderTap);
+    return OrderCardList(
+      orders: matches,
+      onOrderTap: widget.onOrderTap,
+      onEditOrder: widget.onEditOrder,
+      onDeleteOrder: widget.onDeleteOrder,
+      onAdvanceOrderStatus: widget.onAdvanceOrderStatus,
+    );
   }
 }
