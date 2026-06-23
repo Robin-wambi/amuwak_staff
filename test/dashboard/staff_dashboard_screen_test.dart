@@ -246,6 +246,25 @@ void main() {
   );
 
   testWidgets(
+    'Orders tab shows a "New pickup" FAB that opens NewPickupScreen',
+    (tester) async {
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+
+      final fab = find.widgetWithText(FloatingActionButton, 'New pickup');
+      expect(fab, findsOneWidget);
+      await tester.tap(fab);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NewPickupScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'Tapping "Check order" opens OrderSearchScreen',
     (tester) async {
       await pumpDashboardWithDb(tester);
