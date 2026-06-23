@@ -72,11 +72,14 @@ void main() {
   });
 
   group('orderStatusUpdatePayload', () {
-    test('carries the folded status and a UTC updated_at', () {
+    test('carries the folded status, the actor, and a UTC updated_at', () {
       final now = DateTime(2026, 6, 2, 15, 30);
-      final p = orderStatusUpdatePayload(OrderStatus.readyForDelivery, now: now);
-      expect(p.keys, unorderedEquals(<String>['status', 'updated_at']));
+      final p = orderStatusUpdatePayload(OrderStatus.readyForDelivery,
+          actorStaffId: 's1', now: now);
+      expect(p.keys,
+          unorderedEquals(<String>['status', 'updated_by', 'updated_at']));
       expect(p['status'], OrderStatus.readyForDelivery.toDbString());
+      expect(p['updated_by'], 's1');
       expect(p['updated_at'], now.toUtc().toIso8601String());
     });
   });
@@ -102,7 +105,7 @@ void main() {
       );
       final now = DateTime(2026, 6, 2, 12, 0);
 
-      final p = orderDetailsUpdatePayload(order, now: now);
+      final p = orderDetailsUpdatePayload(order, actorStaffId: 's1', now: now);
 
       expect(
         p.keys,
@@ -114,6 +117,7 @@ void main() {
           'item_count',
           'notes',
           'scheduled_for',
+          'updated_by',
           'updated_at',
         ]),
       );
@@ -124,6 +128,7 @@ void main() {
       expect(p['item_count'], 5);
       expect(p['notes'], 'handle with care');
       expect(p['scheduled_for'], DateTime.utc(2026, 6, 3, 9).toIso8601String());
+      expect(p['updated_by'], 's1');
       expect(p['updated_at'], now.toUtc().toIso8601String());
       // Never touches creation metadata, status, or pricing snapshots.
       expect(p.containsKey('created_at'), isFalse);
@@ -145,17 +150,20 @@ void main() {
         address: 'a',
         notes: '',
       );
-      final p = orderDetailsUpdatePayload(order, now: DateTime(2026, 6, 2));
+      final p = orderDetailsUpdatePayload(order,
+          actorStaffId: 's1', now: DateTime(2026, 6, 2));
       expect(p['scheduled_for'], isNull);
     });
   });
 
   group('orderSoftDeletePayload', () {
-    test('sets deleted_at and updated_at to the same UTC ISO instant', () {
+    test('tombstones with deleted_at/deleted_by and a matching updated_at', () {
       final now = DateTime(2026, 6, 2, 18, 5);
-      final p = orderSoftDeletePayload(now: now);
-      expect(p.keys, unorderedEquals(<String>['deleted_at', 'updated_at']));
+      final p = orderSoftDeletePayload(actorStaffId: 's1', now: now);
+      expect(p.keys,
+          unorderedEquals(<String>['deleted_at', 'deleted_by', 'updated_at']));
       expect(p['deleted_at'], now.toUtc().toIso8601String());
+      expect(p['deleted_by'], 's1');
       expect(p['updated_at'], now.toUtc().toIso8601String());
     });
   });

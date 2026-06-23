@@ -50,21 +50,25 @@ Map<String, dynamic> orderUpsertPayload(
 
 Map<String, dynamic> orderStatusUpdatePayload(
   OrderStatus status, {
+  required String actorStaffId,
   required DateTime now,
 }) =>
     {
       'status': status.toDbString(),
+      'updated_by': actorStaffId,
       'updated_at': now.toUtc().toIso8601String(),
     };
 
 /// The descriptive columns an edit can change after creation — customer
-/// details, service, item count, notes, and schedule (+ updated_at). Mirrors
-/// [orderStatusUpdatePayload]'s narrow shape: it deliberately omits
+/// details, service, item count, notes, and schedule (+ updated_by/updated_at).
+/// Mirrors [orderStatusUpdatePayload]'s narrow shape: it deliberately omits
 /// `created_at`/`created_by`, `status`, and every pricing snapshot so an edit
 /// can never clobber creation metadata or the frozen pricing (those flow
 /// through `upsertOrder` / `updatePricing` / `updateStatus` instead).
+/// [actorStaffId] is recorded as `updated_by` (the staff who made the edit).
 Map<String, dynamic> orderDetailsUpdatePayload(
   LaundryOrder order, {
+  required String actorStaffId,
   required DateTime now,
 }) =>
     {
@@ -75,14 +79,21 @@ Map<String, dynamic> orderDetailsUpdatePayload(
       'item_count': order.itemCount,
       'notes': order.notes,
       'scheduled_for': order.scheduledFor?.toUtc().toIso8601String(),
+      'updated_by': actorStaffId,
       'updated_at': now.toUtc().toIso8601String(),
     };
 
 /// Soft-deletes an order — a back-office tombstone that drops it off the
 /// rider's lists (`watchAll` filters `deleted_at != null` client-side). Mirrors
-/// `ExpensesRepository.softDelete`.
-Map<String, dynamic> orderSoftDeletePayload({required DateTime now}) => {
+/// `ExpensesRepository.softDelete`. [actorStaffId] is recorded as `deleted_by`
+/// for the destructive-action audit trail.
+Map<String, dynamic> orderSoftDeletePayload({
+  required String actorStaffId,
+  required DateTime now,
+}) =>
+    {
       'deleted_at': now.toUtc().toIso8601String(),
+      'deleted_by': actorStaffId,
       'updated_at': now.toUtc().toIso8601String(),
     };
 

@@ -206,14 +206,13 @@ class OrdersRepository {
   /// Throws a [StateError] when no order matched (e.g. soft-deleted server-side),
   /// matching [updatePricing]/[updateStatus] so a no-op isn't treated as success.
   ///
-  /// [actorStaffId] is kept for API symmetry with the other mutators but is not
-  /// yet written to the row (there's no `updated_by` column). Whether to record
-  /// an actor here is tracked in issue #71.
+  /// [actorStaffId] is recorded as the row's `updated_by` audit pointer.
   Future<void> updateOrderDetails(LaundryOrder order,
       {required String actorStaffId}) async {
     final updated = await _supabase
         .from('orders')
-        .update(orderDetailsUpdatePayload(order, now: _clock()))
+        .update(orderDetailsUpdatePayload(order,
+            actorStaffId: actorStaffId, now: _clock()))
         .eq('id', order.orderId)
         .select('id');
     if (updated.isEmpty) {
@@ -226,14 +225,13 @@ class OrdersRepository {
   /// lists — [watchAll] filters `deleted_at != null` client-side. Mirrors
   /// [ExpensesRepository.softDelete]; throws a [StateError] when no row matched.
   ///
-  /// [actorStaffId] is kept for API symmetry with the other mutators but is not
-  /// yet written to the row (there's no `deleted_by` column). An audit trail for
-  /// this destructive op is tracked in issue #71.
+  /// [actorStaffId] is recorded as the row's `deleted_by` audit pointer for this
+  /// destructive operation.
   Future<void> softDelete(String orderId,
       {required String actorStaffId}) async {
     final updated = await _supabase
         .from('orders')
-        .update(orderSoftDeletePayload(now: _clock()))
+        .update(orderSoftDeletePayload(actorStaffId: actorStaffId, now: _clock()))
         .eq('id', orderId)
         .select('id');
     if (updated.isEmpty) {
@@ -257,7 +255,8 @@ class OrdersRepository {
     final now = updatedAt ?? _clock();
     final updated = await _supabase
         .from('orders')
-        .update(orderStatusUpdatePayload(newStatus, now: now))
+        .update(orderStatusUpdatePayload(newStatus,
+            actorStaffId: actorStaffId, now: now))
         .eq('id', orderId)
         .select('id');
     if (updated.isEmpty) {
