@@ -79,6 +79,7 @@ class _PricingCatalogScreenState extends State<PricingCatalogScreen> {
       name: result.name,
       amountUgx: result.amountUgx,
       sortOrder: nextSort,
+      category: result.category,
     ));
   }
 
@@ -89,15 +90,31 @@ class _PricingCatalogScreenState extends State<PricingCatalogScreen> {
       name: result.name,
       amountUgx: result.amountUgx,
       active: result.active,
+      category: result.category,
     ));
   }
 
   Future<_SheetResult?> _showItemSheet({CatalogItem? existing}) {
+    final categories = _items
+        .map((e) => e.category)
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
     return showModalBottomSheet<_SheetResult>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _CatalogItemSheet(existing: existing),
+      builder: (_) =>
+          _CatalogItemSheet(existing: existing, categories: categories),
     );
+  }
+
+  Widget? _subtitle(CatalogItem item) {
+    final parts = <String>[
+      if (item.category != null) item.category!,
+      if (!item.active) 'Retired',
+    ];
+    return parts.isEmpty ? null : Text(parts.join(' · '));
   }
 
   @override
@@ -128,9 +145,7 @@ class _PricingCatalogScreenState extends State<PricingCatalogScreen> {
                           return ListTile(
                             key: Key('catalog_item_$i'),
                             title: Text(item.name),
-                            subtitle: item.active
-                                ? null
-                                : const Text('Retired'),
+                            subtitle: _subtitle(item),
                             trailing: Text(formatUgx(item.amountUgx)),
                             enabled: true,
                             onTap: () => _editItem(item),
@@ -144,15 +159,17 @@ class _PricingCatalogScreenState extends State<PricingCatalogScreen> {
 
 /// The validated values a catalog sheet returns.
 class _SheetResult {
-  const _SheetResult(this.name, this.amountUgx, this.active);
+  const _SheetResult(this.name, this.amountUgx, this.active, this.category);
   final String name;
   final int amountUgx;
   final bool active;
+  final String? category;
 }
 
 class _CatalogItemSheet extends StatefulWidget {
-  const _CatalogItemSheet({this.existing});
+  const _CatalogItemSheet({this.existing, this.categories = const []});
   final CatalogItem? existing;
+  final List<String> categories;
 
   @override
   State<_CatalogItemSheet> createState() => _CatalogItemSheetState();
@@ -161,6 +178,7 @@ class _CatalogItemSheet extends StatefulWidget {
 class _CatalogItemSheetState extends State<_CatalogItemSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _amountController;
+  late final TextEditingController _categoryController;
   late bool _active;
   String? _nameError;
   String? _amountError;
@@ -173,6 +191,8 @@ class _CatalogItemSheetState extends State<_CatalogItemSheet> {
         text: widget.existing == null
             ? ''
             : widget.existing!.amountUgx.toString());
+    _categoryController =
+        TextEditingController(text: widget.existing?.category ?? '');
     _active = widget.existing?.active ?? true;
   }
 
@@ -180,6 +200,7 @@ class _CatalogItemSheetState extends State<_CatalogItemSheet> {
   void dispose() {
     _nameController.dispose();
     _amountController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
@@ -196,7 +217,11 @@ class _CatalogItemSheetState extends State<_CatalogItemSheet> {
       });
       return;
     }
-    Navigator.pop(context, _SheetResult(name, amount!, _active));
+    final category = _categoryController.text.trim();
+    Navigator.pop(
+      context,
+      _SheetResult(name, amount!, _active, category.isEmpty ? null : category),
+    );
   }
 
   @override
@@ -211,6 +236,7 @@ class _CatalogItemSheetState extends State<_CatalogItemSheet> {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             key: const Key('catalog_name'),
@@ -230,6 +256,28 @@ class _CatalogItemSheetState extends State<_CatalogItemSheet> {
               errorText: _amountError,
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            key: const Key('catalog_category'),
+            controller: _categoryController,
+            decoration: const InputDecoration(
+              labelText: 'Category (optional, e.g. Dry Cleaning)',
+            ),
+          ),
+          if (widget.categories.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                for (final c in widget.categories)
+                  ActionChip(
+                    key: Key('catalog_category_suggestion_$c'),
+                    label: Text(c),
+                    onPressed: () => _categoryController.text = c,
+                  ),
+              ],
+            ),
+          ],
           if (isEdit) ...[
             const SizedBox(height: AppSpacing.sm),
             SwitchListTile(

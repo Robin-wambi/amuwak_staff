@@ -104,4 +104,58 @@ void main() {
     expect(saved, isNull);
     expect(find.text('Enter an item name'), findsOneWidget);
   });
+
+  testWidgets('shows category in the list subtitle', (tester) async {
+    await tester.pumpWidget(screen(
+      items: [
+        CatalogItem(
+            id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning'),
+      ],
+      onSave: (_) {},
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Dry Cleaning'), findsOneWidget);
+  });
+
+  testWidgets('adds an item with a category', (tester) async {
+    CatalogItem? saved;
+    await tester.pumpWidget(screen(
+      items: const [],
+      onSave: (item) => saved = item,
+      newId: 'gen-1',
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('catalog_add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('catalog_name')), 'Suit');
+    await tester.enterText(find.byKey(const Key('catalog_amount')), '12000');
+    await tester.enterText(
+        find.byKey(const Key('catalog_category')), 'Dry Cleaning');
+    await tester.tap(find.byKey(const Key('catalog_save')));
+    await tester.pumpAndSettle();
+    expect(saved, isNotNull);
+    expect(saved!.category, 'Dry Cleaning');
+  });
+
+  testWidgets('tapping a suggestion fills the category field', (tester) async {
+    CatalogItem? saved;
+    await tester.pumpWidget(screen(
+      items: [
+        CatalogItem(
+            id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning'),
+      ],
+      onSave: (item) => saved = item,
+      newId: 'gen-2',
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('catalog_add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('catalog_name')), 'Coat');
+    await tester.enterText(find.byKey(const Key('catalog_amount')), '9000');
+    await tester.tap(find
+        .byKey(const Key('catalog_category_suggestion_Dry Cleaning')));
+    await tester.tap(find.byKey(const Key('catalog_save')));
+    await tester.pumpAndSettle();
+    expect(saved!.category, 'Dry Cleaning');
+  });
 }
