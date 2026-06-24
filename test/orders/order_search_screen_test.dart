@@ -69,6 +69,37 @@ void main() {
     expect(find.text('Bob Jones'), findsNothing);
   });
 
+  testWidgets('forwards the per-card CRUD callbacks to the active-order cards',
+      (tester) async {
+    LaundryOrder? edited;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider
+              .overrideWith((ref) => Stream<List<LaundryOrder>>.value([_jane])),
+        ],
+        child: MaterialApp(
+          home: OrderSearchScreen(
+            onOrderTap: (_) {},
+            onEditOrder: (o) => edited = o,
+            onDeleteOrder: (_) {},
+            onAdvanceOrderStatus: (_) {},
+            cameraViewBuilder: (context, onDetected) => FakeCameraView(
+              scannedValue: 'x',
+              onDetected: onDetected,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Edit order'), findsOneWidget);
+    await tester.tap(find.byTooltip('Edit order'));
+    await tester.pumpAndSettle();
+    expect(edited?.orderId, 'AMW-2026-0042');
+  });
+
   testWidgets('typing filters across all orders (including completed)',
       (tester) async {
     await tester.pumpWidget(

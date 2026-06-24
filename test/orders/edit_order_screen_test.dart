@@ -101,4 +101,99 @@ void main() {
     expect(saveCalled, isFalse);
     expect(find.text('Enter a valid item count.'), findsOneWidget);
   });
+
+  testWidgets('save carries an edited service type and notes', (tester) async {
+    LaundryOrder? saved;
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (o) async => saved = o),
+    );
+
+    await tester.tap(find.text(ServiceType.dryCleaning.label));
+    await tester.enterText(
+        find.byKey(const Key('edit_notes')), 'leave at the gate');
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saved!.serviceType, ServiceType.dryCleaning);
+    expect(saved!.notes, 'leave at the gate');
+  });
+
+  testWidgets('clearing the schedule sends an immediate (now) order',
+      (tester) async {
+    LaundryOrder? saved;
+    final scheduled = _order().copyWith(scheduledFor: DateTime(2026, 7, 1, 9));
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: scheduled, save: (o) async => saved = o),
+    );
+
+    // The schedule reads as scheduled and offers a Clear affordance.
+    expect(find.byKey(const Key('edit_clear_schedule')), findsOneWidget);
+    expect(find.text('Immediate (pickup now)'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('edit_clear_schedule')));
+    await tester.pumpAndSettle();
+    expect(find.text('Immediate (pickup now)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saved!.scheduledFor, isNull);
+    expect(saved!.timeLabel, 'Pickup: now');
+  });
+
+  testWidgets('picking a date + time sets a scheduledFor on save',
+      (tester) async {
+    LaundryOrder? saved;
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (o) async => saved = o),
+    );
+
+    // Starts immediate.
+    expect(find.text('Immediate (pickup now)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('edit_pick_schedule')));
+    await tester.pumpAndSettle();
+    // Accept the date picker's initial date, then the time picker's initial
+    // time (the dialogs' confirm button).
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saved!.scheduledFor, isNotNull);
+  });
+
+  testWidgets('a successful save shows a confirmation SnackBar',
+      (tester) async {
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (_) async {}),
+    );
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Order updated.'), findsOneWidget);
+  });
+
+  testWidgets('a failing save surfaces a retry SnackBar', (tester) async {
+    await pumpTall(
+      tester,
+      EditOrderScreen(
+        order: _order(),
+        save: (_) async => throw Exception('boom'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not save — please retry.'), findsOneWidget);
+  });
 }

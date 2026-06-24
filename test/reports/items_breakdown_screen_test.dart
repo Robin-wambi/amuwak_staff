@@ -106,4 +106,32 @@ void main() {
     expect(find.text('No items yet'), findsOneWidget);
     expect(find.byType(OrderCard), findsNothing);
   });
+
+  testWidgets('forwards the per-card CRUD callbacks to each OrderCard',
+      (tester) async {
+    LaundryOrder? edited;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([_order('A', 3)]),
+          ),
+        ],
+        child: MaterialApp(
+          home: ItemsBreakdownScreen(
+            onOrderTap: (_) {},
+            onEditOrder: (o) => edited = o,
+            onDeleteOrder: (_) {},
+            onAdvanceOrderStatus: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Edit order'), findsOneWidget);
+    await tester.tap(find.byTooltip('Edit order'));
+    await tester.pumpAndSettle();
+    expect(edited?.orderId, 'A');
+  });
 }

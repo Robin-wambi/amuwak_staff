@@ -137,6 +137,39 @@ void main() {
     expect(find.text('Carol'), findsOneWidget);
   });
 
+  testWidgets('forwards the per-card CRUD callbacks down to each OrderCard',
+      (tester) async {
+    LaundryOrder? edited;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([_pending('Jane')]),
+          ),
+        ],
+        child: MaterialApp(
+          home: OrderFilterScreen(
+            filter: OrderFilter.pendingPickup,
+            onOrderTap: (_) {},
+            onEditOrder: (o) => edited = o,
+            onDeleteOrder: (_) {},
+            onAdvanceOrderStatus: (_) {},
+            now: _fixedNow,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The callbacks reached the card: it shows the visible action icons...
+    expect(find.byTooltip('Edit order'), findsOneWidget);
+    expect(find.byTooltip('More actions'), findsOneWidget);
+    // ...and tapping the pencil forwards to the screen's onEditOrder.
+    await tester.tap(find.byTooltip('Edit order'));
+    await tester.pumpAndSettle();
+    expect(edited?.orderId, 'Jane');
+  });
+
   testWidgets('empty result shows the empty state', (tester) async {
     await _pump(tester, filter: OrderFilter.inProgress, orders: [
       _pending('Jane'),

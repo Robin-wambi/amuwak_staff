@@ -152,7 +152,12 @@ const _fallbackOrder = LaundryOrder(
 );
 
 void main() {
-  setUpAll(() => registerFallbackValue(_fallbackOrder));
+  setUpAll(() {
+    registerFallbackValue(_fallbackOrder);
+    // updateStatus takes a non-nullable OrderStatus positionally; mocktail's
+    // any() matcher needs a fallback value for it.
+    registerFallbackValue(OrderStatus.inProgress);
+  });
 
   testWidgets(
     'Surfaces a SnackBar on startup when an in-flight photo capture was lost',
@@ -371,6 +376,43 @@ void main() {
 
         verify(() => repo.softDelete('o-Zeta', actorStaffId: 'staff-1'))
             .called(1);
+      },
+    );
+
+    testWidgets(
+      'long-press → Mark as Ready for delivery calls updateStatus to the '
+      'proof-less next step',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.updateStatus(any(), any(),
+            actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Zane')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('Zane'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mark as Ready for delivery'));
+        await tester.pumpAndSettle();
+
+        verify(() => repo.updateStatus(
+              'o-Zane',
+              OrderStatus.readyForDelivery,
+              actorStaffId: 'staff-1',
+            )).called(1);
       },
     );
   });
