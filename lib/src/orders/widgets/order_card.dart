@@ -170,6 +170,56 @@ class OrderCard extends StatelessWidget {
     return card;
   }
 
+  /// The header's trailing slot. A plain tap-only card keeps its chevron; once
+  /// the card has actions we surface them as visible icons — a pencil for the
+  /// common Edit, plus a ⋮ overflow opening the same actions sheet as
+  /// long-press — because long-press alone is undiscoverable for many riders.
+  Widget _buildTrailing(BuildContext context) {
+    if (onEdit == null && !_hasActionsMenu) {
+      return const Icon(
+        Icons.chevron_right_rounded,
+        color: AppColors.secondaryText,
+      );
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    // Compact buttons so the 46px header row doesn't grow; each IconButton wins
+    // the gesture arena on its own hit-box, so a tap here fires its action while
+    // a tap elsewhere on the card still triggers onTap.
+    Widget compactButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback onPressed,
+    }) =>
+        IconButton(
+          icon: Icon(icon),
+          tooltip: tooltip,
+          onPressed: onPressed,
+          iconSize: 20,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          color: colorScheme.primary,
+        );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onEdit != null)
+          compactButton(
+            icon: Icons.edit_outlined,
+            tooltip: 'Edit order',
+            onPressed: onEdit!,
+          ),
+        if (_hasActionsMenu)
+          compactButton(
+            icon: Icons.more_vert,
+            tooltip: 'More actions',
+            onPressed: () => _showActionsSheet(context),
+          ),
+      ],
+    );
+  }
+
   Widget _buildCard(BuildContext context) {
     final statusPair = (Theme.of(context).extension<StatusColors>() ??
             StatusColors.light)
@@ -213,10 +263,7 @@ class OrderCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.secondaryText,
-              ),
+              _buildTrailing(context),
             ],
           ),
           const SizedBox(height: AppSpacing.lg - 2),
