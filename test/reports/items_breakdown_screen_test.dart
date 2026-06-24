@@ -133,5 +133,50 @@ void main() {
     await tester.tap(find.byTooltip('Edit order'));
     await tester.pumpAndSettle();
     expect(edited?.orderId, 'A');
+
+    // Also drive the advance action so its forwarded closure is exercised.
+    LaundryOrder? advanced;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([_order('A', 3)]),
+          ),
+        ],
+        child: MaterialApp(
+          home: ItemsBreakdownScreen(
+            onOrderTap: (_) {},
+            onEditOrder: (_) {},
+            onDeleteOrder: (_) {},
+            onAdvanceOrderStatus: (o) => advanced = o,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('Cust A'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mark as Ready for delivery'));
+    await tester.pumpAndSettle();
+    expect(advanced?.orderId, 'A');
+  });
+
+  testWidgets('stream error shows the load-error state', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.error(Exception('boom')),
+          ),
+        ],
+        child: const MaterialApp(home: ItemsBreakdownScreen(onOrderTap: _noop)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("Couldn't load orders"), findsOneWidget);
+    expect(find.byType(OrderCard), findsNothing);
   });
 }
+
+void _noop(LaundryOrder _) {}

@@ -415,6 +415,163 @@ void main() {
             )).called(1);
       },
     );
+
+    testWidgets(
+      'Edit with no session shows session-expired, never opens EditOrderScreen',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Nyx')]),
+          ),
+          currentUserIdProvider.overrideWith((ref) => null),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+        await tester.longPress(find.text('Nyx'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Edit details'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(EditOrderScreen), findsNothing);
+        expect(find.text('Session expired — please sign in again.'),
+            findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a failing softDelete surfaces a retry SnackBar',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.softDelete(any(),
+                actorStaffId: any(named: 'actorStaffId')))
+            .thenThrow(Exception('boom'));
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Nix')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+        await tester.drag(find.text('Nix'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        expect(
+            find.text('Could not delete — please retry.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a failing updateStatus surfaces a retry SnackBar',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.updateStatus(any(), any(),
+                actorStaffId: any(named: 'actorStaffId')))
+            .thenThrow(Exception('boom'));
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Nox')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+        await tester.longPress(find.text('Nox'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mark as Ready for delivery'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Could not update status — please retry.'),
+            findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Delete with no session shows session-expired and never calls softDelete',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Nul')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => null),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+        await tester.drag(find.text('Nul'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Session expired — please sign in again.'),
+            findsOneWidget);
+        verifyNever(() =>
+            repo.softDelete(any(), actorStaffId: any(named: 'actorStaffId')));
+      },
+    );
+
+    testWidgets(
+      'Advance status with no session shows session-expired, no updateStatus',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Nil')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => null),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+        await tester.longPress(find.text('Nil'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mark as Ready for delivery'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Session expired — please sign in again.'),
+            findsOneWidget);
+        verifyNever(() => repo.updateStatus(any(), any(),
+            actorStaffId: any(named: 'actorStaffId')));
+      },
+    );
   });
 
   testWidgets(
