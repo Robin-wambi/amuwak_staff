@@ -24,8 +24,13 @@ enum _ScheduleChip { inOneHour, tomorrowMorning, tomorrowAfternoon, custom }
 /// real seconds) is treated as valid rather than wrongly rejected.
 @visibleForTesting
 bool scheduledTimeIsInPast(DateTime chosen, DateTime now) {
-  final nowMinute =
-      DateTime(now.year, now.month, now.day, now.hour, now.minute);
+  final nowMinute = DateTime(
+    now.year,
+    now.month,
+    now.day,
+    now.hour,
+    now.minute,
+  );
   return chosen.isBefore(nowMinute);
 }
 
@@ -114,8 +119,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     setState(() {
       _count = next;
       _countController.text = '$next';
-      _countController.selection =
-          TextSelection.collapsed(offset: _countController.text.length);
+      _countController.selection = TextSelection.collapsed(
+        offset: _countController.text.length,
+      );
     });
   }
 
@@ -129,8 +135,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     setState(() => _count = clamped);
     if (clamped != parsed) {
       _countController.text = '$clamped';
-      _countController.selection =
-          TextSelection.collapsed(offset: _countController.text.length);
+      _countController.selection = TextSelection.collapsed(
+        offset: _countController.text.length,
+      );
     }
   }
 
@@ -225,8 +232,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       if (!mounted) return;
       final ranked = counts.keys.toList()
         ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
-      setState(() => _addressSuggestions =
-          ranked.map((k) => firstSeen[k]!).toList(growable: false));
+      setState(
+        () => _addressSuggestions = ranked
+            .map((k) => firstSeen[k]!)
+            .toList(growable: false),
+      );
     }
 
     // Kick off the orders read alongside the customers read so they overlap.
@@ -237,8 +247,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       }
       publish();
     } catch (e, st) {
-      developer.log('Customer address suggestions load failed.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'Customer address suggestions load failed.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
     }
     try {
       for (final o in await ordersFuture) {
@@ -246,20 +260,34 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       }
       publish();
     } catch (e, st) {
-      developer.log('Order address suggestions load failed.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'Order address suggestions load failed.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
-  bool get _canSubmit =>
-      _nameController.text.trim().isNotEmpty &&
-      ugandaNationalDigits(_phoneController.text).length == 9 &&
-      _addressController.text.trim().isNotEmpty &&
-      _serviceType != null &&
-      // In "Schedule for later" mode a time must be chosen, otherwise the order
-      // would silently fall back to an immediate pickup (startPickupNow == true).
-      (_pickupMode == _PickupTimeMode.now || _scheduledFor != null) &&
-      !_saving;
+  bool get _canSubmit => _missingRequirements.isEmpty && !_saving;
+
+  /// Required fields still unmet, in form order, as user-facing labels. Drives
+  /// both [_canSubmit] (empty == submittable) and the hint under the Create
+  /// button, so a greyed-out button is never a silent dead-end — the rider sees
+  /// exactly what's left to fill instead of guessing why it won't enable.
+  List<String> get _missingRequirements => [
+    if (_nameController.text.trim().isEmpty) 'Customer name',
+    // The phone needs exactly 9 national digits; being a digit short is the
+    // easiest thing to miss, so call it out explicitly.
+    if (ugandaNationalDigits(_phoneController.text).length != 9)
+      'Phone number (9 digits)',
+    if (_addressController.text.trim().isEmpty) 'Address',
+    if (_serviceType == null) 'Service type',
+    // In "Schedule for later" mode a time must be chosen, otherwise the
+    // order would silently fall back to an immediate pickup.
+    if (_pickupMode == _PickupTimeMode.scheduled && _scheduledFor == null)
+      'Pickup time',
+  ];
 
   Future<void> _useMyLocation() async {
     setState(() => _locating = true);
@@ -270,8 +298,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                "Couldn't get your location — check permissions, or type the "
-                'address manually.'),
+              "Couldn't get your location — check permissions, or type the "
+              'address manually.',
+            ),
           ),
         );
         return;
@@ -282,7 +311,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Could not determine address — please type it manually.'),
+              'Could not determine address — please type it manually.',
+            ),
           ),
         );
         return;
@@ -312,8 +342,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       if (matched == null || !mounted) return;
       await _showCustomerMatchSheet(matched);
     } catch (e, st) {
-      developer.log('Customer phone-match lookup failed.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'Customer phone-match lookup failed.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -341,10 +375,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               Text(match.name, style: const TextStyle(fontSize: 16)),
               if (match.address != null) ...[
                 const SizedBox(height: 4),
-                Text(match.address!,
-                    style: TextStyle(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant)),
+                Text(
+                  match.address!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               Row(
@@ -397,7 +433,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       );
       return;
     }
-    final customerId = _matchedCustomerId ??
+    final customerId =
+        _matchedCustomerId ??
         (_pendingCustomerId ??= widget.customerIdGenerator());
     final customer = Customer(
       id: customerId,
@@ -412,19 +449,25 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       // order snapshot below). For a matched returning customer we never touch
       // their stored standing rate; only a brand-new customer's typed rate
       // establishes one.
-      customRatePerKgUgx:
-          _matchedCustomerId != null ? _matchedCustomerRate : customRate,
+      customRatePerKgUgx: _matchedCustomerId != null
+          ? _matchedCustomerRate
+          : customRate,
     );
     try {
       await widget.customersRepo.upsertCustomer(customer);
     } catch (e, st) {
-      developer.log('upsertCustomer failed during pickup creation.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'upsertCustomer failed during pickup creation.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Could not save customer. Please try again.')),
+          content: Text('Could not save customer. Please try again.'),
+        ),
       );
       return;
     }
@@ -433,16 +476,24 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     // second value off the server-side counter.
     final String orderCode;
     try {
-      orderCode = _pendingOrderCode ??= await widget.ordersRepo.reserveOrderCode();
+      orderCode = _pendingOrderCode ??= await widget.ordersRepo
+          .reserveOrderCode();
     } catch (e, st) {
-      developer.log('reserveOrderCode failed during pickup creation.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'reserveOrderCode failed during pickup creation.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Could not reserve an order number. '
-                'Check your connection and tap Create pickup again.')),
+          content: Text(
+            'Could not reserve an order number. '
+            'Check your connection and tap Create pickup again.',
+          ),
+        ),
       );
       return;
     }
@@ -472,11 +523,17 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       expressPctSnapshot: _isExpress ? widget.expressPct : 0,
     );
     try {
-      await widget.ordersRepo
-          .upsertOrder(order, actorStaffId: widget.actorStaffId);
+      await widget.ordersRepo.upsertOrder(
+        order,
+        actorStaffId: widget.actorStaffId,
+      );
     } catch (e, st) {
-      developer.log('upsertOrder failed during pickup creation.',
-          name: 'NewPickupScreen', error: e, stackTrace: st);
+      developer.log(
+        'upsertOrder failed during pickup creation.',
+        name: 'NewPickupScreen',
+        error: e,
+        stackTrace: st,
+      );
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -529,6 +586,13 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Customer name'),
               textCapitalization: TextCapitalization.words,
+              // Inline errors only after the rider has touched the field, so a
+              // freshly-opened form isn't pre-nagged. Pairs with the bottom
+              // "Still needed" summary to explain a disabled Create button.
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? "Enter the customer's name"
+                  : null,
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
@@ -539,6 +603,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               keyboardType: TextInputType.phone,
               inputFormatters: const [_UgandaNationalDigitsLimiter()],
               decoration: const InputDecoration(labelText: 'Phone'),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              // The single easiest field to get subtly wrong (one digit short),
+              // so call out the exact requirement inline.
+              validator: (v) => ugandaNationalDigits(v ?? '').length == 9
+                  ? null
+                  : 'Enter the 9-digit number after +256',
               onChanged: (_) => setState(() {
                 _matchedCustomerId = null;
                 _matchedCustomerRate = null;
@@ -570,18 +640,26 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               onSelected: (_) => setState(() {}),
               fieldViewBuilder:
                   (context, controller, focusNode, onFieldSubmitted) {
-                return LayoutBuilder(builder: (context, constraints) {
-                  // Cache the field width so the overlay below can match it.
-                  _addressFieldWidth = constraints.maxWidth;
-                  return TextFormField(
-                    key: const Key('np_address'),
-                    controller: controller,
-                    focusNode: focusNode,
-                    decoration: const InputDecoration(labelText: 'Address'),
-                    onChanged: (_) => setState(() {}),
-                  );
-                });
-              },
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Cache the field width so the overlay below can match it.
+                        _addressFieldWidth = constraints.maxWidth;
+                        return TextFormField(
+                          key: const Key('np_address'),
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(
+                            labelText: 'Address',
+                          ),
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Enter or detect the pickup address'
+                              : null,
+                          onChanged: (_) => setState(() {}),
+                        );
+                      },
+                    );
+                  },
               optionsViewBuilder: (context, onSelected, options) {
                 return Align(
                   alignment: Alignment.topLeft,
@@ -589,7 +667,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     elevation: 4,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                          maxHeight: 240, maxWidth: _addressFieldWidth),
+                        maxHeight: 240,
+                        maxWidth: _addressFieldWidth,
+                      ),
                       child: ListView.builder(
                         padding: EdgeInsets.zero,
                         shrinkWrap: true,
@@ -618,7 +698,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 'Rate: ${formatUgx(_resolvedRate.round())}/kg',
                 key: const Key('np_rate'),
                 style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -626,6 +707,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               key: const Key('np_service_type'),
               decoration: const InputDecoration(labelText: 'Service type'),
               value: _serviceType,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) => v == null ? 'Choose a service type' : null,
               items: ServiceType.values
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
                   .toList(),
@@ -635,10 +718,13 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
             SegmentedButton<_PickupTimeMode>(
               segments: const [
                 ButtonSegment(
-                    value: _PickupTimeMode.now, label: Text('Pickup now')),
+                  value: _PickupTimeMode.now,
+                  label: Text('Pickup now'),
+                ),
                 ButtonSegment(
-                    value: _PickupTimeMode.scheduled,
-                    label: Text('Schedule for later')),
+                  value: _PickupTimeMode.scheduled,
+                  label: Text('Schedule for later'),
+                ),
               ],
               selected: <_PickupTimeMode>{_pickupMode},
               onSelectionChanged: (sel) => setState(() {
@@ -658,16 +744,19 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     label: const Text('In 1 hour'),
                     selected: _selectedChip == _ScheduleChip.inOneHour,
                     onSelected: (_) => _setQuickSchedule(
-                        _ScheduleChip.inOneHour,
-                        widget.clock().add(const Duration(hours: 1))),
+                      _ScheduleChip.inOneHour,
+                      widget.clock().add(const Duration(hours: 1)),
+                    ),
                   ),
                   ChoiceChip(
                     label: const Text('Tomorrow morning'),
                     selected: _selectedChip == _ScheduleChip.tomorrowMorning,
                     onSelected: (_) {
                       final t = widget.clock().add(const Duration(days: 1));
-                      _setQuickSchedule(_ScheduleChip.tomorrowMorning,
-                          DateTime(t.year, t.month, t.day, 9));
+                      _setQuickSchedule(
+                        _ScheduleChip.tomorrowMorning,
+                        DateTime(t.year, t.month, t.day, 9),
+                      );
                     },
                   ),
                   ChoiceChip(
@@ -675,8 +764,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     selected: _selectedChip == _ScheduleChip.tomorrowAfternoon,
                     onSelected: (_) {
                       final t = widget.clock().add(const Duration(days: 1));
-                      _setQuickSchedule(_ScheduleChip.tomorrowAfternoon,
-                          DateTime(t.year, t.month, t.day, 14));
+                      _setQuickSchedule(
+                        _ScheduleChip.tomorrowAfternoon,
+                        DateTime(t.year, t.month, t.day, 14),
+                      );
                     },
                   ),
                   ChoiceChip(
@@ -691,7 +782,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 Text(
                   'Scheduled for: ${LaundryOrder.formatScheduled(_scheduledFor!, now: widget.clock)}',
                   style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],
@@ -703,15 +795,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(
                   children: [
-                    Icon(_optionalExpanded
-                        ? Icons.expand_less
-                        : Icons.expand_more),
+                    Icon(
+                      _optionalExpanded ? Icons.expand_less : Icons.expand_more,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Add optional details',
                       style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
@@ -723,8 +816,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 child: Text(
                   'Number of items',
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface),
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
@@ -733,8 +827,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 child: Text(
                   'Pieces of clothing to collect — weight is recorded at pickup',
                   style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -757,7 +852,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: _onCountTyped,
                       style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                       decoration: const InputDecoration(
                         isDense: true,
                         suffixText: 'items',
@@ -768,8 +865,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     key: const Key('np_count_inc'),
                     tooltip: 'More items',
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed:
-                        _count < _maxItemCount ? () => _changeCount(1) : null,
+                    onPressed: _count < _maxItemCount
+                        ? () => _changeCount(1)
+                        : null,
                   ),
                 ],
               ),
@@ -777,8 +875,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               TextFormField(
                 key: const Key('np_notes'),
                 controller: _notesController,
-                decoration:
-                    const InputDecoration(labelText: 'Notes (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                ),
                 maxLines: 3,
               ),
               const SizedBox(height: 8),
@@ -797,9 +896,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 key: const Key('np_delivery_toggle'),
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Include delivery'),
-                subtitle: Text(widget.deliveryFeeUgx > 0
-                    ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
-                    : 'No delivery fee configured'),
+                subtitle: Text(
+                  widget.deliveryFeeUgx > 0
+                      ? 'Adds ${formatUgx(widget.deliveryFeeUgx)} delivery fee'
+                      : 'No delivery fee configured',
+                ),
                 value: _includeDelivery,
                 onChanged: (v) => setState(() => _includeDelivery = v),
               ),
@@ -813,12 +914,28 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               ),
             ],
             const SizedBox(height: 24),
+            // A disabled Create button is otherwise a silent dead-end: this
+            // names the required fields still missing so the rider knows why it
+            // won't enable (and exactly what's left to fill).
+            if (!_saving && _missingRequirements.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Still needed: ${_missingRequirements.join(', ')}',
+                  key: const Key('np_missing_hint'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.pop(context, null),
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.pop(context, null),
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -830,8 +947,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Create pickup'),
                   ),
