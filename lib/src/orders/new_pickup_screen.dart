@@ -569,6 +569,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Compute once: drives both the "Still needed" hint and whether Create is
+    // enabled, so they can't disagree and the list isn't rebuilt several times
+    // per frame.
+    final missing = _missingRequirements;
+    final canSubmit = missing.isEmpty && !_saving;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -652,6 +657,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                             labelText: 'Address',
                           ),
                           autovalidateMode: AutovalidateMode.onUserInteraction,
+                          // `controller` is _addressController (passed to
+                          // RawAutocomplete above), so `v` reflects the same
+                          // value _missingRequirements checks at submit.
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Enter or detect the pickup address'
                               : null,
@@ -917,11 +925,11 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
             // A disabled Create button is otherwise a silent dead-end: this
             // names the required fields still missing so the rider knows why it
             // won't enable (and exactly what's left to fill).
-            if (!_saving && _missingRequirements.isNotEmpty)
+            if (!_saving && missing.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Still needed: ${_missingRequirements.join(', ')}',
+                  'Still needed: ${missing.join(', ')}',
                   key: const Key('np_missing_hint'),
                   style: TextStyle(
                     fontSize: 13,
@@ -942,7 +950,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _canSubmit ? _onSubmit : null,
+                    onPressed: canSubmit ? _onSubmit : null,
                     child: _saving
                         ? const SizedBox(
                             height: 20,
