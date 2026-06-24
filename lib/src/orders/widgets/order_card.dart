@@ -59,6 +59,12 @@ class OrderCard extends StatelessWidget {
   bool get _hasActionsMenu =>
       onEdit != null || onDelete != null || onAdvanceStatus != null;
 
+  /// Actions reachable only through the overflow sheet — everything except the
+  /// pencil, which has its own dedicated icon. Drives whether the ⋮ button
+  /// appears, so a card with only [onEdit] shows just the pencil rather than a
+  /// ⋮ that opens a sheet repeating "Edit details".
+  bool get _hasOverflowActions => onDelete != null || onAdvanceStatus != null;
+
   Future<void> _showActionsSheet(BuildContext context) async {
     final colorScheme = Theme.of(context).colorScheme;
     final quickTarget = _quickAdvanceTarget;
@@ -175,7 +181,7 @@ class OrderCard extends StatelessWidget {
   /// common Edit, plus a ⋮ overflow opening the same actions sheet as
   /// long-press — because long-press alone is undiscoverable for many riders.
   Widget _buildTrailing(BuildContext context) {
-    if (onEdit == null && !_hasActionsMenu) {
+    if (!_hasActionsMenu) {
       return const Icon(
         Icons.chevron_right_rounded,
         color: AppColors.secondaryText,
@@ -210,7 +216,7 @@ class OrderCard extends StatelessWidget {
             tooltip: 'Edit order',
             onPressed: onEdit!,
           ),
-        if (_hasActionsMenu)
+        if (_hasOverflowActions)
           compactButton(
             icon: Icons.more_vert,
             tooltip: 'More actions',

@@ -152,6 +152,28 @@ void main() {
       expect(find.byTooltip('More actions'), findsNothing);
       expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
     });
+
+    testWidgets(
+        'a card with only onEdit shows just the pencil, not a redundant overflow',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}, onEdit: () {}),
+      ));
+
+      expect(find.byTooltip('Edit order'), findsOneWidget);
+      // No ⋮ — it would only open a sheet repeating "Edit details".
+      expect(find.byTooltip('More actions'), findsNothing);
+    });
+
+    testWidgets('a card with only onDelete shows the overflow but no pencil',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}, onDelete: () {}),
+      ));
+
+      expect(find.byTooltip('Edit order'), findsNothing);
+      expect(find.byTooltip('More actions'), findsOneWidget);
+    });
   });
 
   group('swipe-to-delete', () {

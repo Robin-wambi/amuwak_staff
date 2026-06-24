@@ -17,6 +17,7 @@ import '../orders/geo_services.dart';
 import '../orders/new_pickup_result.dart';
 import '../orders/new_pickup_screen.dart';
 import '../orders/order.dart';
+import '../orders/order_status.dart';
 import '../orders/edit_order_screen.dart';
 import '../orders/order_details_screen.dart';
 import '../orders/order_filter.dart';
@@ -376,6 +377,11 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   /// proof-less in-progress → ready step; pickup/delivery route into Details'
   /// proof capture instead.
   Future<void> _advanceOrderStatus(LaundryOrder order) async {
+    // Self-enforce the proof-less-only invariant the card already gates on:
+    // only in-progress → ready is safe to advance without proof. If a future
+    // caller invokes this for a proof-gated status (pending pickup / ready for
+    // delivery), do nothing rather than skip pickup/delivery proof capture.
+    if (order.status != OrderStatus.inProgress) return;
     final next = order.status.nextStatus;
     if (next == null) return;
     final staffId = ref.read(currentUserIdProvider);
