@@ -30,32 +30,33 @@ Customer _customer({
   required String name,
   required String phone,
   String? address,
-}) =>
-    Customer(
-      id: id,
-      name: name,
-      phone: phone,
-      address: address,
-      notes: null,
-      createdAt: DateTime(2026, 5, 20, 9),
-      updatedAt: DateTime(2026, 5, 20, 9),
-      deletedAt: null,
-    );
+}) => Customer(
+  id: id,
+  name: name,
+  phone: phone,
+  address: address,
+  notes: null,
+  createdAt: DateTime(2026, 5, 20, 9),
+  updatedAt: DateTime(2026, 5, 20, 9),
+  deletedAt: null,
+);
 
 void main() {
   setUpAll(() {
     registerFallbackValue(_customer(id: 'fb', name: 'fb', phone: '0'));
-    registerFallbackValue(const LaundryOrder(
-      orderId: 'fb',
-      customerName: 'fb',
-      serviceType: ServiceType.washAndIron,
-      status: OrderStatus.pendingPickup,
-      timeLabel: '',
-      itemCount: 1,
-      phone: '0',
-      address: 'a',
-      notes: '',
-    ));
+    registerFallbackValue(
+      const LaundryOrder(
+        orderId: 'fb',
+        customerName: 'fb',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: '',
+        itemCount: 1,
+        phone: '0',
+        address: 'a',
+        notes: '',
+      ),
+    );
   });
 
   late _MockCustomersRepository customersRepo;
@@ -68,13 +69,19 @@ void main() {
     // writes succeed.
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
     when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0001');
-    when(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(
+      () => ordersRepo.reserveOrderCode(),
+    ).thenAnswer((_) async => 'AMW-2026-0001');
+    when(
+      () => ordersRepo.upsertOrder(
+        any(),
+        actorStaffId: any(named: 'actorStaffId'),
+      ),
+    ).thenAnswer((_) async {});
     // initState loads address suggestions from customers + orders.
-    when(() => ordersRepo.getAll())
-        .thenAnswer((_) async => const <LaundryOrder>[]);
+    when(
+      () => ordersRepo.getAll(),
+    ).thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
   /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
@@ -83,16 +90,26 @@ void main() {
           as Customer;
 
   /// Captures the single [LaundryOrder] passed to [OrdersRepository.upsertOrder].
-  LaundryOrder capturedOrder() => verify(() => ordersRepo.upsertOrder(
-        captureAny(),
-        actorStaffId: any(named: 'actorStaffId'),
-      )).captured.single as LaundryOrder;
+  LaundryOrder capturedOrder() =>
+      verify(
+            () => ordersRepo.upsertOrder(
+              captureAny(),
+              actorStaffId: any(named: 'actorStaffId'),
+            ),
+          ).captured.single
+          as LaundryOrder;
 
   Future<_FormHandle> pumpFormAndOpen(
     WidgetTester tester, {
     GeolocateFn? geolocate,
     ReverseGeocodeFn? reverseGeocode,
   }) async {
+    // A tall viewport so the whole form (summary hint + any inline field errors
+    // + the action row) fits without scrolling — otherwise the lazy ListView
+    // disposes off-screen children and finders/taps on the buttons fail.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final handle = _FormHandle();
     await tester.pumpWidget(
       MaterialApp(
@@ -101,22 +118,22 @@ void main() {
             body: Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  handle.popped =
-                      await Navigator.of(context).push<NewPickupResult>(
-                    MaterialPageRoute(
-                      builder: (_) => NewPickupScreen(
-                        customersRepo: customersRepo,
-                        ordersRepo: ordersRepo,
-                        actorStaffId: 'staff-1',
-                        clock: () => DateTime(2026, 5, 25, 10),
-                        orderIdGenerator: () => 'uuid-order-1',
-                        customerIdGenerator: () => 'uuid-cust-1',
-                        geolocate: geolocate ?? () async => null,
-                        reverseGeocode: reverseGeocode ?? (_) async => null,
-                        defaultRatePerKgUgx: 5000,
-                      ),
-                    ),
-                  );
+                  handle.popped = await Navigator.of(context)
+                      .push<NewPickupResult>(
+                        MaterialPageRoute(
+                          builder: (_) => NewPickupScreen(
+                            customersRepo: customersRepo,
+                            ordersRepo: ordersRepo,
+                            actorStaffId: 'staff-1',
+                            clock: () => DateTime(2026, 5, 25, 10),
+                            orderIdGenerator: () => 'uuid-order-1',
+                            customerIdGenerator: () => 'uuid-cust-1',
+                            geolocate: geolocate ?? () async => null,
+                            reverseGeocode: reverseGeocode ?? (_) async => null,
+                            defaultRatePerKgUgx: 5000,
+                          ),
+                        ),
+                      );
                 },
                 child: const Text('Open'),
               ),
@@ -130,15 +147,22 @@ void main() {
     return handle;
   }
 
-  testWidgets('Create button is disabled until required fields are valid',
-      (tester) async {
+  testWidgets('Create button is disabled until required fields are valid', (
+    tester,
+  ) async {
     await pumpFormAndOpen(tester);
     final create = find.widgetWithText(ElevatedButton, 'Create pickup');
     expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
+    await tester.enterText(
+      find.byKey(const Key('np_address')),
+      'Kikoni, Kampala',
+    );
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
@@ -148,23 +172,100 @@ void main() {
   });
 
   testWidgets(
-      'Create stays disabled when the phone has fewer than 9 digits even '
-      'though the formatted text is 9+ characters', (tester) async {
-    await pumpFormAndOpen(tester);
+    'while Create is disabled, a hint names the required fields still missing',
+    (tester) async {
+      await pumpFormAndOpen(tester);
+      final hint = find.byKey(const Key('np_missing_hint'));
 
-    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    // '+256 1234' is 9 raw characters but only 7 digits — a raw-length check
-    // would wrongly enable Create; a digit-count check must keep it disabled.
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 1234');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
-    await tester.tap(find.byKey(const Key('np_service_type')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(ServiceType.washAndIron.label).last);
-    await tester.pumpAndSettle();
+      // Nothing filled yet: every required field is listed so a greyed-out
+      // Create button is never a silent dead-end.
+      expect(hint, findsOneWidget);
+      final initial = tester.widget<Text>(hint).data!;
+      expect(initial, contains('Customer name'));
+      expect(initial, contains('Phone'));
+      expect(initial, contains('Address'));
+      expect(initial, contains('Service type'));
 
-    final create = find.widgetWithText(ElevatedButton, 'Create pickup');
-    expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
-  });
+      // Fill everything except the service type — only that should remain.
+      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 700 111 222',
+      );
+      await tester.enterText(
+        find.byKey(const Key('np_address')),
+        'Kikoni, Kampala',
+      );
+      await tester.pump();
+      final partial = tester.widget<Text>(hint).data!;
+      expect(partial, isNot(contains('Customer name')));
+      expect(partial, isNot(contains('Address')));
+      expect(partial, contains('Service type'));
+
+      // Pick it: the hint disappears and Create enables.
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('np_missing_hint')), findsNothing);
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Create pickup'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'phone field shows an inline error until it holds 9 national digits',
+    (tester) async {
+      await pumpFormAndOpen(tester);
+      const message = 'Enter the 9-digit number after +256';
+
+      // Pristine field: no premature error.
+      expect(find.text(message), findsNothing);
+
+      // Too short after the rider edits it — the error appears under the field.
+      await tester.enterText(find.byKey(const Key('np_phone')), '+256 700');
+      await tester.pump();
+      expect(find.text(message), findsOneWidget);
+
+      // Completing the number clears it.
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 700111222',
+      );
+      await tester.pump();
+      expect(find.text(message), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Create stays disabled when the phone has fewer than 9 digits even '
+    'though the formatted text is 9+ characters',
+    (tester) async {
+      await pumpFormAndOpen(tester);
+
+      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+      // '+256 1234' is 9 raw characters but only 7 digits — a raw-length check
+      // would wrongly enable Create; a digit-count check must keep it disabled.
+      await tester.enterText(find.byKey(const Key('np_phone')), '+256 1234');
+      await tester.enterText(
+        find.byKey(const Key('np_address')),
+        'Kikoni, Kampala',
+      );
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
+
+      final create = find.widgetWithText(ElevatedButton, 'Create pickup');
+      expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+    },
+  );
 
   testWidgets('phone field caps the national number at 9 digits (blocks the '
       '10th)', (tester) async {
@@ -175,8 +276,9 @@ void main() {
     await tester.enterText(phone, '+256 700123456');
     await tester.pump();
     expect(
-      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
-          .length,
+      ugandaNationalDigits(
+        tester.widget<TextFormField>(phone).controller!.text,
+      ).length,
       9,
     );
 
@@ -184,8 +286,9 @@ void main() {
     await tester.enterText(phone, '+256 7001234567');
     await tester.pump();
     expect(
-      ugandaNationalDigits(tester.widget<TextFormField>(phone).controller!.text)
-          .length,
+      ugandaNationalDigits(
+        tester.widget<TextFormField>(phone).controller!.text,
+      ).length,
       9,
     );
   });
@@ -195,8 +298,14 @@ void main() {
     final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
+    await tester.enterText(
+      find.byKey(const Key('np_address')),
+      'Kikoni, Kampala',
+    );
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
@@ -225,15 +334,23 @@ void main() {
     expect(order.orderCode, 'AMW-2026-0001');
   });
 
-  testWidgets('order_code comes from the repository (server) reservation',
-      (tester) async {
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0042');
+  testWidgets('order_code comes from the repository (server) reservation', (
+    tester,
+  ) async {
+    when(
+      () => ordersRepo.reserveOrderCode(),
+    ).thenAnswer((_) async => 'AMW-2026-0042');
     final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
+    await tester.enterText(
+      find.byKey(const Key('np_address')),
+      'Kikoni, Kampala',
+    );
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
@@ -247,42 +364,56 @@ void main() {
   });
 
   testWidgets(
-      'a failed order-code reservation surfaces an error and writes no order; '
-      'a retry then succeeds', (tester) async {
-    var calls = 0;
-    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
-      calls++;
-      if (calls == 1) throw Exception('offline');
-      return 'AMW-2026-0042';
-    });
+    'a failed order-code reservation surfaces an error and writes no order; '
+    'a retry then succeeds',
+    (tester) async {
+      var calls = 0;
+      when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) throw Exception('offline');
+        return 'AMW-2026-0042';
+      });
 
-    final handle = await pumpFormAndOpen(tester);
+      final handle = await pumpFormAndOpen(tester);
 
-    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
-    await tester.tap(find.byKey(const Key('np_service_type')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(ServiceType.washAndIron.label).last);
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 700 111 222',
+      );
+      await tester.enterText(
+        find.byKey(const Key('np_address')),
+        'Kikoni, Kampala',
+      );
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
 
-    // First attempt: the RPC throws. The form stays open with an error and the
-    // order is never written (the reservation throws before the order write).
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
-    await tester.pump();
-    expect(find.textContaining('Could not reserve an order number'),
-        findsOneWidget);
-    expect(handle.popped, isNull);
-    verifyNever(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId')));
+      // First attempt: the RPC throws. The form stays open with an error and the
+      // order is never written (the reservation throws before the order write).
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+      await tester.pump();
+      expect(
+        find.textContaining('Could not reserve an order number'),
+        findsOneWidget,
+      );
+      expect(handle.popped, isNull);
+      verifyNever(
+        () => ordersRepo.upsertOrder(
+          any(),
+          actorStaffId: any(named: 'actorStaffId'),
+        ),
+      );
 
-    // Second attempt: the RPC succeeds and the order is written with its code.
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
-    await tester.pumpAndSettle();
-    expect(handle.popped, isNotNull);
-    expect(capturedOrder().orderCode, 'AMW-2026-0042');
-    expect(calls, 2);
-  });
+      // Second attempt: the RPC succeeds and the order is written with its code.
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+      await tester.pumpAndSettle();
+      expect(handle.popped, isNotNull);
+      expect(capturedOrder().orderCode, 'AMW-2026-0042');
+      expect(calls, 2);
+    },
+  );
 
   testWidgets('Cancel returns null and writes nothing', (tester) async {
     final handle = await pumpFormAndOpen(tester);
@@ -290,23 +421,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(handle.popped, isNull);
     verifyNever(() => customersRepo.upsertCustomer(any()));
-    verifyNever(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId')));
+    verifyNever(
+      () => ordersRepo.upsertOrder(
+        any(),
+        actorStaffId: any(named: 'actorStaffId'),
+      ),
+    );
   });
 
   testWidgets('Phone-on-blur with a matching customer shows the bottom sheet; '
       'tapping "Use this customer" pre-fills name + address', (tester) async {
-    when(() => customersRepo.getAll()).thenAnswer((_) async => [
-          _customer(
-            id: 'existing-cust-1',
-            name: 'Jane Existing',
-            phone: '+256 700 111 222',
-            address: 'Old address, Kampala',
-          ),
-        ]);
+    when(() => customersRepo.getAll()).thenAnswer(
+      (_) async => [
+        _customer(
+          id: 'existing-cust-1',
+          name: 'Jane Existing',
+          phone: '+256 700 111 222',
+          address: 'Old address, Kampala',
+        ),
+      ],
+    );
     await pumpFormAndOpen(tester);
 
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.tap(find.byKey(const Key('np_name')));
     await tester.pumpAndSettle();
 
@@ -317,28 +457,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      (tester.widget<TextFormField>(find.byKey(const Key('np_name')))).controller!.text,
+      (tester.widget<TextFormField>(
+        find.byKey(const Key('np_name')),
+      )).controller!.text,
       'Jane Existing',
     );
     expect(
-      (tester.widget<TextFormField>(find.byKey(const Key('np_address')))).controller!.text,
+      (tester.widget<TextFormField>(
+        find.byKey(const Key('np_address')),
+      )).controller!.text,
       'Old address, Kampala',
     );
   });
 
-  testWidgets('Submit with a matched existing customer reuses customer id',
-      (tester) async {
-    when(() => customersRepo.getAll()).thenAnswer((_) async => [
-          _customer(
-            id: 'existing-cust-2',
-            name: 'Bob Returning',
-            phone: '+256 701 222 333',
-            address: 'Wandegeya',
-          ),
-        ]);
+  testWidgets('Submit with a matched existing customer reuses customer id', (
+    tester,
+  ) async {
+    when(() => customersRepo.getAll()).thenAnswer(
+      (_) async => [
+        _customer(
+          id: 'existing-cust-2',
+          name: 'Bob Returning',
+          phone: '+256 701 222 333',
+          address: 'Wandegeya',
+        ),
+      ],
+    );
     await pumpFormAndOpen(tester);
 
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 701 222 333');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 701 222 333',
+    );
     await tester.tap(find.byKey(const Key('np_name')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Use this customer'));
@@ -355,111 +505,129 @@ void main() {
   });
 
   testWidgets(
-      'Editing the phone field after accepting a customer match drops the '
-      'cached customer id so submit creates a fresh customer row',
-      (tester) async {
-    when(() => customersRepo.getAll()).thenAnswer((_) async => [
+    'Editing the phone field after accepting a customer match drops the '
+    'cached customer id so submit creates a fresh customer row',
+    (tester) async {
+      when(() => customersRepo.getAll()).thenAnswer(
+        (_) async => [
           _customer(
             id: 'existing-cust-edited',
             name: 'Carol Original',
             phone: '+256 702 333 444',
             address: 'Original address',
           ),
-        ]);
-    await pumpFormAndOpen(tester);
+        ],
+      );
+      await pumpFormAndOpen(tester);
 
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 702 333 444');
-    await tester.tap(find.byKey(const Key('np_name')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Use this customer'));
-    await tester.pumpAndSettle();
-    // Rider realises the wrong customer was matched and edits the phone.
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 702 999 999');
-    await tester.tap(find.byKey(const Key('np_service_type')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(ServiceType.washAndIron.label).last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 702 333 444',
+      );
+      await tester.tap(find.byKey(const Key('np_name')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use this customer'));
+      await tester.pumpAndSettle();
+      // Rider realises the wrong customer was matched and edits the phone.
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 702 999 999',
+      );
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+      await tester.pumpAndSettle();
 
-    // Cached match id was dropped → a fresh customer id is used, and the order
-    // points at the new row (NOT the originally matched 'existing-cust-edited').
-    final customer = capturedCustomer();
-    expect(customer.id, 'uuid-cust-1');
-    expect(customer.id, isNot('existing-cust-edited'));
-    expect(capturedOrder().customerId, 'uuid-cust-1');
-  });
-
-  testWidgets('Use my location chip fills address from stubbed reverseGeocode',
-      (tester) async {
-    final handle = await pumpFormAndOpen(
-      tester,
-      geolocate: () async =>
-          const GeoLocation(latitude: 0.3163, longitude: 32.5822),
-      reverseGeocode: (_) async => 'Detected address, Kampala',
-    );
-
-    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
-    await tester.pumpAndSettle();
-
-    expect(
-      (tester.widget<TextFormField>(find.byKey(const Key('np_address')))).controller!.text,
-      'Detected address, Kampala',
-    );
-    expect(handle.popped, isNull);
-  });
+      // Cached match id was dropped → a fresh customer id is used, and the order
+      // points at the new row (NOT the originally matched 'existing-cust-edited').
+      final customer = capturedCustomer();
+      expect(customer.id, 'uuid-cust-1');
+      expect(customer.id, isNot('existing-cust-edited'));
+      expect(capturedOrder().customerId, 'uuid-cust-1');
+    },
+  );
 
   testWidgets(
-      'Use my location chip shows a SnackBar when geolocation is unavailable '
-      '(permission denied / GPS off) and leaves the address blank',
-      (tester) async {
-    // geolocate returns null — no fix available.
-    await pumpFormAndOpen(tester, geolocate: () async => null);
+    'Use my location chip fills address from stubbed reverseGeocode',
+    (tester) async {
+      final handle = await pumpFormAndOpen(
+        tester,
+        geolocate: () async =>
+            const GeoLocation(latitude: 0.3163, longitude: 32.5822),
+        reverseGeocode: (_) async => 'Detected address, Kampala',
+      );
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining("Couldn't get your location"), findsOneWidget);
-    expect(
-      (tester.widget<TextFormField>(find.byKey(const Key('np_address'))))
-          .controller!
-          .text,
-      isEmpty,
-    );
-  });
+      expect(
+        (tester.widget<TextFormField>(
+          find.byKey(const Key('np_address')),
+        )).controller!.text,
+        'Detected address, Kampala',
+      );
+      expect(handle.popped, isNull);
+    },
+  );
 
   testWidgets(
-      'Use my location chip shows a SnackBar when reverseGeocode returns '
-      'null after a successful geolocate, and leaves the address blank',
-      (tester) async {
-    await pumpFormAndOpen(
-      tester,
-      geolocate: () async =>
-          const GeoLocation(latitude: 0.3163, longitude: 32.5822),
-      reverseGeocode: (_) async => null,
-    );
+    'Use my location chip shows a SnackBar when geolocation is unavailable '
+    '(permission denied / GPS off) and leaves the address blank',
+    (tester) async {
+      // geolocate returns null — no fix available.
+      await pumpFormAndOpen(tester, geolocate: () async => null);
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text('Could not determine address — please type it manually.'),
-      findsOneWidget,
-    );
-    expect(
-      (tester.widget<TextFormField>(find.byKey(const Key('np_address'))))
-          .controller!
-          .text,
-      isEmpty,
-    );
-  });
+      expect(find.textContaining("Couldn't get your location"), findsOneWidget);
+      expect(
+        (tester.widget<TextFormField>(
+          find.byKey(const Key('np_address')),
+        )).controller!.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    'Use my location chip shows a SnackBar when reverseGeocode returns '
+    'null after a successful geolocate, and leaves the address blank',
+    (tester) async {
+      await pumpFormAndOpen(
+        tester,
+        geolocate: () async =>
+            const GeoLocation(latitude: 0.3163, longitude: 32.5822),
+        reverseGeocode: (_) async => null,
+      );
+
+      await tester.tap(find.widgetWithText(ActionChip, 'Use my location'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Could not determine address — please type it manually.'),
+        findsOneWidget,
+      );
+      expect(
+        (tester.widget<TextFormField>(
+          find.byKey(const Key('np_address')),
+        )).controller!.text,
+        isEmpty,
+      );
+    },
+  );
 
   testWidgets('Schedule for later → Tomorrow morning sets scheduledFor to '
       '9 AM next day and pops with startPickupNow=false', (tester) async {
     final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
@@ -472,10 +640,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final tomorrowMorningChip = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'Tomorrow morning'));
+      find.widgetWithText(ChoiceChip, 'Tomorrow morning'),
+    );
     expect(tomorrowMorningChip.selected, isTrue);
-    final inOneHourChip = tester
-        .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'In 1 hour'));
+    final inOneHourChip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, 'In 1 hour'),
+    );
     expect(inOneHourChip.selected, isFalse);
     expect(find.text('Scheduled for: Tomorrow, 9:00 AM'), findsOneWidget);
 
@@ -498,7 +668,10 @@ void main() {
     await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
@@ -544,7 +717,10 @@ void main() {
     await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
@@ -568,7 +744,9 @@ void main() {
       const Offset(0, -200),
     );
     await tester.enterText(
-        find.byKey(const Key('np_notes')), 'Gate locked after 6');
+      find.byKey(const Key('np_notes')),
+      'Gate locked after 6',
+    );
 
     await tester.dragUntilVisible(
       find.widgetWithText(ElevatedButton, 'Create pickup'),
@@ -583,7 +761,9 @@ void main() {
     expect(order.notes, 'Gate locked after 6');
   });
 
-  testWidgets('Optional details: item-count stepper caps at 99', (tester) async {
+  testWidgets('Optional details: item-count stepper caps at 99', (
+    tester,
+  ) async {
     await pumpFormAndOpen(tester);
 
     await tester.dragUntilVisible(
@@ -602,14 +782,19 @@ void main() {
 
     expect(find.text('99'), findsOneWidget);
     expect(find.text('100'), findsNothing);
-    final incButton =
-        tester.widget<IconButton>(find.byKey(const Key('np_count_inc')));
-    expect(incButton.onPressed, isNull,
-        reason: 'increment is disabled once the cap is reached');
+    final incButton = tester.widget<IconButton>(
+      find.byKey(const Key('np_count_inc')),
+    );
+    expect(
+      incButton.onPressed,
+      isNull,
+      reason: 'increment is disabled once the cap is reached',
+    );
   });
 
-  testWidgets('Optional details: the count is labelled and carries its unit',
-      (tester) async {
+  testWidgets('Optional details: the count is labelled and carries its unit', (
+    tester,
+  ) async {
     await pumpFormAndOpen(tester);
     await tester.dragUntilVisible(
       find.text('Add optional details'),
@@ -625,12 +810,16 @@ void main() {
     expect(find.text('items'), findsOneWidget);
   });
 
-  testWidgets('Optional details: typing a count sets itemCount (tap-to-edit)',
-      (tester) async {
+  testWidgets('Optional details: typing a count sets itemCount (tap-to-edit)', (
+    tester,
+  ) async {
     await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
@@ -664,12 +853,16 @@ void main() {
     expect(capturedOrder().itemCount, 30);
   });
 
-  testWidgets('Optional details: a typed count over 99 is clamped to 99',
-      (tester) async {
+  testWidgets('Optional details: a typed count over 99 is clamped to 99', (
+    tester,
+  ) async {
     await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
     await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni');
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
@@ -704,8 +897,9 @@ void main() {
     expect(capturedOrder().itemCount, 99);
   });
 
-  testWidgets('Create pickup shows a spinner while the submit is in flight',
-      (tester) async {
+  testWidgets('Create pickup shows a spinner while the submit is in flight', (
+    tester,
+  ) async {
     // Gate the order-code reservation so the submit stays in flight while we
     // assert, then release it to let the form finish.
     final gate = Completer<String>();
@@ -713,8 +907,14 @@ void main() {
     final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(find.byKey(const Key('np_phone')), '+256 700 111 222');
-    await tester.enterText(find.byKey(const Key('np_address')), 'Kikoni, Kampala');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
+    await tester.enterText(
+      find.byKey(const Key('np_address')),
+      'Kikoni, Kampala',
+    );
     await tester.tap(find.byKey(const Key('np_service_type')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
@@ -733,15 +933,19 @@ void main() {
   });
 
   group('Address auto-suggest', () {
-    testWidgets('suggests a previously-used address and fills it on tap',
-        (tester) async {
-      when(() => customersRepo.getAll()).thenAnswer((_) async => [
-            _customer(
-                id: 'c1',
-                name: 'Ann',
-                phone: '+256 700 000 001',
-                address: 'Kololo, Kampala'),
-          ]);
+    testWidgets('suggests a previously-used address and fills it on tap', (
+      tester,
+    ) async {
+      when(() => customersRepo.getAll()).thenAnswer(
+        (_) async => [
+          _customer(
+            id: 'c1',
+            name: 'Ann',
+            phone: '+256 700 000 001',
+            address: 'Kololo, Kampala',
+          ),
+        ],
+      );
       await pumpFormAndOpen(tester);
       await tester.pumpAndSettle(); // let the initState suggestion load finish
 
@@ -763,25 +967,31 @@ void main() {
       );
     });
 
-    testWidgets('orders suggestions by how commonly the address is used',
-        (tester) async {
-      when(() => customersRepo.getAll()).thenAnswer((_) async => [
-            _customer(
-                id: 'a',
-                name: 'A',
-                phone: '+256 700 000 001',
-                address: 'Plot 1, Kampala'),
-            _customer(
-                id: 'b',
-                name: 'B',
-                phone: '+256 700 000 002',
-                address: 'Plot 2, Kampala'),
-            _customer(
-                id: 'c',
-                name: 'C',
-                phone: '+256 700 000 003',
-                address: 'Plot 2, Kampala'),
-          ]);
+    testWidgets('orders suggestions by how commonly the address is used', (
+      tester,
+    ) async {
+      when(() => customersRepo.getAll()).thenAnswer(
+        (_) async => [
+          _customer(
+            id: 'a',
+            name: 'A',
+            phone: '+256 700 000 001',
+            address: 'Plot 1, Kampala',
+          ),
+          _customer(
+            id: 'b',
+            name: 'B',
+            phone: '+256 700 000 002',
+            address: 'Plot 2, Kampala',
+          ),
+          _customer(
+            id: 'c',
+            name: 'C',
+            phone: '+256 700 000 003',
+            address: 'Plot 2, Kampala',
+          ),
+        ],
+      );
       await pumpFormAndOpen(tester);
       await tester.pumpAndSettle();
 
@@ -796,55 +1006,65 @@ void main() {
       );
     });
 
-    testWidgets('includes addresses from past orders and ranks by combined use',
-        (tester) async {
-      when(() => customersRepo.getAll()).thenAnswer((_) async => [
+    testWidgets(
+      'includes addresses from past orders and ranks by combined use',
+      (tester) async {
+        when(() => customersRepo.getAll()).thenAnswer(
+          (_) async => [
             _customer(
-                id: 'c1',
-                name: 'Ann',
-                phone: '+256 700 000 001',
-                address: 'Bugolobi, Kampala'),
-          ]);
-      LaundryOrder order(String id, String address) => LaundryOrder(
-            orderId: id,
-            customerName: 'X',
-            serviceType: ServiceType.washAndIron,
-            status: OrderStatus.pendingPickup,
-            timeLabel: '',
-            itemCount: 0,
-            phone: '0',
-            address: address,
-            notes: '',
-          );
-      when(() => ordersRepo.getAll()).thenAnswer((_) async => [
+              id: 'c1',
+              name: 'Ann',
+              phone: '+256 700 000 001',
+              address: 'Bugolobi, Kampala',
+            ),
+          ],
+        );
+        LaundryOrder order(String id, String address) => LaundryOrder(
+          orderId: id,
+          customerName: 'X',
+          serviceType: ServiceType.washAndIron,
+          status: OrderStatus.pendingPickup,
+          timeLabel: '',
+          itemCount: 0,
+          phone: '0',
+          address: address,
+          notes: '',
+        );
+        when(() => ordersRepo.getAll()).thenAnswer(
+          (_) async => [
             order('o1', 'Ntinda, Kampala'),
             order('o2', 'Ntinda, Kampala'),
-          ]);
-      await pumpFormAndOpen(tester);
-      await tester.pumpAndSettle();
+          ],
+        );
+        await pumpFormAndOpen(tester);
+        await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(const Key('np_address')), 'kampala');
-      await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('np_address')), 'kampala');
+        await tester.pumpAndSettle();
 
-      // The order-only address is offered, and (used twice across orders) it
-      // ranks above the customer address that was used only once.
-      expect(find.text('Ntinda, Kampala'), findsOneWidget);
-      expect(find.text('Bugolobi, Kampala'), findsOneWidget);
-      expect(
-        tester.getTopLeft(find.text('Ntinda, Kampala')).dy <
-            tester.getTopLeft(find.text('Bugolobi, Kampala')).dy,
-        isTrue,
-      );
-    });
+        // The order-only address is offered, and (used twice across orders) it
+        // ranks above the customer address that was used only once.
+        expect(find.text('Ntinda, Kampala'), findsOneWidget);
+        expect(find.text('Bugolobi, Kampala'), findsOneWidget);
+        expect(
+          tester.getTopLeft(find.text('Ntinda, Kampala')).dy <
+              tester.getTopLeft(find.text('Bugolobi, Kampala')).dy,
+          isTrue,
+        );
+      },
+    );
 
     testWidgets('shows no suggestion when nothing matches', (tester) async {
-      when(() => customersRepo.getAll()).thenAnswer((_) async => [
-            _customer(
-                id: 'c1',
-                name: 'Ann',
-                phone: '+256 700 000 001',
-                address: 'Kololo, Kampala'),
-          ]);
+      when(() => customersRepo.getAll()).thenAnswer(
+        (_) async => [
+          _customer(
+            id: 'c1',
+            name: 'Ann',
+            phone: '+256 700 000 001',
+            address: 'Kololo, Kampala',
+          ),
+        ],
+      );
       await pumpFormAndOpen(tester);
       await tester.pumpAndSettle();
 
@@ -866,16 +1086,20 @@ void main() {
       expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 29), now), isTrue);
     });
 
-    test('the current minute is NOT in the past (now\'s seconds are ignored)',
-        () {
-      // The time picker yields 14:30:00 for "this minute"; comparing against
-      // now=14:30:45 at second precision would wrongly reject it.
-      expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 30), now), isFalse);
-    });
+    test(
+      'the current minute is NOT in the past (now\'s seconds are ignored)',
+      () {
+        // The time picker yields 14:30:00 for "this minute"; comparing against
+        // now=14:30:45 at second precision would wrongly reject it.
+        expect(
+          scheduledTimeIsInPast(DateTime(2026, 5, 25, 14, 30), now),
+          isFalse,
+        );
+      },
+    );
 
     test('a future time is not in the past', () {
-      expect(
-          scheduledTimeIsInPast(DateTime(2026, 5, 25, 15, 0), now), isFalse);
+      expect(scheduledTimeIsInPast(DateTime(2026, 5, 25, 15, 0), now), isFalse);
     });
   });
 }
