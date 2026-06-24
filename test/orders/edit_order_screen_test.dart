@@ -28,14 +28,14 @@ LaundryOrder _order() => LaundryOrder(
 void main() {
   // A tall surface so the whole scrolling form lays out (the Notes field and
   // Save button sit below the default 800x600 viewport).
-  Future<void> _pumpTall(WidgetTester tester, Widget child) async {
+  Future<void> pumpTall(WidgetTester tester, Widget child) async {
     await tester.binding.setSurfaceSize(const Size(1200, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(home: child));
   }
 
   testWidgets('prefills the form from the order', (tester) async {
-    await _pumpTall(
+    await pumpTall(
       tester,
       EditOrderScreen(order: _order(), save: (_) async {}),
     );
@@ -49,7 +49,7 @@ void main() {
   testWidgets('save passes an order with the edited fields, pricing intact',
       (tester) async {
     LaundryOrder? saved;
-    await _pumpTall(
+    await pumpTall(
       tester,
       EditOrderScreen(order: _order(), save: (o) async => saved = o),
     );
@@ -72,7 +72,7 @@ void main() {
 
   testWidgets('a blank customer name is rejected before save', (tester) async {
     var saveCalled = false;
-    await _pumpTall(
+    await pumpTall(
       tester,
       EditOrderScreen(order: _order(), save: (_) async => saveCalled = true),
     );
@@ -89,7 +89,7 @@ void main() {
     // invalid path is an empty/non-numeric count, where int.tryParse returns
     // null and the same guard (itemCount == null || itemCount < 0) fires.
     var saveCalled = false;
-    await _pumpTall(
+    await pumpTall(
       tester,
       EditOrderScreen(order: _order(), save: (_) async => saveCalled = true),
     );
