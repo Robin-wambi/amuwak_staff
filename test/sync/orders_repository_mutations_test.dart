@@ -43,6 +43,59 @@ void main() {
         },
       );
 
+  group('updatePricing', () {
+    // A priced order whose stored total_ugx (19500) is deliberately stale vs
+    // its inputs, so the test can prove updatePricing dispatches the RECOMPUTED
+    // total rather than echoing the stored one.
+    LaundryOrder pricedOrder() => order().copyWith(
+          finalWeightKg: 4,
+          manualAdjustmentUgx: 500,
+          deliveryFeeSnapshotUgx: 2000,
+        );
+
+    test('dispatches recomputed pricing columns + updated_at for the order id',
+        () async {
+      late String gotId;
+      late Map<String, dynamic> values;
+      final repo = repoThat(record: (id, v) {
+        gotId = id;
+        values = v;
+      });
+
+      final o = pricedOrder();
+      await repo.updatePricing(o, actorStaffId: 'staff-7');
+
+      expect(gotId, 'o1');
+      // Pricing inputs are dispatched verbatim from the order.
+      expect(values['estimated_weight_kg'], o.estimatedWeightKg);
+      expect(values['final_weight_kg'], 4);
+      expect(values['line_items'], const []);
+      expect(values['manual_adjustment_ugx'], 500);
+      expect(values['delivery_fee_snapshot_ugx'], 2000);
+      expect(values['is_express'], false);
+      expect(values['express_flat_snapshot_ugx'], 0);
+      expect(values['express_pct_snapshot'], 0);
+      // total_ugx is the RECOMPUTED total, not the stale stored 19500.
+      final recomputed = OrdersRepository.recomputeOrderTotal(o).totalUgx;
+      expect(values['total_ugx'], recomputed);
+      expect(values['total_ugx'], isNot(19500));
+      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
+      // Descriptive, status, and creation columns must never leak into a
+      // pricing-only update.
+      expect(values.containsKey('customer_name'), isFalse);
+      expect(values.containsKey('status'), isFalse);
+      expect(values.containsKey('created_by'), isFalse);
+    });
+
+    test('throws StateError when no row matched', () async {
+      final repo = repoThat(record: (_, __) {}, matched: false);
+      expect(
+        () => repo.updatePricing(pricedOrder(), actorStaffId: 's'),
+        throwsStateError,
+      );
+    });
+  });
+
   group('updateOrderDetails', () {
     test('dispatches the descriptive payload + updated_by for the order id',
         () async {
