@@ -104,6 +104,78 @@ void main() {
     });
   });
 
+  group('visible action icons (long-press is undiscoverable)', () {
+    testWidgets('an Edit icon invokes onEdit without a long-press',
+        (tester) async {
+      var edited = false;
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}, onEdit: () => edited = true),
+      ));
+
+      final editIcon = find.byTooltip('Edit order');
+      expect(editIcon, findsOneWidget);
+      await tester.tap(editIcon);
+      await tester.pumpAndSettle();
+      expect(edited, isTrue);
+    });
+
+    testWidgets('the overflow button opens the actions sheet', (tester) async {
+      var deleted = false;
+      await tester.pumpWidget(_host(
+        OrderCard(
+          order: _order(),
+          onTap: () {},
+          onEdit: () {},
+          onDelete: () => deleted = true,
+        ),
+      ));
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      // The same sheet the long-press opens — drive its Delete entry through to
+      // the confirm dialog.
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(deleted, isTrue);
+    });
+
+    testWidgets('a tap-only card shows neither icon (keeps the chevron)',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}),
+      ));
+
+      expect(find.byTooltip('Edit order'), findsNothing);
+      expect(find.byTooltip('More actions'), findsNothing);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+    });
+
+    testWidgets(
+        'a card with only onEdit shows just the pencil, not a redundant overflow',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}, onEdit: () {}),
+      ));
+
+      expect(find.byTooltip('Edit order'), findsOneWidget);
+      // No ⋮ — it would only open a sheet repeating "Edit details".
+      expect(find.byTooltip('More actions'), findsNothing);
+    });
+
+    testWidgets('a card with only onDelete shows the overflow but no pencil',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}, onDelete: () {}),
+      ));
+
+      expect(find.byTooltip('Edit order'), findsNothing);
+      expect(find.byTooltip('More actions'), findsOneWidget);
+    });
+  });
+
   group('swipe-to-delete', () {
     testWidgets('confirming the dialog invokes onDelete', (tester) async {
       var deleted = false;
