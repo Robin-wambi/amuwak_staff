@@ -87,7 +87,7 @@ void main() {
   testWidgets('an empty item count is rejected before save', (tester) async {
     // The field is digitsOnly, so a literal "-1" can't be typed; the reachable
     // invalid path is an empty/non-numeric count, where int.tryParse returns
-    // null and the same guard (itemCount == null || itemCount < 0) fires.
+    // null and the itemCount == null guard fires.
     var saveCalled = false;
     await pumpTall(
       tester,
@@ -99,7 +99,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saveCalled, isFalse);
-    expect(find.text('Enter a valid item count.'), findsOneWidget);
+    expect(find.text('Enter an item count.'), findsOneWidget);
   });
 
   testWidgets('save carries an edited service type and notes', (tester) async {

@@ -88,10 +88,12 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       );
       return;
     }
+    // The field is digitsOnly, so a negative can't be entered; the only invalid
+    // input is an empty / non-numeric count, where tryParse returns null.
     final itemCount = int.tryParse(_itemCountController.text.trim());
-    if (itemCount == null || itemCount < 0) {
+    if (itemCount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid item count.')),
+        const SnackBar(content: Text('Enter an item count.')),
       );
       return;
     }
