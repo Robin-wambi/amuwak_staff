@@ -79,6 +79,7 @@ void main() {
       final recomputed = OrdersRepository.recomputeOrderTotal(o).totalUgx;
       expect(values['total_ugx'], recomputed);
       expect(values['total_ugx'], isNot(19500));
+      expect(values['updated_by'], 'staff-7');
       expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
       // Descriptive, status, and creation columns must never leak into a
       // pricing-only update.

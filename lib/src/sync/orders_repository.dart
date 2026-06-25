@@ -224,6 +224,7 @@ class OrdersRepository {
       'express_flat_snapshot_ugx': priced.expressFlatSnapshotUgx,
       'express_pct_snapshot': priced.expressPctSnapshot,
       'total_ugx': priced.totalUgx,
+      'updated_by': actorStaffId,
       'updated_at': _clock().toUtc().toIso8601String(),
     });
     if (updated.isEmpty) {
