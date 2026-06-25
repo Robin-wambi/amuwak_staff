@@ -101,4 +101,89 @@ void main() {
     expect(saveCalled, isFalse);
     expect(find.text('Enter a valid item count.'), findsOneWidget);
   });
+
+  testWidgets('a failed save surfaces a retry SnackBar and clears saving',
+      (tester) async {
+    await pumpTall(
+      tester,
+      EditOrderScreen(
+        order: _order(),
+        save: (_) async => throw Exception('network down'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not save — please retry.'), findsOneWidget);
+    // The button is interactive again (not stuck in the saving spinner).
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('changing the service chip is carried into the saved order',
+      (tester) async {
+    LaundryOrder? saved;
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (o) async => saved = o),
+    );
+
+    // _order() starts as washAndIron; pick a different service.
+    await tester.tap(find.text(ServiceType.washOnly.label));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saved!.serviceType, ServiceType.washOnly);
+  });
+
+  testWidgets(
+      'picking a date and time sets a concrete schedule on the saved order',
+      (tester) async {
+    LaundryOrder? saved;
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: _order(), save: (o) async => saved = o),
+    );
+
+    await tester.tap(find.byKey(const Key('edit_pick_schedule')));
+    await tester.pumpAndSettle();
+    // Confirm the date picker's initial date.
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    // Confirm the time picker's initial time.
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+
+    expect(saved!.scheduledFor, isNotNull);
+  });
+
+  testWidgets(
+      'an order with a schedule shows it and can be cleared back to immediate',
+      (tester) async {
+    LaundryOrder? saved;
+    final scheduled =
+        _order().copyWith(scheduledFor: DateTime(2026, 7, 1, 14, 30));
+    await pumpTall(
+      tester,
+      EditOrderScreen(order: scheduled, save: (o) async => saved = o),
+    );
+
+    // The scheduled label renders and the Clear affordance is offered.
+    expect(find.text(LaundryOrder.formatScheduled(scheduled.scheduledFor!)),
+        findsOneWidget);
+    final clear = find.byKey(const Key('edit_clear_schedule'));
+    expect(clear, findsOneWidget);
+
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    expect(find.text('Immediate (pickup now)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('edit_save')));
+    await tester.pumpAndSettle();
+    expect(saved!.scheduledFor, isNull);
+  });
 }

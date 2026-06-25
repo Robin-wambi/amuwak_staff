@@ -58,7 +58,10 @@ Widget _wrap(
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(OrderStatus.pendingPickup));
+  setUpAll(() {
+    registerFallbackValue(OrderStatus.pendingPickup);
+    registerFallbackValue(_baseOrder);
+  });
 
   testWidgets(
     'inProgress: rate row shows USh 5,000/kg; entering final weight shows total and removes Provisional badge',
@@ -137,6 +140,120 @@ void main() {
 
       // 5000 weight + 8000 blanket = 13000.
       expect(find.text('USh 13,000'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'saving pricing calls updatePricing with the edited weight and confirms',
+    (tester) async {
+      final repo = _MockOrdersRepository();
+      when(() => repo.updatePricing(any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(_baseOrder, ordersRepo: repo));
+      await tester.enterText(find.byKey(const Key('details_final_weight')), '4');
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('details_save_pricing')));
+      await tester.tap(find.byKey(const Key('details_save_pricing')));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => repo.updatePricing(captureAny(),
+          actorStaffId: 's-test')).captured.single as LaundryOrder;
+      expect(captured.finalWeightKg, 4);
+      expect(find.text('Pricing saved.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a failed pricing save surfaces a retry SnackBar',
+    (tester) async {
+      final repo = _MockOrdersRepository();
+      when(() => repo.updatePricing(any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenThrow(Exception('x'));
+
+      await tester.pumpWidget(_wrap(_baseOrder, ordersRepo: repo));
+      await tester.enterText(find.byKey(const Key('details_final_weight')), '4');
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('details_save_pricing')));
+      await tester.tap(find.byKey(const Key('details_save_pricing')));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.text('Could not save pricing — please retry.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'prefills an integer final weight without a trailing decimal',
+    (tester) async {
+      await tester.pumpWidget(_wrap(_baseOrder.copyWith(finalWeightKg: 6)));
+      expect(find.widgetWithText(TextField, '6'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'prefills a fractional final weight and a non-zero manual adjustment',
+    (tester) async {
+      await tester.pumpWidget(_wrap(
+          _baseOrder.copyWith(finalWeightKg: 4.5, manualAdjustmentUgx: 500)));
+      expect(find.widgetWithText(TextField, '4.5'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '500'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Move to Ready advances the status, updates the chip, and confirms',
+    (tester) async {
+      final repo = _MockOrdersRepository();
+      when(() => repo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(_baseOrder, ordersRepo: repo));
+      await tester.ensureVisible(find.text('Move to Ready for delivery'));
+      await tester.tap(find.text('Move to Ready for delivery'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.updateStatus('AMW-0001',
+          OrderStatus.readyForDelivery, actorStaffId: 's-test')).called(1);
+      expect(find.textContaining('Order moved to'), findsOneWidget);
+      // The chip reflects the optimistic local update.
+      expect(find.text(OrderStatus.readyForDelivery.label), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'a failed status advance surfaces a retry SnackBar',
+    (tester) async {
+      final repo = _MockOrdersRepository();
+      when(() => repo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenThrow(Exception('x'));
+
+      await tester.pumpWidget(_wrap(_baseOrder, ordersRepo: repo));
+      await tester.ensureVisible(find.text('Move to Ready for delivery'));
+      await tester.tap(find.text('Move to Ready for delivery'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not save status change — please retry.'),
+          findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'entering a manual adjustment recomputes the total',
+    (tester) async {
+      await tester.pumpWidget(_wrap(_baseOrder));
+      await tester.enterText(find.byKey(const Key('details_final_weight')), '2');
+      await tester.pump();
+      // 2kg * 5000 = 10,000.
+      expect(find.text('USh 10,000'), findsOneWidget);
+
+      await tester.enterText(
+          find.byKey(const Key('details_manual_adjustment')), '500');
+      await tester.pump();
+      // 10,000 + 500 manual adjustment = 10,500.
+      expect(find.text('USh 10,500'), findsOneWidget);
     },
   );
 }

@@ -31,6 +31,7 @@ import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
 import 'package:amuwak_staff/src/pricing/pricing_providers.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings_repository.dart';
+import 'package:amuwak_staff/src/pricing/pricing_settings_screen.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
@@ -78,6 +79,17 @@ class _FakePricingSettingsRepository extends PricingSettingsRepository {
 
   @override
   Future<PricingSettings> fetch() async => _settings;
+}
+
+/// A settings repo whose fetch fails, to drive the "pricing settings missing"
+/// branch of the dashboard's New-pickup handler.
+class _ThrowingPricingSettingsRepository extends PricingSettingsRepository {
+  _ThrowingPricingSettingsRepository()
+      : super.forTest(fetchRows: () async => []);
+
+  @override
+  Future<PricingSettings> fetch() async =>
+      throw Exception('pricing settings unavailable');
 }
 
 Future<void> pumpDashboardWithDb(
@@ -152,7 +164,10 @@ const _fallbackOrder = LaundryOrder(
 );
 
 void main() {
-  setUpAll(() => registerFallbackValue(_fallbackOrder));
+  setUpAll(() {
+    registerFallbackValue(_fallbackOrder);
+    registerFallbackValue(OrderStatus.pendingPickup);
+  });
 
   testWidgets(
     'Surfaces a SnackBar on startup when an in-flight photo capture was lost',
@@ -371,6 +386,76 @@ void main() {
 
         verify(() => repo.softDelete('o-Zeta', actorStaffId: 'staff-1'))
             .called(1);
+      },
+    );
+
+    testWidgets(
+      'swipe-to-delete → confirm shows a retry SnackBar when softDelete fails',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.softDelete(any(),
+                actorStaffId: any(named: 'actorStaffId')))
+            .thenThrow(Exception('network down'));
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Zane')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.drag(find.text('Zane'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Could not delete — please retry.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'long-press → Mark as Ready calls updateStatus and confirms',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.updateStatus(any(), any(),
+            actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgress('Zuri')]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('Zuri'));
+        await tester.pumpAndSettle();
+        await tester
+            .tap(find.text('Mark as ${OrderStatus.readyForDelivery.label}'));
+        await tester.pumpAndSettle();
+
+        verify(() => repo.updateStatus(
+                'o-Zuri', OrderStatus.readyForDelivery,
+                actorStaffId: 'staff-1'))
+            .called(1);
+        expect(find.textContaining('Order moved to'), findsOneWidget);
       },
     );
   });
@@ -1279,6 +1364,47 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Pricing settings'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Account tab: tapping Pricing settings opens the settings screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'manager'),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pricing settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PricingSettingsScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'New pickup surfaces a SnackBar when pricing settings cannot be loaded',
+    (tester) async {
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        pricingSettingsRepositoryProvider
+            .overrideWithValue(_ThrowingPricingSettingsRepository()),
+      ]);
+
+      await tester.ensureVisible(find.text('New pickup', skipOffstage: false));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New pickup'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pricing settings missing — contact admin.'),
+          findsOneWidget);
+      expect(find.byType(NewPickupScreen), findsNothing);
     },
   );
 }
