@@ -5,6 +5,13 @@ import '../orders/proof_event.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
+/// Test seam for the proof-event upsert: given the column map, returns the
+/// "selected" rows (empty ⇒ the write did not persist). Lets unit tests
+/// exercise [ProofEventsRepository.insertEvent]'s payload + missing-write
+/// [StateError] without a live SupabaseClient.
+typedef ProofEventUpsert =
+    Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
+
 /// Read/write repository for proof events — ONLINE-ONLY mode.
 ///
 /// Reads stream live from Supabase; [insertEvent] upserts directly (upsert,
@@ -14,18 +21,46 @@ import 'supabase_payloads.dart';
 /// preserved in the commented `OFFLINE` block at the bottom of this file.
 class ProofEventsRepository {
   ProofEventsRepository(
-    this._supabase, {
+    SupabaseClient supabase, {
     DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  })  : _supabase = supabase,
+        _clock = clock ?? DateTime.now,
+        _upsertOverride = null;
 
-  final SupabaseClient _supabase;
+  /// Test seam: inject the raw `upsert(...).select('id')` so unit tests can
+  /// drive [insertEvent] (payload shape + missing-write [StateError]) without
+  /// mocking SupabaseClient. The read stream is unavailable on a forTest
+  /// instance (it asserts the client is present).
+  ProofEventsRepository.forTest({
+    required DateTime Function() clock,
+    ProofEventUpsert? upsertRow,
+  })  : _supabase = null,
+        _clock = clock,
+        _upsertOverride = upsertRow;
+
+  final SupabaseClient? _supabase;
   final DateTime Function() _clock;
+  final ProofEventUpsert? _upsertOverride;
+
+  /// Dispatches the proof-event upsert and returns the selected rows so the
+  /// caller can detect a write that didn't persist (empty ⇒ nothing written).
+  /// Routes through the test override when constructed via [forTest], else the
+  /// live Supabase client.
+  Future<List<Map<String, dynamic>>> _upsertRow(
+      Map<String, dynamic> values) async {
+    final override = _upsertOverride;
+    if (override != null) return override(values);
+    assert(_supabase != null,
+        'forTest instance has no upsertRow — '
+        'pass one to ProofEventsRepository.forTest(upsertRow: ...)');
+    return _supabase!.from('proof_events').upsert(values).select('id');
+  }
 
   // ----- READ -----
 
   /// Non-deleted proof events for [orderId], ordered by `captured_at`.
   Stream<List<drift.ProofEvent>> watchByOrder(String orderId) {
-    return _supabase
+    return _supabase!
         .from('proof_events')
         .stream(primaryKey: ['id'])
         .eq('order_id', orderId)
@@ -41,18 +76,27 @@ class ProofEventsRepository {
   /// Upserts a proof event. Idempotent on the proof-event PK so a capture
   /// screen that retries (e.g. after the follow-up status update throws) with
   /// the SAME event id is a no-op rather than a duplicate-key error.
+  ///
+  /// Throws a [StateError] when the upsert wrote no row (e.g. an RLS policy
+  /// silently dropped it) so a captured photo/proof never shows "saved" for a
+  /// write that didn't persist — the `.select('id')` returning empty is the
+  /// signal.
   Future<void> insertEvent(
     ProofEvent event, {
     required String orderId,
     required String actorStaffId,
   }) async {
     final now = _clock();
-    await _supabase.from('proof_events').upsert(proofEventUpsertPayload(
+    final written = await _upsertRow(proofEventUpsertPayload(
           event,
           orderId: orderId,
           actorStaffId: actorStaffId,
           now: now,
         ));
+    if (written.isEmpty) {
+      throw StateError(
+          'insertEvent: write did not persist proof event "${event.id}"');
+    }
   }
 }
 

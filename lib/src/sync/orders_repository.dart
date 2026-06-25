@@ -30,29 +30,39 @@ import 'supabase_payloads.dart';
 typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
     String id, Map<String, dynamic> values);
 
+/// Test seam for the row upsert: given the column map, returns the "selected"
+/// rows (empty ⇒ the write did not persist). Lets unit tests exercise
+/// [upsertOrder]'s payload + missing-write [StateError] without a live client.
+typedef OrderUpsert =
+    Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
+
 class OrdersRepository {
   OrdersRepository(
     SupabaseClient supabase, {
     DateTime Function()? clock,
   })  : _supabase = supabase,
         _clock = clock ?? DateTime.now,
-        _updateOverride = null;
+        _updateOverride = null,
+        _upsertOverride = null;
 
-  /// Test seam: inject the raw `update(...).eq('id', …).select('id')` so unit
-  /// tests can drive the write methods (payload shape + no-op [StateError])
-  /// without mocking SupabaseClient. Mirrors [ExpensesRepository.forTest].
-  /// Read/RPC/upsert methods are unavailable on a forTest instance (they assert
-  /// the client is present).
+  /// Test seam: inject the raw `update(...).eq('id', …).select('id')` and
+  /// `upsert(...).select('id')` so unit tests can drive the write methods
+  /// (payload shape + no-op/no-write [StateError]) without mocking
+  /// SupabaseClient. Mirrors [ExpensesRepository.forTest]. Read/RPC methods are
+  /// unavailable on a forTest instance (they assert the client is present).
   OrdersRepository.forTest({
     required DateTime Function() clock,
     OrderUpdateById? updateRow,
+    OrderUpsert? upsertRow,
   })  : _supabase = null,
         _clock = clock,
-        _updateOverride = updateRow;
+        _updateOverride = updateRow,
+        _upsertOverride = upsertRow;
 
   final SupabaseClient? _supabase;
   final DateTime Function() _clock;
   final OrderUpdateById? _updateOverride;
+  final OrderUpsert? _upsertOverride;
 
   /// Dispatches an id-scoped column update and returns the selected rows so the
   /// caller can detect a no-op (empty ⇒ no row matched). Routes through the
@@ -68,6 +78,20 @@ class OrdersRepository {
         'forTest instance has no updateRow — '
         'pass one to OrdersRepository.forTest(updateRow: ...)');
     return _supabase!.from('orders').update(values).eq('id', id).select('id');
+  }
+
+  /// Dispatches a full-row upsert and returns the selected rows so the caller
+  /// can detect a write that didn't persist (empty ⇒ nothing written, e.g. an
+  /// RLS policy silently dropped it). Routes through the test override when
+  /// constructed via [OrdersRepository.forTest], else the live Supabase client.
+  Future<List<Map<String, dynamic>>> _upsertRow(
+      Map<String, dynamic> values) async {
+    final override = _upsertOverride;
+    if (override != null) return override(values);
+    assert(_supabase != null,
+        'forTest instance has no upsertRow — '
+        'pass one to OrdersRepository.forTest(upsertRow: ...)');
+    return _supabase!.from('orders').upsert(values).select('id');
   }
 
   // ----- READ -----
@@ -205,13 +229,20 @@ class OrdersRepository {
   /// current actor/time. Don't repurpose it for edits — add a dedicated update
   /// method (or a DB rule pinning the creation columns) if an edit flow is ever
   /// needed.
+  /// Throws a [StateError] when the upsert wrote no row (e.g. an RLS policy
+  /// silently dropped the insert) — matching the other write methods so a
+  /// caller (the New Pickup flow) never shows "saved" for a write that didn't
+  /// persist. The `.select('id')` returning empty is the signal.
   Future<void> upsertOrder(LaundryOrder order,
       {required String actorStaffId}) async {
     final now = _clock();
     final priced = recomputeOrderTotal(order);
-    await _supabase!
-        .from('orders')
-        .upsert(orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
+    final written = await _upsertRow(
+        orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
+    if (written.isEmpty) {
+      throw StateError(
+          'upsertOrder: write did not persist order "${priced.orderId}"');
+    }
   }
 
   /// Updates only the pricing columns (+ updated_at), recomputing total_ugx.
