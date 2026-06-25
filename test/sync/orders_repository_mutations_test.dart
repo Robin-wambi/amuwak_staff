@@ -43,6 +43,21 @@ void main() {
         },
       );
 
+  group('forTest misuse', () {
+    test('a write without updateRow trips a descriptive assert, not a bare '
+        'null-check crash', () async {
+      // forTest with no updateRow leaves both the override and _supabase null;
+      // the guard in _updateById must name the omission rather than crashing
+      // opaquely on _supabase!.
+      final repo = OrdersRepository.forTest(clock: () => clock);
+      expect(
+        () => repo.softDelete('o1', actorStaffId: 's'),
+        throwsA(isA<AssertionError>().having(
+            (e) => e.message, 'message', contains('updateRow'))),
+      );
+    });
+  });
+
   group('updatePricing', () {
     // A priced order whose stored total_ugx (19500) is deliberately stale vs
     // its inputs, so the test can prove updatePricing dispatches the RECOMPUTED

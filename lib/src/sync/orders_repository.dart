@@ -62,6 +62,11 @@ class OrdersRepository {
       String id, Map<String, dynamic> values) async {
     final override = _updateOverride;
     if (override != null) return override(id, values);
+    // A forTest instance built without updateRow has a null _supabase; name the
+    // omission here rather than letting the _supabase! below crash opaquely.
+    assert(_supabase != null,
+        'forTest instance has no updateRow — '
+        'pass one to OrdersRepository.forTest(updateRow: ...)');
     return _supabase!.from('orders').update(values).eq('id', id).select('id');
   }
 
