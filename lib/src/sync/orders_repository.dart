@@ -23,14 +23,52 @@ import 'supabase_payloads.dart';
 /// changes when proof is captured, so the orders stream re-emits and the join
 /// refetches. Two simple queries are easier to reason about and the cost (one
 /// extra `SELECT` per emission) is negligible at the dashboard's scale.
+/// Test seam for the id-scoped column writes: given the row id and the column
+/// map, returns the "selected" rows (empty ⇒ no row matched). Lets unit tests
+/// exercise the write methods' payloads + missing-row [StateError] without a
+/// live SupabaseClient. Mirrors [ExpensesRepository]'s update override.
+typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
+    String id, Map<String, dynamic> values);
+
 class OrdersRepository {
   OrdersRepository(
-    this._supabase, {
+    SupabaseClient supabase, {
     DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  })  : _supabase = supabase,
+        _clock = clock ?? DateTime.now,
+        _updateOverride = null;
 
-  final SupabaseClient _supabase;
+  /// Test seam: inject the raw `update(...).eq('id', …).select('id')` so unit
+  /// tests can drive the write methods (payload shape + no-op [StateError])
+  /// without mocking SupabaseClient. Mirrors [ExpensesRepository.forTest].
+  /// Read/RPC/upsert methods are unavailable on a forTest instance (they assert
+  /// the client is present).
+  OrdersRepository.forTest({
+    required DateTime Function() clock,
+    OrderUpdateById? updateRow,
+  })  : _supabase = null,
+        _clock = clock,
+        _updateOverride = updateRow;
+
+  final SupabaseClient? _supabase;
   final DateTime Function() _clock;
+  final OrderUpdateById? _updateOverride;
+
+  /// Dispatches an id-scoped column update and returns the selected rows so the
+  /// caller can detect a no-op (empty ⇒ no row matched). Routes through the
+  /// test override when constructed via [OrdersRepository.forTest], else the
+  /// live Supabase client.
+  Future<List<Map<String, dynamic>>> _updateById(
+      String id, Map<String, dynamic> values) async {
+    final override = _updateOverride;
+    if (override != null) return override(id, values);
+    // A forTest instance built without updateRow has a null _supabase; name the
+    // omission here rather than letting the _supabase! below crash opaquely.
+    assert(_supabase != null,
+        'forTest instance has no updateRow — '
+        'pass one to OrdersRepository.forTest(updateRow: ...)');
+    return _supabase!.from('orders').update(values).eq('id', id).select('id');
+  }
 
   // ----- READ -----
 
@@ -38,7 +76,7 @@ class OrdersRepository {
     // Soft-deleted orders (back-office tombstones) must not surface to the
     // rider, mirroring the deletedAt filter on the other read repos. `.stream()`
     // can't express `IS NULL`, so we filter client-side.
-    return _supabase
+    return _supabase!
         .from('orders')
         .stream(primaryKey: ['id'])
         .order('created_at')
@@ -76,7 +114,7 @@ class OrdersRepository {
   /// don't need proof events or live updates (e.g. the New Pickup address-
   /// suggestion seed). Mirrors [CustomersRepository.getAll].
   Future<List<LaundryOrder>> getAll() async {
-    final rows = await _supabase
+    final rows = await _supabase!
         .from('orders')
         .select()
         .isFilter('deleted_at', null)
@@ -85,7 +123,7 @@ class OrdersRepository {
   }
 
   Stream<LaundryOrder?> watchById(String orderId) {
-    return _supabase
+    return _supabase!
         .from('orders')
         .stream(primaryKey: ['id'])
         .eq('id', orderId)
@@ -152,7 +190,7 @@ class OrdersRepository {
   /// hands the coded order to [upsertOrder]. The RPC throws when offline, which
   /// the form surfaces as a retryable error.
   Future<String> reserveOrderCode() async {
-    final result = await _supabase.rpc('next_order_code');
+    final result = await _supabase!.rpc('next_order_code');
     return parseOrderCodeRpcResult(result);
   }
 
@@ -171,7 +209,7 @@ class OrdersRepository {
       {required String actorStaffId}) async {
     final now = _clock();
     final priced = recomputeOrderTotal(order);
-    await _supabase
+    await _supabase!
         .from('orders')
         .upsert(orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
   }
@@ -181,7 +219,7 @@ class OrdersRepository {
   Future<void> updatePricing(LaundryOrder order,
       {required String actorStaffId}) async {
     final priced = recomputeOrderTotal(order);
-    final updated = await _supabase.from('orders').update({
+    final updated = await _updateById(priced.orderId, {
       'estimated_weight_kg': priced.estimatedWeightKg,
       'final_weight_kg': priced.finalWeightKg,
       'line_items': priced.lineItems.map((i) => i.toJson()).toList(),
@@ -191,8 +229,9 @@ class OrdersRepository {
       'express_flat_snapshot_ugx': priced.expressFlatSnapshotUgx,
       'express_pct_snapshot': priced.expressPctSnapshot,
       'total_ugx': priced.totalUgx,
+      'updated_by': actorStaffId,
       'updated_at': _clock().toUtc().toIso8601String(),
-    }).eq('id', priced.orderId).select('id');
+    });
     if (updated.isEmpty) {
       throw StateError('updatePricing: no order with id "${priced.orderId}"');
     }
@@ -209,12 +248,10 @@ class OrdersRepository {
   /// [actorStaffId] is recorded as the row's `updated_by` audit pointer.
   Future<void> updateOrderDetails(LaundryOrder order,
       {required String actorStaffId}) async {
-    final updated = await _supabase
-        .from('orders')
-        .update(orderDetailsUpdatePayload(order,
-            actorStaffId: actorStaffId, now: _clock()))
-        .eq('id', order.orderId)
-        .select('id');
+    final updated = await _updateById(
+        order.orderId,
+        orderDetailsUpdatePayload(order,
+            actorStaffId: actorStaffId, now: _clock()));
     if (updated.isEmpty) {
       throw StateError(
           'updateOrderDetails: no order with id "${order.orderId}"');
@@ -229,11 +266,8 @@ class OrdersRepository {
   /// destructive operation.
   Future<void> softDelete(String orderId,
       {required String actorStaffId}) async {
-    final updated = await _supabase
-        .from('orders')
-        .update(orderSoftDeletePayload(actorStaffId: actorStaffId, now: _clock()))
-        .eq('id', orderId)
-        .select('id');
+    final updated = await _updateById(orderId,
+        orderSoftDeletePayload(actorStaffId: actorStaffId, now: _clock()));
     if (updated.isEmpty) {
       throw StateError('softDelete: no order with id "$orderId"');
     }
@@ -253,12 +287,8 @@ class OrdersRepository {
     DateTime? updatedAt,
   }) async {
     final now = updatedAt ?? _clock();
-    final updated = await _supabase
-        .from('orders')
-        .update(orderStatusUpdatePayload(newStatus,
-            actorStaffId: actorStaffId, now: now))
-        .eq('id', orderId)
-        .select('id');
+    final updated = await _updateById(orderId,
+        orderStatusUpdatePayload(newStatus, actorStaffId: actorStaffId, now: now));
     if (updated.isEmpty) {
       throw StateError('updateStatus: no order with id "$orderId"');
     }

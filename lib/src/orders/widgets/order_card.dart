@@ -13,10 +13,11 @@ import '../order_status.dart';
 /// order list and the order search results so both stay visually identical.
 ///
 /// Contextual CRUD is opt-in via the optional [onEdit], [onDelete], and
-/// [onAdvanceStatus] callbacks: supplying any of them adds a long-press actions
-/// menu, and [onDelete] additionally enables swipe-to-delete (guarded by a
-/// confirm dialog). With none supplied the card is the original tap-only
-/// summary, so existing call sites are unaffected.
+/// [onAdvanceStatus] callbacks. Supplying any of them surfaces visible action
+/// icons (a pencil for Edit, a ⋮ overflow for the rest) plus a long-press
+/// actions menu, and [onDelete] additionally enables swipe-to-delete (guarded
+/// by a confirm dialog). With none supplied the card is the original tap-only
+/// summary (keeping its chevron), so existing call sites are unaffected.
 class OrderCard extends StatelessWidget {
   const OrderCard({
     super.key,
@@ -58,6 +59,12 @@ class OrderCard extends StatelessWidget {
 
   bool get _hasActionsMenu =>
       onEdit != null || onDelete != null || onAdvanceStatus != null;
+
+  /// Actions reachable only through the overflow sheet — everything except the
+  /// pencil, which has its own dedicated icon. Drives whether the ⋮ button
+  /// appears, so a card with only [onEdit] shows just the pencil rather than a
+  /// ⋮ that opens a sheet repeating "Edit details".
+  bool get _hasOverflowActions => onDelete != null || onAdvanceStatus != null;
 
   Future<void> _showActionsSheet(BuildContext context) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -170,6 +177,56 @@ class OrderCard extends StatelessWidget {
     return card;
   }
 
+  /// The header's trailing slot. A plain tap-only card keeps its chevron; once
+  /// the card has actions we surface them as visible icons — a pencil for the
+  /// common Edit, plus a ⋮ overflow opening the same actions sheet as
+  /// long-press — because long-press alone is undiscoverable for many riders.
+  Widget _buildTrailing(BuildContext context) {
+    if (!_hasActionsMenu) {
+      return const Icon(
+        Icons.chevron_right_rounded,
+        color: AppColors.secondaryText,
+      );
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    // Compact buttons so the 46px header row doesn't grow; each IconButton wins
+    // the gesture arena on its own hit-box, so a tap here fires its action while
+    // a tap elsewhere on the card still triggers onTap.
+    Widget compactButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback onPressed,
+    }) =>
+        IconButton(
+          icon: Icon(icon),
+          tooltip: tooltip,
+          onPressed: onPressed,
+          iconSize: 20,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          color: colorScheme.primary,
+        );
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onEdit != null)
+          compactButton(
+            icon: Icons.edit_outlined,
+            tooltip: 'Edit order',
+            onPressed: onEdit!,
+          ),
+        if (_hasOverflowActions)
+          compactButton(
+            icon: Icons.more_vert,
+            tooltip: 'More actions',
+            onPressed: () => _showActionsSheet(context),
+          ),
+      ],
+    );
+  }
+
   Widget _buildCard(BuildContext context) {
     final statusPair = (Theme.of(context).extension<StatusColors>() ??
             StatusColors.light)
@@ -213,10 +270,7 @@ class OrderCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.secondaryText,
-              ),
+              _buildTrailing(context),
             ],
           ),
           const SizedBox(height: AppSpacing.lg - 2),
