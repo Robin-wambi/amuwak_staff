@@ -164,10 +164,10 @@ class OrderCard extends StatelessWidget {
     return card;
   }
 
-  /// A compact icon button sized so it doesn't grow the rows it sits in; each
-  /// IconButton wins the gesture arena on its own hit-box, so a tap here fires
-  /// its action while a tap elsewhere on the card still triggers onTap. Shared
-  /// by the header pencil and the bottom-row ⋮ overflow.
+  /// A compact icon button sized so it doesn't grow the row it sits in. Used by
+  /// the header pencil and the bottom-row ⋮ overflow; each wins the gesture
+  /// arena on its own hit-box, so a tap fires its action while a tap elsewhere
+  /// on the card still triggers the card's onTap.
   Widget _compactActionButton(
     BuildContext context, {
     required IconData icon,
