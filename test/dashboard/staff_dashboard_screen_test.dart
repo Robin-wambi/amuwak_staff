@@ -25,6 +25,7 @@ import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
+import 'package:amuwak_staff/src/staff/invite_staff_screen.dart';
 import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:amuwak_staff/src/data/app_database.dart' hide ProofEvent;
 import 'package:amuwak_staff/src/shared/widgets/sync_status_banner.dart';
@@ -1405,6 +1406,82 @@ void main() {
       expect(find.text('Pricing settings missing — contact admin.'),
           findsOneWidget);
       expect(find.byType(NewPickupScreen), findsNothing);
+    },
+  );
+
+  // ---------------------------------------------- Invite-staff entry gating
+
+  testWidgets(
+    'Account tab hides Invite staff for the driver role',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'driver'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invite staff'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Account tab hides Invite staff for the in_shop role',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'in_shop'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invite staff'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Account tab shows Invite staff for the manager role',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'manager'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invite staff'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Account tab: tapping Invite staff opens InviteStaffScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'manager'),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Invite staff'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(InviteStaffScreen), findsOneWidget);
     },
   );
 }

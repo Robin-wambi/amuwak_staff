@@ -41,6 +41,7 @@ import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../pricing/pricing_catalog_screen.dart';
 import '../shared/uuid.dart';
+import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
 // ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
@@ -455,6 +456,18 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
         );
   }
 
+  /// Opens the manager-only invite form. Entry is already gated to managers in
+  /// the Account tab; the Edge Function re-checks the caller's role server-side,
+  /// so this is convenience gating, not the security boundary.
+  void _openInviteStaff() {
+    final service = ref.read(inviteStaffServiceProvider);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => InviteStaffScreen(invite: service.invite),
+      ),
+    );
+  }
+
   void _openPricingCatalog() {
     final catalogRepo = ref.read(pricingCatalogRepositoryProvider);
     Navigator.of(context).push<void>(
@@ -640,12 +653,18 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
           3 => _AccountTab(
               onSignOut: _onSignOutPressed,
               onOpenPricingSettings: _openPricingSettings,
+              onInviteStaff: _openInviteStaff,
               roleText:
                   roleLabel(ref.watch(currentRoleProvider)) ?? 'Operations staff',
               // Pricing writes are gated to in_shop + manager (migration 0024),
               // so drivers don't get the entry point — saving would only fail.
               canManagePricing: const {'in_shop', 'manager'}
                   .contains(ref.watch(currentRoleProvider)),
+              // Only managers may write the staff table (migration 0007 RLS) and
+              // the invite Edge Function rejects non-managers, so only they see
+              // the entry point.
+              canInviteStaff:
+                  ref.watch(currentRoleProvider) == 'manager',
             ),
           // Home tab. Loading and data share one `_HomeTab` widget (orders ==
           // null means loading) so the header and quick actions stay mounted
@@ -853,12 +872,15 @@ class _AccountTab extends StatelessWidget {
   const _AccountTab({
     required this.onSignOut,
     required this.onOpenPricingSettings,
+    required this.onInviteStaff,
     required this.roleText,
     required this.canManagePricing,
+    required this.canInviteStaff,
   });
 
   final VoidCallback onSignOut;
   final VoidCallback onOpenPricingSettings;
+  final VoidCallback onInviteStaff;
 
   /// Human label for the signed-in staff member's role, mirroring the header
   /// chip (falls back to a generic label when there's no role claim).
@@ -867,6 +889,11 @@ class _AccountTab extends StatelessWidget {
   /// Whether to show the Pricing settings entry. False for drivers, whose
   /// pricing writes are blocked server-side (migration 0024).
   final bool canManagePricing;
+
+  /// Whether to show the Invite staff entry. Managers only — they alone may
+  /// write the staff table (migration 0007) and pass the invite function's
+  /// server-side role check.
+  final bool canInviteStaff;
 
   @override
   Widget build(BuildContext context) {
@@ -934,6 +961,21 @@ class _AccountTab extends StatelessWidget {
                 Icon(Icons.payments_outlined, color: colorScheme.primary),
                 const SizedBox(width: AppSpacing.md),
                 const Expanded(child: Text('Pricing settings')),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg2),
+        ],
+        if (canInviteStaff) ...[
+          AppCard(
+            onTap: onInviteStaff,
+            child: Row(
+              children: [
+                Icon(Icons.person_add_alt_1_outlined,
+                    color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(child: Text('Invite staff')),
                 const Icon(Icons.chevron_right_rounded),
               ],
             ),
