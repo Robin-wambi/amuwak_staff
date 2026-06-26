@@ -174,6 +174,30 @@ void main() {
       expect(find.byTooltip('Edit order'), findsNothing);
       expect(find.byTooltip('More actions'), findsOneWidget);
     });
+
+    testWidgets('the overflow sits in the bottom row; the pencil stays in the '
+        'header', (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(
+          order: _order(),
+          onTap: () {},
+          onEdit: () {},
+          onDelete: () {},
+        ),
+      ));
+
+      final chipDy =
+          tester.getCenter(find.byIcon(Icons.inventory_2_outlined)).dy;
+      final pencilDy = tester.getCenter(find.byTooltip('Edit order')).dy;
+      final overflowDy = tester.getCenter(find.byTooltip('More actions')).dy;
+      final pillDy = tester.getCenter(find.text('In progress')).dy;
+
+      // Pencil is above the info chips (header); ⋮ is below them, aligned with
+      // the status pill at the bottom-right.
+      expect(pencilDy, lessThan(chipDy));
+      expect(overflowDy, greaterThan(chipDy));
+      expect((overflowDy - pillDy).abs(), lessThan(1.0));
+    });
   });
 
   group('swipe-to-delete', () {
