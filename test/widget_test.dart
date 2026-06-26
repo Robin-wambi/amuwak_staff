@@ -3,21 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/main.dart';
+import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/sync/sync_orchestrator_provider.dart';
 
 void main() {
-  // syncLifecycleProvider would otherwise pull in syncOrchestratorProvider,
-  // which builds a real SyncOrchestrator against Supabase.instance.client —
-  // not safe in widget tests. Override it with a no-op so the lifecycle
-  // listener is silently absent.
-  final lifecycleNoop = <Override>[
+  // The app root is now AuthGate, which reads the auth state to choose a screen.
+  // Override the auth seams to "no session" so it renders LoginScreen without
+  // touching the uninitialised Supabase.instance. syncLifecycleProvider is a
+  // no-op override for the same safety reason (it would build a real
+  // SyncOrchestrator against Supabase.instance.client).
+  final bootstrapOverrides = <Override>[
     syncLifecycleProvider.overrideWith((ref) {}),
+    currentUserIdProvider.overrideWithValue(null),
+    lastAuthEventProvider.overrideWithValue(null),
   ];
 
   testWidgets('App opens to login screen first', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: lifecycleNoop,
+        overrides: bootstrapOverrides,
         child: const AmuwakStaffApp(),
       ),
     );

@@ -1,8 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:amuwak_staff/src/auth/auth_service.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
+
+class _MockAuthService extends Mock implements AuthService {}
+
+class _MockUser extends Mock implements User {}
 
 /// Builds an unsigned JWT (header.payload.signature) carrying [claims]. The
 /// role reader never verifies the signature, so a dummy segment is fine.
@@ -79,6 +88,42 @@ void main() {
         'exp': wellExpired.millisecondsSinceEpoch ~/ 1000,
       });
       expect(roleFromAccessToken(token), isNull);
+    });
+  });
+
+  group('currentUserIdProvider', () {
+    test(
+        'falls back to the restored session before the first auth event '
+        'so a returning user is recognised on cold start', () {
+      final user = _MockUser();
+      when(() => user.id).thenReturn('restored-user');
+      final auth = _MockAuthService();
+      when(() => auth.currentUser).thenReturn(user);
+
+      final container = ProviderContainer(overrides: [
+        authServiceProvider.overrideWithValue(auth),
+        // Stream that never emits: authStateProvider stays AsyncLoading, mimicking
+        // the cold-start window before supabase emits `initialSession`.
+        authStateProvider
+            .overrideWith((ref) => const Stream<AuthState>.empty()),
+      ]);
+      addTearDown(container.dispose);
+
+      expect(container.read(currentUserIdProvider), 'restored-user');
+    });
+
+    test('is null when there is no restored session and no event', () {
+      final auth = _MockAuthService();
+      when(() => auth.currentUser).thenReturn(null);
+
+      final container = ProviderContainer(overrides: [
+        authServiceProvider.overrideWithValue(auth),
+        authStateProvider
+            .overrideWith((ref) => const Stream<AuthState>.empty()),
+      ]);
+      addTearDown(container.dispose);
+
+      expect(container.read(currentUserIdProvider), isNull);
     });
   });
 }

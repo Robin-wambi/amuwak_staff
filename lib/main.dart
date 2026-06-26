@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'src/auth/login_screen.dart';
+import 'src/auth/auth_gate.dart';
 import 'src/bootstrap/app_bootstrap.dart';
 import 'src/printing/printing_providers.dart';
 import 'src/shared/widgets/app_theme.dart';
@@ -35,7 +35,10 @@ class AmuwakStaffApp extends ConsumerWidget {
       title: 'Amuwak Staff',
       debugShowCheckedModeBanner: false,
       theme: buildAmuwakTheme(),
-      home: const LoginScreen(),
+      // AuthGate routes between login, set-password (invite/reset), and the
+      // dashboard from the persisted auth state — so a returning, already
+      // signed-in staff member lands straight on the dashboard.
+      home: const AuthGate(),
     );
   }
 }

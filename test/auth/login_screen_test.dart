@@ -6,11 +6,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/auth/auth_service.dart';
 import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
-import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
-import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/sync/repository_providers.dart';
-import 'package:amuwak_staff/src/sync/sync_orchestrator_provider.dart';
-import 'package:amuwak_staff/src/sync/sync_status.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
 
@@ -22,19 +17,6 @@ Future<void> _pumpLogin(
     ProviderScope(
       overrides: [
         authServiceProvider.overrideWithValue(authService),
-        // Stub sync-side providers so the dashboard (post-login navigation
-        // target) builds without touching Supabase or Drift streams.
-        syncLifecycleProvider.overrideWith((ref) {}),
-        // Emit ONE value (empty list) immediately so the dashboard's
-        // ordersAsync.when() resolves to the data branch — its loading
-        // branch shows a LinearProgressIndicator which would make
-        // pumpAndSettle hang forever in this test.
-        ordersStreamProvider.overrideWith(
-            (ref) => Stream<List<LaundryOrder>>.value(const [])),
-        pendingOutboxCountProvider
-            .overrideWith((ref) => const Stream<int>.empty()),
-        lastSyncedAtProvider
-            .overrideWith((ref) => const Stream<DateTime?>.empty()),
       ],
       child: const MaterialApp(home: LoginScreen()),
     ),
@@ -54,57 +36,74 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
     await tester.pump();
 
-    expect(find.text('Enter your username'), findsOneWidget);
-    expect(find.text('Enter your PIN'), findsOneWidget);
-    verifyNever(() => auth.signInWithUsernamePin(
-        username: any(named: 'username'), pin: any(named: 'pin')));
+    expect(find.text('Enter your email'), findsOneWidget);
+    expect(find.text('Enter your password'), findsOneWidget);
+    verifyNever(() => auth.signInWithEmailPassword(
+        email: any(named: 'email'), password: any(named: 'password')));
   });
 
-  testWidgets('successful login pushes the dashboard', (tester) async {
-    when(() => auth.signInWithUsernamePin(
-        username: 'rider1', pin: '1234')).thenAnswer((_) async {});
+  testWidgets('successful login calls the service and shows no error',
+      (tester) async {
+    when(() => auth.signInWithEmailPassword(
+        email: any(named: 'email'),
+        password: any(named: 'password'))).thenAnswer((_) async {});
 
     await _pumpLogin(tester, authService: auth);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username'),
-      'rider1',
-    );
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'PIN'),
-      '1234',
-    );
+        find.widgetWithText(TextFormField, 'Password'), 'secret-pass');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
-    // The dashboard's animated header repeats forever, so pumpAndSettle would
-    // time out. Pump a couple of bounded frames to run the login future and let
-    // the navigation complete instead.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+    verify(() => auth.signInWithEmailPassword(
+        email: 'rider1@amuwak.co', password: 'secret-pass')).called(1);
   });
 
   testWidgets('AuthFailure shows the error message and stays on login',
       (tester) async {
-    when(() => auth.signInWithUsernamePin(
-        username: 'rider1',
-        pin: '0000')).thenThrow(AuthFailure('Invalid username or PIN'));
+    when(() => auth.signInWithEmailPassword(
+            email: any(named: 'email'), password: any(named: 'password')))
+        .thenThrow(AuthFailure('Invalid login credentials'));
 
     await _pumpLogin(tester, authService: auth);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Username'),
-      'rider1',
-    );
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'PIN'),
-      '0000',
-    );
+        find.widgetWithText(TextFormField, 'Password'), 'nope');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
     await tester.pump();
 
-    expect(find.text('Invalid username or PIN'), findsOneWidget);
+    expect(find.text('Invalid login credentials'), findsOneWidget);
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(StaffDashboardScreen), findsNothing);
+  });
+
+  testWidgets('Forgot password with no email prompts for one and does not send',
+      (tester) async {
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pump();
+
+    expect(find.text('Enter your email first'), findsOneWidget);
+    verifyNever(() => auth.sendPasswordReset(any()));
+  });
+
+  testWidgets('Forgot password with an email sends a reset and confirms',
+      (tester) async {
+    when(() => auth.sendPasswordReset(any())).thenAnswer((_) async {});
+
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pump();
+
+    verify(() => auth.sendPasswordReset('rider1@amuwak.co')).called(1);
+    expect(find.textContaining('reset link'), findsOneWidget);
   });
 }

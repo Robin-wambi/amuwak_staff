@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../expenses/expense.dart';
 import '../expenses/expenses_repository.dart';
 import '../orders/order.dart';
+import '../staff/invite_staff_service.dart';
 import 'customers_repository.dart';
 import 'orders_repository.dart';
 import 'outbox_repository.dart';
@@ -82,4 +83,8 @@ final expensesRepositoryProvider = Provider<ExpensesRepository>(
 
 final expensesStreamProvider = StreamProvider<List<Expense>>(
   (ref) => ref.watch(expensesRepositoryProvider).watchAll(),
+);
+
+final inviteStaffServiceProvider = Provider<InviteStaffService>(
+  (ref) => InviteStaffService(ref.watch(supabaseClientProvider)),
 );

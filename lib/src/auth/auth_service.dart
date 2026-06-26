@@ -13,25 +13,44 @@ class AuthService {
 
   final GoTrueClient _goTrue;
 
-  static const _emailSuffix = '@amuwak.local';
-
-  /// Sign in via the username + PIN scheme. `username` is what staff type at
-  /// the login screen; we compose `<username>@amuwak.local` and use the PIN
-  /// as the password. Supabase Auth is unaware of the scheme — it sees a
-  /// plain email/password sign-in.
-  Future<void> signInWithUsernamePin({
-    required String username,
-    required String pin,
+  /// Sign in with a real email + password. Email is trimmed and lower-cased so
+  /// that casing/whitespace differences don't cause spurious auth failures.
+  Future<void> signInWithEmailPassword({
+    required String email,
+    required String password,
   }) async {
     try {
       await _goTrue.signInWithPassword(
-        email: '${username.toLowerCase()}$_emailSuffix',
-        password: pin,
+        email: _normalizeEmail(email),
+        password: password,
       );
     } on AuthException catch (e) {
       throw AuthFailure(e.message);
     }
   }
+
+  /// Set the signed-in user's password. Used both when accepting an invite
+  /// (the invite link establishes a session, then the user picks a password)
+  /// and when completing a password reset.
+  Future<void> updatePassword(String password) async {
+    try {
+      await _goTrue.updateUser(UserAttributes(password: password));
+    } on AuthException catch (e) {
+      throw AuthFailure(e.message);
+    }
+  }
+
+  /// Send a password-reset email. The redirect target is the project's Site URL
+  /// configured in Supabase, so no URL is hard-coded in the app.
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      await _goTrue.resetPasswordForEmail(_normalizeEmail(email));
+    } on AuthException catch (e) {
+      throw AuthFailure(e.message);
+    }
+  }
+
+  static String _normalizeEmail(String email) => email.trim().toLowerCase();
 
   Future<void> signOut() => _goTrue.signOut();
 

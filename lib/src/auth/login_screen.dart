@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../dashboard/staff_dashboard_screen.dart';
+import '../shared/email_validation.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import 'auth_service.dart';
@@ -15,8 +15,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _pinController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   String? _errorMessage;
   bool _busy = false;
@@ -29,14 +29,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _busy = true);
     try {
-      await ref.read(authServiceProvider).signInWithUsernamePin(
-            username: _usernameController.text.trim(),
-            pin: _pinController.text.trim(),
+      // On success the auth state changes and AuthGate swaps in the dashboard,
+      // so there's no manual navigation here.
+      await ref.read(authServiceProvider).signInWithEmailPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
           );
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const StaffDashboardScreen()),
-      );
     } on AuthFailure catch (e) {
       setState(() => _errorMessage = e.message);
     } finally {
@@ -44,10 +42,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    if (email.isEmpty || !isValidEmail(email)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Enter your email first')),
+      );
+      return;
+    }
+    try {
+      await ref.read(authServiceProvider).sendPasswordReset(email);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Sent a password reset link to $email')),
+      );
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   @override
   void dispose() {
-    _usernameController.dispose();
-    _pinController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -93,29 +112,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                     enableSuggestions: false,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Enter your username' : null,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.mail_outline),
+                    ),
+                    validator: (v) {
+                      final value = v?.trim() ?? '';
+                      if (value.isEmpty) return 'Enter your email';
+                      if (!isValidEmail(value)) return 'Enter a valid email';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _pinController,
+                    controller: _passwordController,
                     obscureText: true,
-                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _busy ? null : _login(),
                     decoration: const InputDecoration(
-                      labelText: 'PIN',
+                      labelText: 'Password',
                       prefixIcon: Icon(Icons.lock_outline),
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Enter your PIN' : null,
+                    validator: (v) => (v == null || v.isEmpty)
+                        ? 'Enter your password'
+                        : null,
                   ),
-                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _busy ? null : _forgotPassword,
+                      child: const Text('Forgot password?'),
+                    ),
+                  ),
                   if (_errorMessage != null)
                     Container(
                       width: double.infinity,
