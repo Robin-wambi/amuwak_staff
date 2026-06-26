@@ -44,7 +44,9 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
       // callback doesn't touch this widget's State or BuildContext.)
       widget.onCompleted();
     } on AuthFailure catch (e) {
-      setState(() => _errorMessage = e.message);
+      // Writes this screen's state, so guard like `finally` — unlike
+      // onCompleted above, which intentionally drives the parent regardless.
+      if (mounted) setState(() => _errorMessage = e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
