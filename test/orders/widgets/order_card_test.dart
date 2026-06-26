@@ -5,10 +5,11 @@ import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The order card grows contextual CRUD: a long-press actions menu (Edit /
-/// Mark-as / Delete) and swipe-to-delete with a confirm dialog. All action
-/// callbacks are optional — with none supplied the card is exactly the old
-/// tap-only summary, so every existing list keeps working unchanged.
+/// The order card grows contextual CRUD: visible action icons (a header pencil
+/// for Edit, a bottom-right ⋮ overflow for the rest) plus a long-press actions
+/// menu (Edit / Mark-as / Delete), with Delete guarded by a confirm dialog. All
+/// action callbacks are optional — with none supplied the card is exactly the
+/// old tap-only summary, so every existing list keeps working unchanged.
 LaundryOrder _order({
   OrderStatus status = OrderStatus.inProgress,
   String id = 'o1',
@@ -174,44 +175,44 @@ void main() {
       expect(find.byTooltip('Edit order'), findsNothing);
       expect(find.byTooltip('More actions'), findsOneWidget);
     });
+
+    testWidgets('the overflow sits in the bottom row; the pencil stays in the '
+        'header', (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(
+          order: _order(),
+          onTap: () {},
+          onEdit: () {},
+          onDelete: () {},
+        ),
+      ));
+
+      final chipDy =
+          tester.getCenter(find.byIcon(Icons.inventory_2_outlined)).dy;
+      final pencilDy = tester.getCenter(find.byTooltip('Edit order')).dy;
+      final overflowDy = tester.getCenter(find.byTooltip('More actions')).dy;
+      final pillDy = tester.getCenter(find.text('In progress')).dy;
+
+      // Pencil is above the info chips (header); ⋮ is below them, aligned with
+      // the status pill at the bottom-right.
+      expect(pencilDy, lessThan(chipDy));
+      expect(overflowDy, greaterThan(chipDy));
+      expect((overflowDy - pillDy).abs(), lessThan(1.0));
+    });
   });
 
-  group('swipe-to-delete', () {
-    testWidgets('confirming the dialog invokes onDelete', (tester) async {
-      var deleted = false;
+  group('delete', () {
+    testWidgets('a card with onDelete has no swipe Dismissible — delete is '
+        'only via the ⋮ menu', (tester) async {
       await tester.pumpWidget(_host(
         OrderCard(
           order: _order(),
           onTap: () {},
-          onDelete: () => deleted = true,
+          onDelete: () {},
         ),
       ));
 
-      await tester.drag(find.text('Ada'), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      // A confirm dialog guards the destructive action.
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.text('Delete'));
-      await tester.pumpAndSettle();
-      expect(deleted, isTrue);
-    });
-
-    testWidgets('cancelling the dialog does not invoke onDelete',
-        (tester) async {
-      var deleted = false;
-      await tester.pumpWidget(_host(
-        OrderCard(
-          order: _order(),
-          onTap: () {},
-          onDelete: () => deleted = true,
-        ),
-      ));
-
-      await tester.drag(find.text('Ada'), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(deleted, isFalse);
+      expect(find.byType(Dismissible), findsNothing);
     });
   });
 }

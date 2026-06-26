@@ -14,9 +14,9 @@ import '../order_status.dart';
 ///
 /// Contextual CRUD is opt-in via the optional [onEdit], [onDelete], and
 /// [onAdvanceStatus] callbacks. Supplying any of them surfaces visible action
-/// icons (a pencil for Edit, a ⋮ overflow for the rest) plus a long-press
-/// actions menu, and [onDelete] additionally enables swipe-to-delete (guarded
-/// by a confirm dialog). With none supplied the card is the original tap-only
+/// icons (a pencil for Edit in the header, a ⋮ overflow at the bottom-right for
+/// the rest) plus a long-press actions menu; Delete lives in that menu, guarded
+/// by a confirm dialog. With none supplied the card is the original tap-only
 /// summary (keeping its chevron), so existing call sites are unaffected.
 class OrderCard extends StatelessWidget {
   const OrderCard({
@@ -34,7 +34,7 @@ class OrderCard extends StatelessWidget {
   /// Opens the edit-details flow for this order. Null hides the menu entry.
   final VoidCallback? onEdit;
 
-  /// Soft-deletes this order. Null hides the menu entry and disables swipe.
+  /// Soft-deletes this order. Null hides the Delete entry in the actions menu.
   final VoidCallback? onDelete;
 
   /// Advances this order to its next status. Only wired for the single
@@ -161,31 +161,33 @@ class OrderCard extends StatelessWidget {
       );
     }
 
-    if (onDelete != null) {
-      card = Dismissible(
-        key: ValueKey('order-card-${order.orderId}'),
-        direction: DismissDirection.endToStart,
-        background: _DeleteSwipeBackground(),
-        // Returning false leaves the card in the tree: the soft-delete makes the
-        // orders stream re-emit without this order, and the list rebuild removes
-        // it. (Letting Dismissible drop it itself would assert until the stream
-        // catches up, since the parent list is still the source of truth.)
-        confirmDismiss: (_) async {
-          final confirmed = await _confirmDelete(context);
-          if (confirmed && context.mounted) onDelete!();
-          return false;
-        },
-        child: card,
-      );
-    }
-
     return card;
   }
 
-  /// The header's trailing slot. A plain tap-only card keeps its chevron; once
-  /// the card has actions we surface them as visible icons — a pencil for the
-  /// common Edit, plus a ⋮ overflow opening the same actions sheet as
-  /// long-press — because long-press alone is undiscoverable for many riders.
+  /// A compact icon button sized so it doesn't grow the row it sits in. Used by
+  /// the header pencil and the bottom-row ⋮ overflow; each wins the gesture
+  /// arena on its own hit-box, so a tap fires its action while a tap elsewhere
+  /// on the card still triggers the card's onTap.
+  Widget _compactActionButton(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) =>
+      IconButton(
+        icon: Icon(icon),
+        tooltip: tooltip,
+        onPressed: onPressed,
+        iconSize: 20,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        color: Theme.of(context).colorScheme.primary,
+      );
+
+  /// The header's trailing slot. A plain tap-only card keeps its chevron; an
+  /// actions card surfaces the common Edit as a visible pencil here. The ⋮
+  /// overflow lives in the bottom row (beside the status pill), not here.
   Widget _buildTrailing(BuildContext context) {
     if (!_hasActionsMenu) {
       return const Icon(
@@ -193,42 +195,12 @@ class OrderCard extends StatelessWidget {
         color: AppColors.secondaryText,
       );
     }
-    final colorScheme = Theme.of(context).colorScheme;
-    // Compact buttons so the 46px header row doesn't grow; each IconButton wins
-    // the gesture arena on its own hit-box, so a tap here fires its action while
-    // a tap elsewhere on the card still triggers onTap.
-    Widget compactButton({
-      required IconData icon,
-      required String tooltip,
-      required VoidCallback onPressed,
-    }) =>
-        IconButton(
-          icon: Icon(icon),
-          tooltip: tooltip,
-          onPressed: onPressed,
-          iconSize: 20,
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          color: colorScheme.primary,
-        );
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (onEdit != null)
-          compactButton(
-            icon: Icons.edit_outlined,
-            tooltip: 'Edit order',
-            onPressed: onEdit!,
-          ),
-        if (_hasOverflowActions)
-          compactButton(
-            icon: Icons.more_vert,
-            tooltip: 'More actions',
-            onPressed: () => _showActionsSheet(context),
-          ),
-      ],
+    if (onEdit == null) return const SizedBox.shrink();
+    return _compactActionButton(
+      context,
+      icon: Icons.edit_outlined,
+      tooltip: 'Edit order',
+      onPressed: onEdit!,
     );
   }
 
@@ -293,43 +265,41 @@ class OrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 7,
-            ),
-            decoration: BoxDecoration(
-              color: statusPair.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.chip),
-            ),
-            child: Text(
-              order.status.label,
-              style: TextStyle(
-                color: statusPair.onColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: statusPair.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.chip),
+                ),
+                child: Text(
+                  order.status.label,
+                  style: TextStyle(
+                    color: statusPair.onColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
               ),
-            ),
+              // The ⋮ overflow sits opposite the status pill, filling the
+              // bottom-right and keeping the header to the pencil + identity.
+              if (_hasOverflowActions) ...[
+                const Spacer(),
+                _compactActionButton(
+                  context,
+                  icon: Icons.more_vert,
+                  tooltip: 'More actions',
+                  onPressed: () => _showActionsSheet(context),
+                ),
+              ],
+            ],
           ),
         ],
       ),
-    );
-  }
-}
-
-/// The red trailing reveal behind a card as it's swiped left to delete.
-class _DeleteSwipeBackground extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.error.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
-      child: Icon(Icons.delete_outline, color: colorScheme.error),
     );
   }
 }
