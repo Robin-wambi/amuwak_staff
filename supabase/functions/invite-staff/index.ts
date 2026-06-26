@@ -19,7 +19,10 @@
 // SUPABASE_SERVICE_ROLE_KEY. Optional: INVITE_REDIRECT_URL (where the invite
 // link lands — defaults to the project Site URL when unset).
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Pinned to an exact version so a cold start can't silently pull a different
+// 2.x into this security-boundary function. Bump deliberately after testing —
+// verify this matches a known-good release on the first deploy.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const ALLOWED_ROLES = ['driver', 'in_shop', 'manager'] as const;
 type Role = (typeof ALLOWED_ROLES)[number];

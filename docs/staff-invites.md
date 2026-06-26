@@ -37,6 +37,10 @@ These cannot be done from app code — an operator must run them:
    - Enable email confirmations.
    - Set **Site URL** and add the web app origin to **Redirect URLs**.
    - Review the **Invite user** and **Reset password** email templates.
+   - Set the **minimum password length to 8** (Authentication → Policies) to match
+     the client's 8-char check in [set_password_screen.dart](../lib/src/auth/set_password_screen.dart).
+     If Supabase's minimum is lower the client still enforces 8; if it's set
+     higher, users hit a raw server error instead of a clean field message.
 
 3. **Bootstrap a manager.** Only managers can invite, so seed the first one:
    create an auth user (Authentication → Users → Add user, set a password), then
