@@ -21,6 +21,9 @@ class _MockAuthService extends Mock implements AuthService {}
 final _testEventProvider =
     StateProvider<AuthChangeEvent?>((_) => AuthChangeEvent.passwordRecovery);
 
+/// Controllable signed-in user id so a test can simulate sign-out mid-render.
+final _testUserIdProvider = StateProvider<String?>((_) => 'u1');
+
 /// Overrides that let the heavy dashboard build without touching Supabase.
 List<Override> _dashboardStubs() => [
       currentRoleProvider.overrideWithValue(null),
@@ -132,6 +135,33 @@ void main() {
     await tester.pump();
 
     expect(find.byType(SetPasswordScreen), findsOneWidget);
+    expect(find.byType(StaffDashboardScreen), findsNothing);
+  });
+
+  testWidgets('routes back to LoginScreen when the session ends (sign-out)',
+      (tester) async {
+    final container = ProviderContainer(overrides: [
+      currentUserIdProvider.overrideWith((ref) => ref.watch(_testUserIdProvider)),
+      lastAuthEventProvider.overrideWithValue(AuthChangeEvent.signedIn),
+      authServiceProvider.overrideWithValue(_MockAuthService()),
+      ..._dashboardStubs(),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AuthGate()),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+
+    // Sign out: the session id clears. AuthGate must show the login screen so a
+    // subsequent sign-in routes forward again (the dashboard no longer does this
+    // itself).
+    container.read(_testUserIdProvider.notifier).state = null;
+    await tester.pump();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.byType(StaffDashboardScreen), findsNothing);
   });
 }

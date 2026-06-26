@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../auth/login_screen.dart';
 import '../auth/session.dart';
 import '../auth/sign_out.dart';
 import 'current_staff_provider.dart';
@@ -131,10 +130,13 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
   }
 
   /// Confirms intent, then either runs the injected `signOut` callback (test
-  /// seam) or wires `signOutAndReset` through the real orchestrator / db /
-  /// auth providers. On success, replaces the navigation stack with
-  /// LoginScreen so the user can re-authenticate. On failure, surfaces a
-  /// SnackBar — leaving them on a half-cleared dashboard would be worse.
+  /// seam) or wires `signOutAndReset` through the real orchestrator / db / auth
+  /// providers. On success there is NO manual navigation: clearing the auth
+  /// session makes the root [AuthGate] rebuild to the login screen on its own.
+  /// Pushing LoginScreen here used to strand the user — it removed AuthGate from
+  /// the tree, and the login form no longer self-navigates, so a later sign-in
+  /// had nothing to route it to the dashboard. On failure, surface a SnackBar —
+  /// leaving them on a half-cleared dashboard would be worse.
   Future<void> _onSignOutPressed() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -172,12 +174,7 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       );
       return;
     }
-
-    if (!mounted) return;
-    await Navigator.of(context).pushAndRemoveUntil<void>(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (_) => false,
-    );
+    // No navigation here — AuthGate routes to LoginScreen once the session clears.
   }
 
   /// Production wiring: resolves the auth service from Riverpod and hands it to

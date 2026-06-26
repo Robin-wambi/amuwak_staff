@@ -38,7 +38,10 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
       await ref.read(authServiceProvider).updatePassword(
             _passwordController.text,
           );
-      if (!mounted) return;
+      // onCompleted drives the parent (AuthGate) — call it even if this screen
+      // was torn down mid-request, or the user is stranded on a Set-password
+      // screen whose password already saved. (No `mounted` guard here: the
+      // callback doesn't touch this widget's State or BuildContext.)
       widget.onCompleted();
     } on AuthFailure catch (e) {
       setState(() => _errorMessage = e.message);

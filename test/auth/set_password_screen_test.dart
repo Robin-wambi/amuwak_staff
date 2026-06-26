@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -76,6 +78,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     verify(() => auth.updatePassword('longenough1')).called(1);
+    expect(completed, isTrue);
+  });
+
+  testWidgets(
+      'calls onCompleted even if the screen is disposed before the save '
+      'request resolves', (tester) async {
+    // onCompleted drives the parent (AuthGate), not this screen — so a save that
+    // finishes after this widget is torn down must still notify the parent, or
+    // the user is stranded on a Set-password screen whose password already saved.
+    final completer = Completer<void>();
+    when(() => auth.updatePassword(any())).thenAnswer((_) => completer.future);
+    var completed = false;
+    await _pump(tester, authService: auth, onCompleted: () => completed = true);
+
+    await enterBoth(tester, 'longenough1', 'longenough1');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
+    await tester.pump();
+
+    // Tear the screen down while updatePassword is still pending.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    completer.complete();
+    await tester.pump();
+
     expect(completed, isTrue);
   });
 

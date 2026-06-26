@@ -356,7 +356,7 @@ void main() {
     );
 
     testWidgets(
-      'swipe-to-delete → confirm calls softDelete with the order id',
+      'long-press → Delete → confirm calls softDelete with the order id',
       (tester) async {
         tester.view.physicalSize = const Size(800, 1600);
         tester.view.devicePixelRatio = 1.0;
@@ -379,10 +379,14 @@ void main() {
         await tester.tap(find.text('Orders').last);
         await tester.pumpAndSettle();
 
-        await tester.drag(find.text('Zeta'), const Offset(-500, 0));
+        // Delete now lives behind long-press → actions sheet → confirm dialog
+        // (swipe-to-delete was removed).
+        await tester.longPress(find.text('Zeta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete')); // actions-sheet entry
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
-        await tester.tap(find.text('Delete'));
+        await tester.tap(find.widgetWithText(TextButton, 'Delete')); // confirm
         await tester.pumpAndSettle();
 
         verify(() => repo.softDelete('o-Zeta', actorStaffId: 'staff-1'))
@@ -391,7 +395,8 @@ void main() {
     );
 
     testWidgets(
-      'swipe-to-delete → confirm shows a retry SnackBar when softDelete fails',
+      'long-press → Delete → confirm shows a retry SnackBar when softDelete '
+      'fails',
       (tester) async {
         tester.view.physicalSize = const Size(800, 1600);
         tester.view.devicePixelRatio = 1.0;
@@ -414,9 +419,11 @@ void main() {
         await tester.tap(find.text('Orders').last);
         await tester.pumpAndSettle();
 
-        await tester.drag(find.text('Zane'), const Offset(-500, 0));
+        await tester.longPress(find.text('Zane'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Delete'));
+        await tester.tap(find.text('Delete')); // actions-sheet entry
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, 'Delete')); // confirm
         await tester.pumpAndSettle();
 
         expect(find.text('Could not delete — please retry.'), findsOneWidget);
@@ -659,14 +666,14 @@ void main() {
   });
 
   testWidgets(
-    'Sign-out menu item invokes the signOut callback and navigates to '
-    'LoginScreen after the user confirms',
+    'Sign-out menu item invokes the signOut callback after the user confirms',
     (tester) async {
       // Critical #5: signOutAndReset is fully tested in pure-Dart but was
       // unreachable from the UI until now. This test verifies (a) the menu
-      // item exists, (b) the confirmation dialog gates the action, (c) on
-      // confirm the injected signOut callback fires, and (d) the dashboard
-      // is replaced by the login screen.
+      // item exists, (b) the confirmation dialog gates the action, and (c) on
+      // confirm the injected signOut callback fires. Routing to the login screen
+      // is AuthGate's job (covered in auth_gate_test.dart) — the dashboard, here
+      // pumped without AuthGate, no longer navigates on sign-out.
       var signOutCalls = 0;
 
       // The sign-out control now lives at the bottom of the Account tab; give
@@ -732,11 +739,12 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
       await tester.pumpAndSettle();
 
-      // signOut callback fired exactly once and the LoginScreen replaced
-      // the dashboard.
+      // signOut callback fired exactly once and the confirm dialog closed. The
+      // dashboard stays put here (no AuthGate to route it); the real app's
+      // AuthGate swaps in the login screen once the session clears.
       expect(signOutCalls, 1);
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.byType(StaffDashboardScreen), findsNothing);
+      expect(find.text('Sign out?'), findsNothing);
+      expect(find.byType(StaffDashboardScreen), findsOneWidget);
     },
   );
 
