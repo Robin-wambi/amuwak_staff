@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import '../shared/email_validation.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import 'invite_staff_service.dart';
 
 /// Manager-only form for inviting a new staff member. The caller (dashboard)
 /// gates entry on the manager role and passes [invite], which forwards to the
-/// `invite-staff` Edge Function. The new account always starts at the lowest
-/// field role; managers can raise it afterwards, and the invitee never picks
-/// their own role.
+/// `invite-staff` Edge Function. The inviting manager assigns the new role —
+/// the form defaults to the lowest field role (driver) but a manager may pick
+/// any role, including manager. The invitee never chooses their own role.
 class InviteStaffScreen extends StatefulWidget {
   const InviteStaffScreen({super.key, required this.invite});
 
@@ -103,7 +104,7 @@ class _InviteStaffScreenState extends State<InviteStaffScreen> {
                   validator: (v) {
                     final value = v?.trim() ?? '';
                     if (value.isEmpty) return 'Enter an email';
-                    if (!value.contains('@')) return 'Enter a valid email';
+                    if (!isValidEmail(value)) return 'Enter a valid email';
                     return null;
                   },
                 ),

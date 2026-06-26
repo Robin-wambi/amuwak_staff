@@ -48,8 +48,8 @@ void main() {
       details: {'error': 'Username already taken'},
     ));
 
-    expect(
-      () => service.invite(
+    await expectLater(
+      service.invite(
         email: 'a@b.co',
         displayName: 'A B',
         username: 'ab',

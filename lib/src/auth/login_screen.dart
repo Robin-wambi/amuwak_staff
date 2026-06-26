@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../shared/email_validation.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import 'auth_service.dart';
@@ -44,7 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _forgotPassword() async {
     final email = _emailController.text.trim();
     final messenger = ScaffoldMessenger.of(context);
-    if (email.isEmpty || !email.contains('@')) {
+    if (email.isEmpty || !isValidEmail(email)) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Enter your email first')),
       );
@@ -123,7 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     validator: (v) {
                       final value = v?.trim() ?? '';
                       if (value.isEmpty) return 'Enter your email';
-                      if (!value.contains('@')) return 'Enter a valid email';
+                      if (!isValidEmail(value)) return 'Enter a valid email';
                       return null;
                     },
                   ),

@@ -17,6 +17,10 @@ import 'package:amuwak_staff/src/sync/repository_providers.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
 
+/// Controllable event source so a test can change the auth event mid-render.
+final _testEventProvider =
+    StateProvider<AuthChangeEvent?>((_) => AuthChangeEvent.passwordRecovery);
+
 /// Overrides that let the heavy dashboard build without touching Supabase.
 List<Override> _dashboardStubs() => [
       currentRoleProvider.overrideWithValue(null),
@@ -100,5 +104,34 @@ void main() {
 
     expect(find.byType(SetPasswordScreen), findsNothing);
     expect(find.byType(StaffDashboardScreen), findsOneWidget);
+  });
+
+  testWidgets(
+      'a token refresh during recovery keeps the user on SetPassword',
+      (tester) async {
+    final container = ProviderContainer(overrides: [
+      currentUserIdProvider.overrideWithValue('u1'),
+      lastAuthEventProvider.overrideWith((ref) => ref.watch(_testEventProvider)),
+      authServiceProvider.overrideWithValue(_MockAuthService()),
+      ..._dashboardStubs(),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AuthGate()),
+    ));
+
+    expect(find.byType(SetPasswordScreen), findsOneWidget);
+
+    // Supabase can fire tokenRefreshed during the recovery window; the sticky
+    // _recovering flag must keep the user on the password form, not route them
+    // to the dashboard.
+    container.read(_testEventProvider.notifier).state =
+        AuthChangeEvent.tokenRefreshed;
+    await tester.pump();
+
+    expect(find.byType(SetPasswordScreen), findsOneWidget);
+    expect(find.byType(StaffDashboardScreen), findsNothing);
   });
 }

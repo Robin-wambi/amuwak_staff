@@ -47,8 +47,8 @@ void main() {
             password: any(named: 'password'),
           )).thenThrow(const AuthException('Invalid login credentials'));
 
-      expect(
-        () => service.signInWithEmailPassword(
+      await expectLater(
+        service.signInWithEmailPassword(
           email: 'a@b.co',
           password: 'x',
         ),
@@ -78,8 +78,8 @@ void main() {
       when(() => goTrue.updateUser(any()))
           .thenThrow(const AuthException('Password too short'));
 
-      expect(
-        () => service.updatePassword('x'),
+      await expectLater(
+        service.updatePassword('x'),
         throwsA(isA<AuthFailure>().having(
           (e) => e.message,
           'message',
@@ -105,8 +105,8 @@ void main() {
               redirectTo: any(named: 'redirectTo')))
           .thenThrow(const AuthException('rate limited'));
 
-      expect(
-        () => service.sendPasswordReset('a@b.co'),
+      await expectLater(
+        service.sendPasswordReset('a@b.co'),
         throwsA(isA<AuthFailure>()),
       );
     });

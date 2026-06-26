@@ -24,8 +24,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ALLOWED_ROLES = ['driver', 'in_shop', 'manager'] as const;
 type Role = (typeof ALLOWED_ROLES)[number];
 
+// Defaults to '*' (fine for a token-authenticated API — the browser never
+// attaches the bearer token automatically). Set ALLOWED_ORIGIN to the web app
+// origin to lock it down once the production URL is known.
+const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') ?? '*';
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': allowedOrigin,
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -134,8 +139,17 @@ Deno.serve(async (req) => {
     active: true,
   });
   if (insertErr) {
-    // Roll back the orphaned auth user so the manager can retry cleanly.
-    await admin.auth.admin.deleteUser(invited.user.id);
+    // Roll back the orphaned auth user so the manager can retry cleanly. Log a
+    // failed cleanup so ops can remove the stray user manually — otherwise an
+    // auth user with no staff row would linger silently.
+    const { error: deleteErr } =
+      await admin.auth.admin.deleteUser(invited.user.id);
+    if (deleteErr) {
+      console.error('invite-staff: orphan auth-user cleanup failed', {
+        userId: invited.user.id,
+        error: deleteErr.message,
+      });
+    }
     const duplicate = insertErr.code === '23505';
     return json(
       {
