@@ -147,6 +147,42 @@ void main() {
     return handle;
   }
 
+  testWidgets(
+    'scheduling: quick chips and the custom date/time picker set a pickup time',
+    (tester) async {
+      await pumpFormAndOpen(tester);
+
+      // Switch to scheduled mode → the quick chips appear.
+      await tester.tap(find.text('Schedule for later'));
+      await tester.pumpAndSettle();
+
+      // Each quick chip sets a concrete schedule (the "Scheduled for:" label).
+      await tester.tap(find.text('In 1 hour'));
+      await tester.pump();
+      expect(find.textContaining('Scheduled for:'), findsOneWidget);
+      await tester.tap(find.text('Tomorrow morning'));
+      await tester.pump();
+      await tester.tap(find.text('Tomorrow afternoon'));
+      await tester.pump();
+      expect(find.textContaining('Scheduled for:'), findsOneWidget);
+
+      // Custom… opens the date then the time picker; confirming both (the
+      // clock is 10:00, so the default 10:00 today is not in the past) sets it.
+      await tester.tap(find.text('Custom…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK')); // confirm date
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK')); // confirm time
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Scheduled for:'), findsOneWidget);
+
+      // Switching back to "Pickup now" clears the schedule.
+      await tester.tap(find.text('Pickup now'));
+      await tester.pump();
+      expect(find.textContaining('Scheduled for:'), findsNothing);
+    },
+  );
+
   testWidgets('Create button is disabled until required fields are valid', (
     tester,
   ) async {

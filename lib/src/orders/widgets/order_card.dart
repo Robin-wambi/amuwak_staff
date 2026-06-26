@@ -113,7 +113,11 @@ class OrderCard extends StatelessWidget {
                     style: TextStyle(color: colorScheme.error)),
                 onTap: () async {
                   Navigator.pop(sheetContext);
-                  if (await _confirmDelete(context)) onDelete!();
+                  final confirmed = await _confirmDelete(context);
+                  // StatelessWidget has no `mounted`; guard the card's context
+                  // explicitly in case the list rebuilt away this card while
+                  // the confirm dialog was open.
+                  if (confirmed && context.mounted) onDelete!();
                 },
               ),
           ],
@@ -167,7 +171,8 @@ class OrderCard extends StatelessWidget {
         // it. (Letting Dismissible drop it itself would assert until the stream
         // catches up, since the parent list is still the source of truth.)
         confirmDismiss: (_) async {
-          if (await _confirmDelete(context)) onDelete!();
+          final confirmed = await _confirmDelete(context);
+          if (confirmed && context.mounted) onDelete!();
           return false;
         },
         child: card,

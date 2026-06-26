@@ -133,4 +133,68 @@ void main() {
     expect(saved.called, isFalse);
     expect(find.text('Express percentage must be below 1000.'), findsOneWidget);
   });
+
+  testWidgets('a failed load shows the error message instead of the form',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: PricingSettingsScreen(
+        load: () async => throw Exception('no settings'),
+        save: ({
+          required ratePerKgUgx,
+          required deliveryFeeUgx,
+          required expressFlatUgx,
+          required expressPct,
+        }) async {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pricing settings missing — contact admin.'),
+        findsOneWidget);
+    expect(find.byKey(const Key('settings_rate')), findsNothing);
+  });
+
+  testWidgets('a failed save surfaces a retry SnackBar', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: PricingSettingsScreen(
+        load: () async => _settings(),
+        save: ({
+          required ratePerKgUgx,
+          required deliveryFeeUgx,
+          required expressFlatUgx,
+          required expressPct,
+        }) async =>
+            throw Exception('network down'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('settings_save')));
+    await tester.pump();
+
+    expect(find.text('Could not save — please retry.'), findsOneWidget);
+  });
+
+  testWidgets('the Manage service items button invokes onManageCatalog',
+      (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(MaterialApp(
+      home: PricingSettingsScreen(
+        load: () async => _settings(),
+        save: ({
+          required ratePerKgUgx,
+          required deliveryFeeUgx,
+          required expressFlatUgx,
+          required expressPct,
+        }) async {},
+        onManageCatalog: () => tapped = true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('settings_manage_catalog')));
+    await tester.pump();
+
+    expect(tapped, isTrue);
+  });
 }

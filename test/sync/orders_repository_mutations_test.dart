@@ -58,6 +58,62 @@ void main() {
     });
   });
 
+  group('upsertOrder', () {
+    /// A repo whose upsert dispatch records the column map and reports whether
+    /// the write persisted (empty rows ⇒ nothing written ⇒ StateError).
+    OrdersRepository repoThatUpserts({
+      required void Function(Map<String, dynamic> values) record,
+      bool persisted = true,
+    }) =>
+        OrdersRepository.forTest(
+          clock: () => clock,
+          upsertRow: (values) async {
+            record(values);
+            return persisted
+                ? [<String, dynamic>{'id': values['id']}]
+                : const [];
+          },
+        );
+
+    test('dispatches the recomputed upsert payload + creation audit pointers',
+        () async {
+      late Map<String, dynamic> values;
+      final repo = repoThatUpserts(record: (v) => values = v);
+
+      final o = order();
+      await repo.upsertOrder(o, actorStaffId: 'staff-7');
+
+      expect(values['id'], 'o1');
+      expect(values['order_code'], 'AMW-1');
+      expect(values['customer_name'], 'Ada');
+      expect(values['created_by'], 'staff-7');
+      expect(values['intake_recorded_by'], 'staff-7');
+      expect(values['created_at'], '2026-06-24T10:30:00.000Z');
+      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
+      // total_ugx is the recomputed total, not the stored snapshot.
+      expect(values['total_ugx'],
+          OrdersRepository.recomputeOrderTotal(o).totalUgx);
+    });
+
+    test('throws StateError when the write did not persist', () async {
+      final repo = repoThatUpserts(record: (_) {}, persisted: false);
+      expect(
+        () => repo.upsertOrder(order(), actorStaffId: 's'),
+        throwsStateError,
+      );
+    });
+
+    test('a forTest instance without upsertRow trips a descriptive assert',
+        () async {
+      final repo = OrdersRepository.forTest(clock: () => clock);
+      expect(
+        () => repo.upsertOrder(order(), actorStaffId: 's'),
+        throwsA(isA<AssertionError>()
+            .having((e) => e.message, 'message', contains('upsertRow'))),
+      );
+    });
+  });
+
   group('updatePricing', () {
     // A priced order whose stored total_ugx (19500) is deliberately stale vs
     // its inputs, so the test can prove updatePricing dispatches the RECOMPUTED
@@ -127,6 +183,7 @@ void main() {
       expect(gotId, 'o1');
       expect(values['customer_name'], 'Ada');
       expect(values['phone'], '0700');
+      expect(values['address'], 'Kira');
       expect(values['service_type'], ServiceType.washAndIron.toDbString());
       expect(values['item_count'], 5);
       expect(values['notes'], 'gate 4');

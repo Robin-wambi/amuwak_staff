@@ -10,6 +10,19 @@ import '../shared/order_code.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
+/// Test seam for the id-scoped column writes: given the row id and the column
+/// map, returns the "selected" rows (empty ⇒ no row matched). Lets unit tests
+/// exercise the write methods' payloads + missing-row [StateError] without a
+/// live SupabaseClient. Mirrors [ExpensesRepository]'s update override.
+typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
+    String id, Map<String, dynamic> values);
+
+/// Test seam for the row upsert: given the column map, returns the "selected"
+/// rows (empty ⇒ the write did not persist). Lets unit tests exercise
+/// [upsertOrder]'s payload + missing-write [StateError] without a live client.
+typedef OrderUpsert =
+    Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
+
 /// Read/write repository for orders — ONLINE-ONLY mode.
 ///
 /// Reads stream live from Supabase (`orders` realtime stream, with a follow-up
@@ -23,36 +36,33 @@ import 'supabase_payloads.dart';
 /// changes when proof is captured, so the orders stream re-emits and the join
 /// refetches. Two simple queries are easier to reason about and the cost (one
 /// extra `SELECT` per emission) is negligible at the dashboard's scale.
-/// Test seam for the id-scoped column writes: given the row id and the column
-/// map, returns the "selected" rows (empty ⇒ no row matched). Lets unit tests
-/// exercise the write methods' payloads + missing-row [StateError] without a
-/// live SupabaseClient. Mirrors [ExpensesRepository]'s update override.
-typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
-    String id, Map<String, dynamic> values);
-
 class OrdersRepository {
   OrdersRepository(
     SupabaseClient supabase, {
     DateTime Function()? clock,
   })  : _supabase = supabase,
         _clock = clock ?? DateTime.now,
-        _updateOverride = null;
+        _updateOverride = null,
+        _upsertOverride = null;
 
-  /// Test seam: inject the raw `update(...).eq('id', …).select('id')` so unit
-  /// tests can drive the write methods (payload shape + no-op [StateError])
-  /// without mocking SupabaseClient. Mirrors [ExpensesRepository.forTest].
-  /// Read/RPC/upsert methods are unavailable on a forTest instance (they assert
-  /// the client is present).
+  /// Test seam: inject the raw `update(...).eq('id', …).select('id')` and
+  /// `upsert(...).select('id')` so unit tests can drive the write methods
+  /// (payload shape + no-op/no-write [StateError]) without mocking
+  /// SupabaseClient. Mirrors [ExpensesRepository.forTest]. Read/RPC methods are
+  /// unavailable on a forTest instance (they assert the client is present).
   OrdersRepository.forTest({
     required DateTime Function() clock,
     OrderUpdateById? updateRow,
+    OrderUpsert? upsertRow,
   })  : _supabase = null,
         _clock = clock,
-        _updateOverride = updateRow;
+        _updateOverride = updateRow,
+        _upsertOverride = upsertRow;
 
   final SupabaseClient? _supabase;
   final DateTime Function() _clock;
   final OrderUpdateById? _updateOverride;
+  final OrderUpsert? _upsertOverride;
 
   /// Dispatches an id-scoped column update and returns the selected rows so the
   /// caller can detect a no-op (empty ⇒ no row matched). Routes through the
@@ -70,9 +80,25 @@ class OrdersRepository {
     return _supabase!.from('orders').update(values).eq('id', id).select('id');
   }
 
+  /// Dispatches a full-row upsert and returns the selected rows so the caller
+  /// can detect a write that didn't persist (empty ⇒ nothing written, e.g. an
+  /// RLS policy silently dropped it). Routes through the test override when
+  /// constructed via [OrdersRepository.forTest], else the live Supabase client.
+  Future<List<Map<String, dynamic>>> _upsertRow(
+      Map<String, dynamic> values) async {
+    final override = _upsertOverride;
+    if (override != null) return override(values);
+    assert(_supabase != null,
+        'forTest instance has no upsertRow — '
+        'pass one to OrdersRepository.forTest(upsertRow: ...)');
+    return _supabase!.from('orders').upsert(values).select('id');
+  }
+
   // ----- READ -----
 
   Stream<List<LaundryOrder>> watchAll() {
+    assert(_supabase != null,
+        'watchAll is not available on a forTest instance');
     // Soft-deleted orders (back-office tombstones) must not surface to the
     // rider, mirroring the deletedAt filter on the other read repos. `.stream()`
     // can't express `IS NULL`, so we filter client-side.
@@ -114,6 +140,8 @@ class OrdersRepository {
   /// don't need proof events or live updates (e.g. the New Pickup address-
   /// suggestion seed). Mirrors [CustomersRepository.getAll].
   Future<List<LaundryOrder>> getAll() async {
+    assert(
+        _supabase != null, 'getAll is not available on a forTest instance');
     final rows = await _supabase!
         .from('orders')
         .select()
@@ -123,6 +151,8 @@ class OrdersRepository {
   }
 
   Stream<LaundryOrder?> watchById(String orderId) {
+    assert(_supabase != null,
+        'watchById is not available on a forTest instance');
     return _supabase!
         .from('orders')
         .stream(primaryKey: ['id'])
@@ -190,6 +220,8 @@ class OrdersRepository {
   /// hands the coded order to [upsertOrder]. The RPC throws when offline, which
   /// the form surfaces as a retryable error.
   Future<String> reserveOrderCode() async {
+    assert(_supabase != null,
+        'reserveOrderCode is not available on a forTest instance');
     final result = await _supabase!.rpc('next_order_code');
     return parseOrderCodeRpcResult(result);
   }
@@ -205,13 +237,20 @@ class OrdersRepository {
   /// current actor/time. Don't repurpose it for edits — add a dedicated update
   /// method (or a DB rule pinning the creation columns) if an edit flow is ever
   /// needed.
+  /// Throws a [StateError] when the upsert wrote no row (e.g. an RLS policy
+  /// silently dropped the insert) — matching the other write methods so a
+  /// caller (the New Pickup flow) never shows "saved" for a write that didn't
+  /// persist. The `.select('id')` returning empty is the signal.
   Future<void> upsertOrder(LaundryOrder order,
       {required String actorStaffId}) async {
     final now = _clock();
     final priced = recomputeOrderTotal(order);
-    await _supabase!
-        .from('orders')
-        .upsert(orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
+    final written = await _upsertRow(
+        orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now));
+    if (written.isEmpty) {
+      throw StateError(
+          'upsertOrder: write did not persist order "${priced.orderId}"');
+    }
   }
 
   /// Updates only the pricing columns (+ updated_at), recomputing total_ugx.

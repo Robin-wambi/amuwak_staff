@@ -7,7 +7,7 @@ mode). When standing up a new Supabase environment (prod, staging, a dev
 project), the following are **hard dependencies** — miss them and the app
 appears to work but silently shows stale data.
 
-## 1. Enable the Realtime publication (REQUIRED)
+## 1. Enable the Realtime publication (handled by migration)
 
 The read repositories use Supabase `.stream(primaryKey: ['id'])`. A stream loads
 an initial snapshot via a normal select, but only delivers **live** updates for
@@ -16,21 +16,15 @@ the dashboard never reflects an order created/updated in the same session (and
 the new-pickup → pickup-capture auto-advance, which waits for the new row to
 arrive on the stream, won't fire).
 
-Run once per environment (Supabase Dashboard → Database → Replication, or the
-SQL editor):
+This is now applied automatically by migration
+`0027_enable_realtime_publication.sql`, which idempotently adds the five read
+tables (`orders`, `customers`, `proof_events`, `staff`, `order_status_events`)
+to `supabase_realtime`. `alter publication ... add table` errors if a table is
+already a member, so the migration guards each add against
+`pg_publication_tables` — it is safe to run against an environment that enabled
+the publication by hand.
 
-```sql
-alter publication supabase_realtime add table
-  public.orders,
-  public.customers,
-  public.proof_events,
-  public.staff,
-  public.order_status_events;
-```
-
-`alter publication ... add table` errors if a table is already a member, so it
-is intentionally **not** baked into a migration (environments that enabled it by
-hand would fail). Run it manually and verify with:
+After applying migrations, verify with:
 
 ```sql
 select tablename from pg_publication_tables where pubname = 'supabase_realtime';
