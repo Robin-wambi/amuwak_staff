@@ -7,7 +7,9 @@
 BEGIN;
 SET search_path TO extensions, public;
 
-SELECT plan(5);
+-- no_plan() so the count is derived from the assertions below; adding a table
+-- to the migration's ARRAY plus its ok() check here needs no plan-count edit.
+SELECT no_plan();
 
 SELECT ok(
   EXISTS (
