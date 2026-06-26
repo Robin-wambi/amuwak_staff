@@ -60,6 +60,8 @@ class ProofEventsRepository {
 
   /// Non-deleted proof events for [orderId], ordered by `captured_at`.
   Stream<List<drift.ProofEvent>> watchByOrder(String orderId) {
+    assert(_supabase != null,
+        'watchByOrder is not available on a forTest instance');
     return _supabase!
         .from('proof_events')
         .stream(primaryKey: ['id'])
