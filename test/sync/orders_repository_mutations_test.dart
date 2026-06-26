@@ -183,6 +183,7 @@ void main() {
       expect(gotId, 'o1');
       expect(values['customer_name'], 'Ada');
       expect(values['phone'], '0700');
+      expect(values['address'], 'Kira');
       expect(values['service_type'], ServiceType.washAndIron.toDbString());
       expect(values['item_count'], 5);
       expect(values['notes'], 'gate 4');

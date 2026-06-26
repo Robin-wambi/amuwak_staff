@@ -10,19 +10,6 @@ import '../shared/order_code.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
-/// Read/write repository for orders — ONLINE-ONLY mode.
-///
-/// Reads stream live from Supabase (`orders` realtime stream, with a follow-up
-/// `proof_events` select to hydrate the joined proof events). Writes go
-/// directly to Supabase. The previous offline-first implementation (local
-/// Drift reads + outbox-queued writes) is preserved verbatim in the commented
-/// `OFFLINE` block at the bottom of this file so it can be re-enabled later.
-///
-/// Joined proof events are fetched via a follow-up query rather than a single
-/// join — Supabase realtime streams are single-table, and an order's status
-/// changes when proof is captured, so the orders stream re-emits and the join
-/// refetches. Two simple queries are easier to reason about and the cost (one
-/// extra `SELECT` per emission) is negligible at the dashboard's scale.
 /// Test seam for the id-scoped column writes: given the row id and the column
 /// map, returns the "selected" rows (empty ⇒ no row matched). Lets unit tests
 /// exercise the write methods' payloads + missing-row [StateError] without a
@@ -36,6 +23,19 @@ typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
 typedef OrderUpsert =
     Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
 
+/// Read/write repository for orders — ONLINE-ONLY mode.
+///
+/// Reads stream live from Supabase (`orders` realtime stream, with a follow-up
+/// `proof_events` select to hydrate the joined proof events). Writes go
+/// directly to Supabase. The previous offline-first implementation (local
+/// Drift reads + outbox-queued writes) is preserved verbatim in the commented
+/// `OFFLINE` block at the bottom of this file so it can be re-enabled later.
+///
+/// Joined proof events are fetched via a follow-up query rather than a single
+/// join — Supabase realtime streams are single-table, and an order's status
+/// changes when proof is captured, so the orders stream re-emits and the join
+/// refetches. Two simple queries are easier to reason about and the cost (one
+/// extra `SELECT` per emission) is negligible at the dashboard's scale.
 class OrdersRepository {
   OrdersRepository(
     SupabaseClient supabase, {
@@ -97,6 +97,8 @@ class OrdersRepository {
   // ----- READ -----
 
   Stream<List<LaundryOrder>> watchAll() {
+    assert(_supabase != null,
+        'watchAll is not available on a forTest instance');
     // Soft-deleted orders (back-office tombstones) must not surface to the
     // rider, mirroring the deletedAt filter on the other read repos. `.stream()`
     // can't express `IS NULL`, so we filter client-side.
@@ -138,6 +140,8 @@ class OrdersRepository {
   /// don't need proof events or live updates (e.g. the New Pickup address-
   /// suggestion seed). Mirrors [CustomersRepository.getAll].
   Future<List<LaundryOrder>> getAll() async {
+    assert(
+        _supabase != null, 'getAll is not available on a forTest instance');
     final rows = await _supabase!
         .from('orders')
         .select()
@@ -147,6 +151,8 @@ class OrdersRepository {
   }
 
   Stream<LaundryOrder?> watchById(String orderId) {
+    assert(_supabase != null,
+        'watchById is not available on a forTest instance');
     return _supabase!
         .from('orders')
         .stream(primaryKey: ['id'])
@@ -214,6 +220,8 @@ class OrdersRepository {
   /// hands the coded order to [upsertOrder]. The RPC throws when offline, which
   /// the form surfaces as a retryable error.
   Future<String> reserveOrderCode() async {
+    assert(_supabase != null,
+        'reserveOrderCode is not available on a forTest instance');
     final result = await _supabase!.rpc('next_order_code');
     return parseOrderCodeRpcResult(result);
   }
