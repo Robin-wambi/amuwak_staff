@@ -20,11 +20,13 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return ref.watch(authServiceProvider).currentUser?.id;
 });
 
-/// The most recent auth lifecycle event (signedIn, passwordRecovery, …). AuthGate
-/// watches this to detect when an invite/reset link lands so it can route to the
-/// Set Password screen. Exposed as its own provider so tests can drive routing
-/// without constructing a full [AuthState]/[Session].
-final lastAuthEventProvider = Provider<AuthChangeEvent?>((ref) {
+/// The current auth lifecycle event (signedIn, passwordRecovery, …) from the
+/// auth stream — not a sticky "last seen" latch; that stickiness lives in
+/// `AuthGate`'s `_recovering` flag. AuthGate watches this to detect when an
+/// invite/reset link lands so it can route to the Set Password screen. Exposed
+/// as its own provider so tests can drive routing without constructing a full
+/// [AuthState]/[Session].
+final currentAuthEventProvider = Provider<AuthChangeEvent?>((ref) {
   return ref.watch(authStateProvider).valueOrNull?.event;
 });
 

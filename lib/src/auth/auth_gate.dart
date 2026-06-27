@@ -30,12 +30,12 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     super.initState();
     // Seed from the current event so a link opened on cold start is honoured.
     _recovering =
-        ref.read(lastAuthEventProvider) == AuthChangeEvent.passwordRecovery;
+        ref.read(currentAuthEventProvider) == AuthChangeEvent.passwordRecovery;
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthChangeEvent?>(lastAuthEventProvider, (prev, next) {
+    ref.listen<AuthChangeEvent?>(currentAuthEventProvider, (prev, next) {
       if (next == AuthChangeEvent.passwordRecovery && !_recovering) {
         setState(() => _recovering = true);
       } else if (next == AuthChangeEvent.signedOut && _recovering) {

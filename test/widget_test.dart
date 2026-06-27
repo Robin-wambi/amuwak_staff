@@ -15,7 +15,7 @@ void main() {
   final bootstrapOverrides = <Override>[
     syncLifecycleProvider.overrideWith((ref) {}),
     currentUserIdProvider.overrideWithValue(null),
-    lastAuthEventProvider.overrideWithValue(null),
+    currentAuthEventProvider.overrideWithValue(null),
   ];
 
   testWidgets('App opens to login screen first', (WidgetTester tester) async {
