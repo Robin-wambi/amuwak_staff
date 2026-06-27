@@ -9,11 +9,18 @@
 //   2. Confirm the caller is an ACTIVE MANAGER (the security boundary — the
 //      Flutter UI only hides the button; this is what actually enforces it).
 //   3. Validate the payload and reject a duplicate username.
-//   4. inviteUserByEmail() — creates an auth user in the "invited" state and
-//      emails them a link to set a password (which also confirms their email).
-//   5. Insert the matching staff row (id == auth user id) with the chosen role.
-//      If the insert fails, delete the just-invited auth user so we don't leave
-//      an orphan with no staff row.
+//   4. createUser({ email_confirm: true }) — creates a confirmed auth user. The
+//      manager vouches for the address; the set-password email in step 6 is the
+//      real ownership proof.
+//   5. Insert the matching staff row (id == auth user id) with the chosen role,
+//      BEFORE sending any email so a failed insert rolls back cleanly. If the
+//      insert fails, delete the just-created auth user so we don't leave an
+//      orphan with no staff row.
+//   6. Send a set-password email as a RECOVERY link (resetPasswordForEmail).
+//      NOT inviteUserByEmail: invite links emit `signedIn`, so the app would
+//      route the new user straight to the dashboard with no password set.
+//      Recovery links emit `passwordRecovery`, which the app routes to the
+//      Set-password screen (same path as "Forgot password").
 //
 // Env (provided by Supabase automatically): SUPABASE_URL, SUPABASE_ANON_KEY,
 // SUPABASE_SERVICE_ROLE_KEY. Optional: INVITE_REDIRECT_URL (where the invite
@@ -122,20 +129,22 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (existing) return json({ error: 'Username already taken' }, 409);
 
-  // 4. Invite the user (sends the email; confirms email on acceptance).
-  const { data: invited, error: inviteErr } =
-    await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
-  if (inviteErr || !invited?.user) {
+  // 4. Create a confirmed auth user.
+  const { data: created, error: createErr } =
+    await admin.auth.admin.createUser({ email, email_confirm: true });
+  if (createErr || !created?.user) {
     // Most commonly: the email already has an account.
     return json(
-      { error: inviteErr?.message ?? 'Could not send the invite' },
+      { error: createErr?.message ?? 'Could not create the user' },
       409,
     );
   }
+  const userId = created.user.id;
 
-  // 5. Create the staff row keyed to the new auth user.
+  // 5. Create the staff row keyed to the new auth user — before sending any
+  //    email, so a failed insert rolls back with nothing already sent.
   const { error: insertErr } = await admin.from('staff').insert({
-    id: invited.user.id,
+    id: userId,
     username,
     display_name: displayName,
     role,
@@ -145,11 +154,10 @@ Deno.serve(async (req) => {
     // Roll back the orphaned auth user so the manager can retry cleanly. Log a
     // failed cleanup so ops can remove the stray user manually — otherwise an
     // auth user with no staff row would linger silently.
-    const { error: deleteErr } =
-      await admin.auth.admin.deleteUser(invited.user.id);
+    const { error: deleteErr } = await admin.auth.admin.deleteUser(userId);
     if (deleteErr) {
       console.error('invite-staff: orphan auth-user cleanup failed', {
-        userId: invited.user.id,
+        userId,
         error: deleteErr.message,
       });
     }
@@ -164,5 +172,29 @@ Deno.serve(async (req) => {
     );
   }
 
-  return json({ ok: true, user_id: invited.user.id }, 200);
+  // 6. Send the set-password email as a recovery link. Mirrors the app's working
+  //    "forgot password" path so Supabase sends its recovery template and the
+  //    link fires `passwordRecovery` on click. The account + staff row already
+  //    exist, so a send failure is non-fatal — log it and ask the manager to
+  //    retry (or the user to use "Forgot password").
+  const anon = createClient(supabaseUrl, anonKey);
+  const { error: emailErr } = await anon.auth.resetPasswordForEmail(
+    email,
+    redirectTo ? { redirectTo } : undefined,
+  );
+  if (emailErr) {
+    console.error('invite-staff: set-password email failed', {
+      userId,
+      error: emailErr.message,
+    });
+    return json(
+      {
+        error: 'Account created but the set-password email could not be sent. '
+          + 'Ask the user to use “Forgot password”, or try again.',
+      },
+      502,
+    );
+  }
+
+  return json({ ok: true, user_id: userId }, 200);
 });

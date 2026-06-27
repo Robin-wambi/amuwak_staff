@@ -2,8 +2,8 @@
 
 The app uses **invite-only** onboarding with **email + password** sign-in. There
 is no public sign-up: a manager invites a teammate, who clicks an emailed link to
-set their own password (which also verifies their email). Returning users stay
-signed in — the persisted Supabase session lands them straight on the dashboard.
+set their own name and password. Returning users stay signed in — the persisted
+Supabase session lands them straight on the dashboard.
 
 ## How it fits together
 
@@ -14,10 +14,20 @@ signed in — the persisted Supabase session lands them straight on the dashboar
 - **Invite (manager only)** — Account tab → "Invite staff" opens a form that calls
   the `invite-staff` Edge Function via [invite_staff_service.dart](../lib/src/staff/invite_staff_service.dart).
 - **Edge Function** — [supabase/functions/invite-staff/index.ts](../supabase/functions/invite-staff/index.ts)
-  authenticates the caller as a manager, then uses the service-role key to invite
-  the user and insert their `staff` row (`id == auth.users.id`, role defaults to
-  `driver`). The UI gating is convenience only — this function is the real
-  boundary. New roles must be one of `driver | in_shop | manager` (migration 0002).
+  authenticates the caller as a manager, then uses the service-role key to create
+  a confirmed auth user, insert their `staff` row (`id == auth.users.id`, role
+  defaults to `driver`), and email them a set-password link. The UI gating is
+  convenience only — this function is the real boundary. New roles must be one of
+  `driver | in_shop | manager` (migration 0002).
+  - The set-password email is sent as a **recovery** link
+    (`resetPasswordForEmail`), not `inviteUserByEmail`. Invite links emit a
+    `signedIn` event, which would route the new user straight to the dashboard
+    with no password set; recovery links emit `passwordRecovery`, which the app
+    routes to the Set-password screen (the same path as "Forgot password").
+- **Set name + password** — on first login the invitee confirms/edits their own
+  display name (pre-filled with what the manager entered) and chooses a password.
+  The name write goes through the `set_my_display_name` RPC (migration 0028),
+  which is column-scoped so a non-manager can rename only themselves.
 
 ## One-time setup (Supabase dashboard / CLI)
 
@@ -36,7 +46,12 @@ These cannot be done from app code — an operator must run them:
 2. **Auth settings** (Authentication → Providers / URL config):
    - Enable email confirmations.
    - Set **Site URL** and add the web app origin to **Redirect URLs**.
-   - Review the **Invite user** and **Reset password** email templates.
+   - Review the **Reset password** email template — this is the email new
+     invitees receive (onboarding sends a recovery link), so word it as a
+     welcome / "set your password" message, not just a reset.
+   - Raise the **recovery link / OTP expiry** (Authentication → Settings) to a
+     window long enough for a new hire to act — recovery links default to a much
+     shorter expiry than the old invite links.
    - Set the **minimum password length to 8** (Authentication → Policies) to match
      the client's 8-char check in [set_password_screen.dart](../lib/src/auth/set_password_screen.dart).
      If Supabase's minimum is lower the client still enforces 8; if it's set
@@ -49,10 +64,11 @@ These cannot be done from app code — an operator must run them:
 ## End-to-end check
 
 1. Sign in as the seeded manager → Account → **Invite staff** → invite a test
-   email as `driver`. Confirm the email arrives and a `staff` row exists
-   (`active = true`, `role = driver`).
-2. Open the invite link → **Set password** → submit → land on the dashboard with
-   driver-scoped data and `user_role = driver` in the JWT.
+   email as `driver`. Confirm the set-password email arrives and a `staff` row
+   exists (`active = true`, `role = driver`).
+2. Open the emailed link → **Set name & password** (name pre-filled with what the
+   manager entered, editable) → submit → land on the dashboard with the chosen
+   name, driver-scoped data and `user_role = driver` in the JWT.
 3. Sign out → **Forgot password?** → complete the reset → sign in again.
 4. Negative: a non-manager calling the function is rejected (403); a duplicate
    username/email returns a clear error.
