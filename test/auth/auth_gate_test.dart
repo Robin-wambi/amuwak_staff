@@ -62,7 +62,7 @@ void main() {
   testWidgets('shows LoginScreen when nobody is signed in', (tester) async {
     await _pumpGate(tester, overrides: [
       currentUserIdProvider.overrideWithValue(null),
-      lastAuthEventProvider.overrideWithValue(null),
+      currentAuthEventProvider.overrideWithValue(null),
     ]);
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -73,7 +73,7 @@ void main() {
       (tester) async {
     await _pumpGate(tester, overrides: [
       currentUserIdProvider.overrideWithValue('u1'),
-      lastAuthEventProvider
+      currentAuthEventProvider
           .overrideWithValue(AuthChangeEvent.passwordRecovery),
       authServiceProvider.overrideWithValue(_MockAuthService()),
     ]);
@@ -85,7 +85,7 @@ void main() {
   testWidgets('shows the dashboard when signed in normally', (tester) async {
     await _pumpGate(tester, overrides: [
       currentUserIdProvider.overrideWithValue('u1'),
-      lastAuthEventProvider.overrideWithValue(AuthChangeEvent.signedIn),
+      currentAuthEventProvider.overrideWithValue(AuthChangeEvent.signedIn),
       authServiceProvider.overrideWithValue(_MockAuthService()),
       ..._dashboardStubs(),
     ]);
@@ -107,7 +107,7 @@ void main() {
     // and writes it via the staff repo, so this submit path needs both stubs.
     await _pumpGate(tester, overrides: [
       currentUserIdProvider.overrideWithValue('u1'),
-      lastAuthEventProvider
+      currentAuthEventProvider
           .overrideWithValue(AuthChangeEvent.passwordRecovery),
       authServiceProvider.overrideWithValue(auth),
       staffRepositoryProvider.overrideWithValue(staffRepo),
@@ -138,7 +138,7 @@ void main() {
       (tester) async {
     final container = ProviderContainer(overrides: [
       currentUserIdProvider.overrideWithValue('u1'),
-      lastAuthEventProvider.overrideWith((ref) => ref.watch(_testEventProvider)),
+      currentAuthEventProvider.overrideWith((ref) => ref.watch(_testEventProvider)),
       authServiceProvider.overrideWithValue(_MockAuthService()),
       ..._dashboardStubs(),
     ]);
@@ -166,7 +166,7 @@ void main() {
       (tester) async {
     final container = ProviderContainer(overrides: [
       currentUserIdProvider.overrideWith((ref) => ref.watch(_testUserIdProvider)),
-      lastAuthEventProvider.overrideWithValue(AuthChangeEvent.signedIn),
+      currentAuthEventProvider.overrideWithValue(AuthChangeEvent.signedIn),
       authServiceProvider.overrideWithValue(_MockAuthService()),
       ..._dashboardStubs(),
     ]);
