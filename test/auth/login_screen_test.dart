@@ -119,6 +119,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Could not send the reset link. Please try again.'),
         findsOneWidget);
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 
   testWidgets('Forgot password with no email prompts for one and does not send',
