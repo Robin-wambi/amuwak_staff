@@ -81,6 +81,47 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
+  testWidgets('a non-AuthFailure error on login shows a generic message',
+      (tester) async {
+    when(() => auth.signInWithEmailPassword(
+            email: any(named: 'email'), password: any(named: 'password')))
+        .thenThrow(Exception('SocketException: connection failed'));
+
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'secret-pass');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Could not sign in. Please try again.'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets(
+      'a non-AuthFailure error on forgot-password shows a generic message',
+      (tester) async {
+    when(() => auth.sendPasswordReset(any()))
+        .thenThrow(Exception('SocketException: connection failed'));
+
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Could not send the reset link. Please try again.'),
+        findsOneWidget);
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
   testWidgets('Forgot password with no email prompts for one and does not send',
       (tester) async {
     await _pumpLogin(tester, authService: auth);

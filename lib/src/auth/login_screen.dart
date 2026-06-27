@@ -36,7 +36,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             password: _passwordController.text,
           );
     } on AuthFailure catch (e) {
-      setState(() => _errorMessage = e.message);
+      if (mounted) setState(() => _errorMessage = e.message);
+    } catch (_) {
+      // Network failures (SocketException, etc.) aren't AuthExceptions, so
+      // AuthService doesn't wrap them into AuthFailure — surface a generic
+      // message rather than letting them propagate uncaught.
+      if (mounted) {
+        setState(() => _errorMessage = 'Could not sign in. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -60,6 +67,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AuthFailure catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      // Same as _login: network errors aren't wrapped into AuthFailure.
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not send the reset link. Please try again.'),
+        ),
+      );
     }
   }
 
