@@ -22,7 +22,7 @@ final currentUserIdProvider = Provider<String?>((ref) {
 
 /// The current auth lifecycle event (signedIn, passwordRecovery, …) from the
 /// auth stream — not a sticky "last seen" latch; that stickiness lives in
-/// [AuthGate]'s `_recovering` flag. AuthGate watches this to detect when an
+/// `AuthGate`'s `_recovering` flag. AuthGate watches this to detect when an
 /// invite/reset link lands so it can route to the Set Password screen. Exposed
 /// as its own provider so tests can drive routing without constructing a full
 /// [AuthState]/[Session].
