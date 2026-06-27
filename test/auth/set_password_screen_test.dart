@@ -80,6 +80,34 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Existing Name'), findsOneWidget);
   });
 
+  testWidgets('does not overwrite a name the user typed before the staff row '
+      'arrives', (tester) async {
+    final staffStream = StreamController<StaffData?>();
+    addTearDown(staffStream.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authServiceProvider.overrideWithValue(auth),
+          staffRepositoryProvider.overrideWithValue(staffRepo),
+          currentStaffProvider.overrideWith((ref) => staffStream.stream),
+        ],
+        child: MaterialApp(home: SetPasswordScreen(onCompleted: () {})),
+      ),
+    );
+    await tester.pump();
+
+    // User types before the staff row has loaded.
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'), 'User Typed');
+
+    // Staff row arrives late.
+    staffStream.add(_staff('Manager Entered'));
+    await tester.pump();
+
+    expect(find.widgetWithText(TextFormField, 'User Typed'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Manager Entered'), findsNothing);
+  });
+
   testWidgets('an empty name shows an error and does not save', (tester) async {
     await _pump(
       tester,

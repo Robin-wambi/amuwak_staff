@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -74,6 +76,64 @@ void main() {
     expect(captured.username, 'janed');
     expect(captured.role, 'driver');
     expect(find.textContaining('Invitation sent'), findsOneWidget);
+  });
+
+  testWidgets('a non-InviteFailure error shows a generic message', (tester) async {
+    await _pump(tester, invite: ({
+      required email,
+      required displayName,
+      required username,
+      required role,
+    }) async {
+      throw Exception('SocketException: connection failed');
+    });
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'a@b.co');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Display name'), 'A B');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'), 'ab');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Send invite'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Could not send the invite. Please try again.'),
+        findsOneWidget);
+  });
+
+  testWidgets('does not setState after dispose when the invite fails late',
+      (tester) async {
+    // The screen can be popped while the Edge Function call is in flight; an
+    // InviteFailure arriving after teardown must not setState on a disposed
+    // State.
+    final completer = Completer<void>();
+    await _pump(tester, invite: ({
+      required email,
+      required displayName,
+      required username,
+      required role,
+    }) async {
+      await completer.future;
+      throw InviteFailure('Username already taken');
+    });
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'a@b.co');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Display name'), 'A B');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'), 'ab');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Send invite'));
+    await tester.pump();
+
+    // Tear the screen down while the invite is still pending, then let it fail.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    completer.complete();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('InviteFailure shows the error message', (tester) async {

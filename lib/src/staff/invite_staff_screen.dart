@@ -59,7 +59,16 @@ class _InviteStaffScreenState extends State<InviteStaffScreen> {
         SnackBar(content: Text('Invitation sent to $email')),
       );
     } on InviteFailure catch (e) {
-      setState(() => _errorMessage = e.message);
+      if (mounted) setState(() => _errorMessage = e.message);
+    } catch (_) {
+      // Network errors (SocketException, etc.) thrown before the Edge Function
+      // responds aren't FunctionExceptions, so they never become InviteFailure —
+      // surface a generic message rather than letting them propagate uncaught.
+      if (mounted) {
+        setState(
+          () => _errorMessage = 'Could not send the invite. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

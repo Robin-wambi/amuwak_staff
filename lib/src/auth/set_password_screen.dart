@@ -89,7 +89,9 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
     // the staff row arrives, so the user can confirm or correct it.
     final staff = ref.watch(currentStaffProvider).valueOrNull;
     if (!_nameSeeded && staff != null) {
-      _nameController.text = staff.displayName;
+      // Don't clobber anything the user typed before the staff row arrived; mark
+      // seeded either way so a later emission can't overwrite their input.
+      if (_nameController.text.isEmpty) _nameController.text = staff.displayName;
       _nameSeeded = true;
     }
 
