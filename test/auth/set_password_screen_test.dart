@@ -8,17 +8,40 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/auth/auth_service.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/auth/set_password_screen.dart';
+import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/dashboard/current_staff_provider.dart';
+import 'package:amuwak_staff/src/sync/repository_providers.dart';
+import 'package:amuwak_staff/src/sync/staff_repository.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _MockStaffRepository extends Mock implements StaffRepository {}
+
+StaffData _staff(String displayName) => StaffData(
+      id: 'u1',
+      username: 'user1',
+      displayName: displayName,
+      role: 'driver',
+      active: true,
+      mustChangePin: false,
+      createdAt: DateTime(2024),
+      updatedAt: DateTime(2024),
+    );
 
 Future<void> _pump(
   WidgetTester tester, {
   required AuthService authService,
+  required StaffRepository staffRepository,
   required VoidCallback onCompleted,
+  StaffData? currentStaff,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [authServiceProvider.overrideWithValue(authService)],
+      overrides: [
+        authServiceProvider.overrideWithValue(authService),
+        staffRepositoryProvider.overrideWithValue(staffRepository),
+        currentStaffProvider.overrideWith((ref) => Stream.value(currentStaff)),
+      ],
       child: MaterialApp(
         home: SetPasswordScreen(onCompleted: onCompleted),
       ),
@@ -28,9 +51,12 @@ Future<void> _pump(
 
 void main() {
   late _MockAuthService auth;
+  late _MockStaffRepository staffRepo;
 
   setUp(() {
     auth = _MockAuthService();
+    staffRepo = _MockStaffRepository();
+    when(() => staffRepo.setMyDisplayName(any())).thenAnswer((_) async {});
   });
 
   Future<void> enterBoth(WidgetTester tester, String pw, String confirm) async {
@@ -40,10 +66,50 @@ void main() {
         find.widgetWithText(TextFormField, 'Confirm password'), confirm);
   }
 
+  testWidgets('pre-fills the name field from the current staff row',
+      (tester) async {
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () {},
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
+
+    expect(find.widgetWithText(TextFormField, 'Existing Name'), findsOneWidget);
+  });
+
+  testWidgets('an empty name shows an error and does not save', (tester) async {
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () {},
+      currentStaff: null, // nothing to pre-fill -> name stays empty
+    );
+    await tester.pump();
+
+    await enterBoth(tester, 'longenough1', 'longenough1');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
+    await tester.pump();
+
+    expect(find.text('Your name is required'), findsOneWidget);
+    verifyNever(() => staffRepo.setMyDisplayName(any()));
+    verifyNever(() => auth.updatePassword(any()));
+  });
+
   testWidgets('mismatched passwords show an error and do not save',
       (tester) async {
     var completed = false;
-    await _pump(tester, authService: auth, onCompleted: () => completed = true);
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () => completed = true,
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
 
     await enterBoth(tester, 'longenough1', 'different1');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
@@ -56,7 +122,14 @@ void main() {
 
   testWidgets('too-short password shows an error and does not save',
       (tester) async {
-    await _pump(tester, authService: auth, onCompleted: () {});
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () {},
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
 
     await enterBoth(tester, 'short', 'short');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
@@ -66,19 +139,55 @@ void main() {
     verifyNever(() => auth.updatePassword(any()));
   });
 
-  testWidgets('valid password calls updatePassword then onCompleted',
+  testWidgets('valid input sets the name then the password then completes',
       (tester) async {
     when(() => auth.updatePassword(any())).thenAnswer((_) async {});
     var completed = false;
-    await _pump(tester, authService: auth, onCompleted: () => completed = true);
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () => completed = true,
+      currentStaff: _staff('Old Name'),
+    );
+    await tester.pump();
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Old Name'), 'New Name');
+    await enterBoth(tester, 'longenough1', 'longenough1');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    verifyInOrder([
+      () => staffRepo.setMyDisplayName('New Name'),
+      () => auth.updatePassword('longenough1'),
+    ]);
+    expect(completed, isTrue);
+  });
+
+  testWidgets('a name-save failure shows an error and does not set the password',
+      (tester) async {
+    when(() => staffRepo.setMyDisplayName(any()))
+        .thenThrow(Exception('network down'));
+    var completed = false;
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () => completed = true,
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
 
     await enterBoth(tester, 'longenough1', 'longenough1');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    verify(() => auth.updatePassword('longenough1')).called(1);
-    expect(completed, isTrue);
+    expect(find.textContaining('went wrong'), findsOneWidget);
+    verifyNever(() => auth.updatePassword(any()));
+    expect(completed, isFalse);
   });
 
   testWidgets(
@@ -90,7 +199,14 @@ void main() {
     final completer = Completer<void>();
     when(() => auth.updatePassword(any())).thenAnswer((_) => completer.future);
     var completed = false;
-    await _pump(tester, authService: auth, onCompleted: () => completed = true);
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () => completed = true,
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
 
     await enterBoth(tester, 'longenough1', 'longenough1');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));
@@ -109,7 +225,14 @@ void main() {
     when(() => auth.updatePassword(any()))
         .thenThrow(AuthFailure('Password is too weak'));
     var completed = false;
-    await _pump(tester, authService: auth, onCompleted: () => completed = true);
+    await _pump(
+      tester,
+      authService: auth,
+      staffRepository: staffRepo,
+      onCompleted: () => completed = true,
+      currentStaff: _staff('Existing Name'),
+    );
+    await tester.pump();
 
     await enterBoth(tester, 'longenough1', 'longenough1');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Save password'));

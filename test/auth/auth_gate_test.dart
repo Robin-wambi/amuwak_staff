@@ -14,8 +14,22 @@ import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
+import 'package:amuwak_staff/src/sync/staff_repository.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _MockStaffRepository extends Mock implements StaffRepository {}
+
+StaffData _staff(String displayName) => StaffData(
+      id: 'u1',
+      username: 'user1',
+      displayName: displayName,
+      role: 'driver',
+      active: true,
+      mustChangePin: false,
+      createdAt: DateTime(2024),
+      updatedAt: DateTime(2024),
+    );
 
 /// Controllable event source so a test can change the auth event mid-render.
 final _testEventProvider =
@@ -86,16 +100,26 @@ void main() {
       (tester) async {
     final auth = _MockAuthService();
     when(() => auth.updatePassword(any())).thenAnswer((_) async {});
+    final staffRepo = _MockStaffRepository();
+    when(() => staffRepo.setMyDisplayName(any())).thenAnswer((_) async {});
 
+    // SetPasswordScreen now also collects a name (pre-filled from the staff row)
+    // and writes it via the staff repo, so this submit path needs both stubs.
     await _pumpGate(tester, overrides: [
       currentUserIdProvider.overrideWithValue('u1'),
       lastAuthEventProvider
           .overrideWithValue(AuthChangeEvent.passwordRecovery),
       authServiceProvider.overrideWithValue(auth),
-      ..._dashboardStubs(),
+      staffRepositoryProvider.overrideWithValue(staffRepo),
+      currentRoleProvider.overrideWithValue(null),
+      currentStaffProvider
+          .overrideWith((ref) => Stream<StaffData?>.value(_staff('Existing'))),
+      ordersStreamProvider
+          .overrideWith((ref) => Stream<List<LaundryOrder>>.value(const [])),
     ]);
 
     expect(find.byType(SetPasswordScreen), findsOneWidget);
+    await tester.pump(); // let currentStaff emit so the name field seeds
 
     await tester.enterText(
         find.widgetWithText(TextFormField, 'New password'), 'longenough1');

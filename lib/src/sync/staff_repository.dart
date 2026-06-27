@@ -36,6 +36,16 @@ class StaffRepository {
       return live.isEmpty ? null : staffFromSupabase(live.first);
     });
   }
+
+  /// Set the signed-in user's own display name. Goes through the
+  /// `set_my_display_name` RPC (migration 0028) because RLS only lets managers
+  /// write the staff table directly — the function is column-scoped to
+  /// display_name on the caller's own row, so non-managers can still rename
+  /// themselves during onboarding without being able to change role/active.
+  Future<void> setMyDisplayName(String name) {
+    return _supabase
+        .rpc('set_my_display_name', params: {'new_name': name.trim()});
+  }
 }
 
 /* ============================================================================
