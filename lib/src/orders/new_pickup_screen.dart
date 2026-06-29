@@ -470,7 +470,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
-          content: Text('Could not save customer: $e'),
+          content: Text(
+            'Could not save customer: $e\n'
+            'Tap Create pickup again to retry.',
+          ),
         ),
       );
       return;
@@ -597,9 +600,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Customer name'),
               textCapitalization: TextCapitalization.words,
-              // Inline errors only after the rider has touched the field, so a
-              // freshly-opened form isn't pre-nagged. Pairs with the bottom
-              // "Still needed" summary to explain a disabled Create button.
+              // Always-on: empty required boxes flag themselves from form open
+              // so the rider sees exactly which fields need a value, not just a
+              // disabled Create button. Pairs with the bottom "Still needed"
+              // summary.
               autovalidateMode: AutovalidateMode.always,
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? "Enter the customer's name"
