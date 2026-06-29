@@ -89,9 +89,11 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       return;
     }
     final itemCount = int.tryParse(_itemCountController.text.trim());
-    if (itemCount == null || itemCount < 0) {
+    // The DB enforces CHECK (item_count > 0), so 0 must be rejected here rather
+    // than failing server-side with an opaque error.
+    if (itemCount == null || itemCount < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid item count.')),
+        const SnackBar(content: Text('Enter an item count of at least 1.')),
       );
       return;
     }
