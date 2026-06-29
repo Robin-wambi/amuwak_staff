@@ -41,6 +41,53 @@ void main() {
     expect(body['role'], 'driver');
   });
 
+  test('InviteFailure.toString carries the human-readable message', () {
+    expect(InviteFailure('Username already taken').toString(),
+        'InviteFailure: Username already taken');
+  });
+
+  test('maps a plain-string error detail to InviteFailure', () async {
+    when(() => functions.invoke('invite-staff', body: any(named: 'body')))
+        .thenThrow(const FunctionException(
+      status: 500,
+      details: 'Edge function crashed',
+    ));
+
+    await expectLater(
+      service.invite(
+        email: 'a@b.co',
+        displayName: 'A B',
+        username: 'ab',
+        role: 'driver',
+      ),
+      throwsA(isA<InviteFailure>().having(
+        (e) => e.message,
+        'message',
+        'Edge function crashed',
+      )),
+    );
+  });
+
+  test('falls back to a generic message when no usable detail is present',
+      () async {
+    when(() => functions.invoke('invite-staff', body: any(named: 'body')))
+        .thenThrow(const FunctionException(status: 500, details: null));
+
+    await expectLater(
+      service.invite(
+        email: 'a@b.co',
+        displayName: 'A B',
+        username: 'ab',
+        role: 'driver',
+      ),
+      throwsA(isA<InviteFailure>().having(
+        (e) => e.message,
+        'message',
+        'Could not send the invite. Please try again.',
+      )),
+    );
+  });
+
   test('maps the server error body to InviteFailure', () async {
     when(() => functions.invoke('invite-staff', body: any(named: 'body')))
         .thenThrow(const FunctionException(

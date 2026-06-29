@@ -62,6 +62,12 @@ void main() {
       )).captured.single as LaundryOrder;
 
   Future<void> pumpAndOpen(WidgetTester tester) async {
+    // A tall viewport so the whole form (now taller with the required item-count
+    // field in the main column) fits — otherwise the express toggle sits at the
+    // viewport edge and its tap misses.
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -107,6 +113,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    // Item count is required now (the DB rejects item_count = 0). The tall
+    // viewport from pumpAndOpen keeps the count box on-screen, so no scroll.
+    await tester.enterText(find.byKey(const Key('np_count_field')), '3');
+    await tester.pump();
   }
 
   Future<void> submit(WidgetTester tester) async {

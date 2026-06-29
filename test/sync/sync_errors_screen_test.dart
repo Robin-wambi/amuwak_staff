@@ -167,6 +167,74 @@ void main() {
   });
 
   testWidgets(
+      'outbox tile Discard then Cancel dismisses the dialog without discarding',
+      (tester) async {
+    // Covers the dialog's Cancel action (pop(false)) and the `ok != true`
+    // early-return guard: discard must NOT be called.
+    final mockOutbox = _MockOutboxRepo();
+    when(() => mockOutbox.discard(any())).thenAnswer((_) async {});
+
+    await _pumpScreen(
+      tester,
+      outboxRows: [
+        _stubOutboxRow(
+          id: 'k-1', forTable: 'orders', op: 'update', rowId: 'AMW-A',
+          lastError: '23505: duplicate key value',
+        ),
+      ],
+      pullRows: const [],
+      outboxRepoOverride: mockOutbox,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Discard'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard upload?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    // Dialog gone and no discard happened.
+    expect(find.text('Discard upload?'), findsNothing);
+    verifyNever(() => mockOutbox.discard(any()));
+  });
+
+  testWidgets(
+    'a failing discard surfaces a SnackBar instead of being swallowed',
+    (tester) async {
+      // Covers the discard catch block: a confirmed discard whose repo call
+      // throws shows rider-friendly copy, not the raw exception.
+      final mockOutbox = _MockOutboxRepo();
+      when(() => mockOutbox.discard(any()))
+          .thenThrow(StateError('local drift delete failed'));
+
+      await _pumpScreen(
+        tester,
+        outboxRows: [
+          _stubOutboxRow(
+            id: 'k-1', forTable: 'orders', op: 'update', rowId: 'AMW-A',
+            lastError: 'network down',
+          ),
+        ],
+        pullRows: const [],
+        outboxRepoOverride: mockOutbox,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Discard'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Discard upload'));
+      // Pump for the async discard + SnackBar animation.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Could not discard'), findsOneWidget);
+      expect(find.textContaining('drift delete failed'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'a failing requeue surfaces a SnackBar instead of being swallowed',
     (tester) async {
       final mockOutbox = _MockOutboxRepo();

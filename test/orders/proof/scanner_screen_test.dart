@@ -387,4 +387,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('the AppBar close button pops the screen with false',
+      (tester) async {
+    // Covers BarcodeScannerScaffold's onClose wiring (Navigator.pop false).
+    // Capture the pop result locally — the shared helper snapshots its result
+    // before the route resolves, so it can't observe a post-pop value.
+    bool? result;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ScannerScreen(
+                        expectedOrderCode: 'AMW-1',
+                        cameraViewBuilder: (ctx, onDetected) =>
+                            const SizedBox.shrink(),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open scanner'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open scanner'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ScannerScreen), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScannerScreen), findsNothing);
+    expect(result, isFalse);
+  });
+
+  testWidgets(
+    'manual entry path: submitting via the keyboard action matches',
+    (tester) async {
+      // Covers TextFormField.onFieldSubmitted in _ManualEntryView — a rider can
+      // press the keyboard's submit action instead of tapping the Submit button.
+      await _pumpAndPushScanner(
+        tester,
+        expectedOrderCode: 'AMW-1',
+        scannedValue: 'unused',
+      );
+
+      await tester.tap(find.text('Enter order code instead'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField), 'AMW-1');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ScannerScreen), findsNothing);
+    },
+  );
 }

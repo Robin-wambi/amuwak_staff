@@ -137,6 +137,30 @@ void main() {
     expect(saved!.category, 'Dry Cleaning');
   });
 
+  testWidgets('a failing save surfaces a retry SnackBar', (tester) async {
+    // Covers _saveAndReload's catch block: when save throws, the screen shows
+    // rider-friendly copy instead of swallowing the error.
+    await tester.pumpWidget(MaterialApp(
+      home: PricingCatalogScreen(
+        load: () async => const [],
+        save: (_) async => throw Exception('network down'),
+        idGenerator: () => 'gen-fail',
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('catalog_add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('catalog_name')), 'Duvet');
+    await tester.enterText(find.byKey(const Key('catalog_amount')), '10000');
+    await tester.tap(find.byKey(const Key('catalog_save')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Could not save — please retry.'), findsOneWidget);
+    expect(find.textContaining('network down'), findsNothing);
+  });
+
   testWidgets('tapping a suggestion fills the category field', (tester) async {
     CatalogItem? saved;
     await tester.pumpWidget(screen(

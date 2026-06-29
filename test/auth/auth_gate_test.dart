@@ -162,6 +162,66 @@ void main() {
     expect(find.byType(StaffDashboardScreen), findsNothing);
   });
 
+  testWidgets(
+      'a passwordRecovery event after mount routes to SetPassword',
+      (tester) async {
+    // Start signed-in (not recovering), then a recovery event arrives at
+    // runtime via ref.listen — the gate must flip into the recovery state.
+    final container = ProviderContainer(overrides: [
+      currentUserIdProvider.overrideWithValue('u1'),
+      currentAuthEventProvider.overrideWith((ref) => ref.watch(_testEventProvider)),
+      authServiceProvider.overrideWithValue(_MockAuthService()),
+      ..._dashboardStubs(),
+    ]);
+    addTearDown(container.dispose);
+    // Seed the event source to signedIn so initState does NOT pre-set recovery.
+    container.read(_testEventProvider.notifier).state = AuthChangeEvent.signedIn;
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AuthGate()),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(StaffDashboardScreen), findsOneWidget);
+
+    container.read(_testEventProvider.notifier).state =
+        AuthChangeEvent.passwordRecovery;
+    await tester.pump();
+
+    expect(find.byType(SetPasswordScreen), findsOneWidget);
+    expect(find.byType(StaffDashboardScreen), findsNothing);
+  });
+
+  testWidgets(
+      'a signedOut event during recovery clears the sticky recovery flag',
+      (tester) async {
+    // Start in recovery; a signedOut event must drop _recovering back to false.
+    final container = ProviderContainer(overrides: [
+      currentUserIdProvider.overrideWith((ref) => ref.watch(_testUserIdProvider)),
+      currentAuthEventProvider.overrideWith((ref) => ref.watch(_testEventProvider)),
+      authServiceProvider.overrideWithValue(_MockAuthService()),
+      ..._dashboardStubs(),
+    ]);
+    addTearDown(container.dispose);
+    container.read(_testEventProvider.notifier).state =
+        AuthChangeEvent.passwordRecovery;
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AuthGate()),
+    ));
+    expect(find.byType(SetPasswordScreen), findsOneWidget);
+
+    // Sign out: event flips to signedOut and the user id clears.
+    container.read(_testEventProvider.notifier).state =
+        AuthChangeEvent.signedOut;
+    container.read(_testUserIdProvider.notifier).state = null;
+    await tester.pump();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(SetPasswordScreen), findsNothing);
+  });
+
   testWidgets('routes back to LoginScreen when the session ends (sign-out)',
       (tester) async {
     final container = ProviderContainer(overrides: [

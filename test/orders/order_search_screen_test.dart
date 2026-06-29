@@ -260,4 +260,76 @@ void main() {
     expect(tapped, isNotNull);
     expect(tapped!.orderId, _jane.orderId);
   });
+
+  testWidgets(
+    'reuses the memoized matches when query and orders are unchanged',
+    (tester) async {
+      // Covers the _matchesFor cache-hit branch: once a query has applied, a
+      // rebuild with the same _query and the same orders list instance returns
+      // the cached matches instead of re-scanning.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ordersStreamProvider.overrideWith(
+                (ref) => Stream<List<LaundryOrder>>.value([_jane, _bob, _carol])),
+          ],
+          child: MaterialApp(
+            home: OrderSearchScreen(
+              onOrderTap: (_) {},
+              cameraViewBuilder: (context, onDetected) => FakeCameraView(
+                scannedValue: 'x',
+                onDetected: onDetected,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Apply a query → first scan, result memoized.
+      await tester.enterText(find.byType(TextField), 'jane');
+      await tester.pump(const Duration(milliseconds: 350)); // past debounce
+      await tester.pumpAndSettle();
+      expect(find.text('Jane Smith'), findsOneWidget);
+      expect(find.text('Bob Jones'), findsNothing);
+
+      // Append a char: within the debounce window _query is still 'jane' and the
+      // orders list instance is unchanged, so the rebuild hits the memo cache.
+      await tester.enterText(find.byType(TextField), 'janex');
+      await tester.pump(const Duration(milliseconds: 100)); // inside debounce
+      // Still showing the 'jane' result (cache hit, no re-scan yet).
+      expect(find.text('Jane Smith'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the error state when the orders stream errors',
+    (tester) async {
+      // Covers ordersAsync.error → EmptyState("Couldn't load orders").
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ordersStreamProvider.overrideWith(
+              (ref) => Stream<List<LaundryOrder>>.error(
+                StateError('stream blew up'),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: OrderSearchScreen(
+              onOrderTap: (_) {},
+              cameraViewBuilder: (context, onDetected) => FakeCameraView(
+                scannedValue: 'x',
+                onDetected: onDetected,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text("Couldn't load orders"), findsOneWidget);
+      expect(find.text('Please try again.'), findsOneWidget);
+    },
+  );
 }

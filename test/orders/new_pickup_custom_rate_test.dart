@@ -116,6 +116,18 @@ void main() {
     return handle;
   }
 
+  /// The item count is a required field now (the DB rejects item_count = 0), so
+  /// every submit must set it. Scrolls the count box into view, then types.
+  Future<void> setCount(WidgetTester tester, int n) async {
+    await tester.dragUntilVisible(
+      find.byKey(const Key('np_count_field')),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.enterText(find.byKey(const Key('np_count_field')), '$n');
+    await tester.pump();
+  }
+
   testWidgets('blank custom rate saves a null override', (tester) async {
     await pumpFormAndOpen(tester);
 
@@ -128,6 +140,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     // Leave custom rate blank (do not expand optional details or leave field empty).
     await tester.dragUntilVisible(
@@ -174,6 +187,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     // Leave the custom-rate field blank (do not expand optional details).
     // Submit.
@@ -224,6 +238,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     // Type a one-off custom rate of 6000 for this order only.
     await tester.dragUntilVisible(
@@ -270,6 +285,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     // Expand optional details and enter a custom rate.
     await tester.dragUntilVisible(
@@ -317,6 +333,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.dragUntilVisible(
       find.text('Add optional details'),

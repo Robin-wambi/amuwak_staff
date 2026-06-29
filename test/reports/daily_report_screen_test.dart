@@ -264,4 +264,52 @@ void main() {
     expect(find.text("This week's progress"), findsOneWidget);
     expect(find.text('USh 17,000'), findsOneWidget); // total spent (weekly)
   });
+
+  testWidgets(
+    'DailyReportScreen wraps the report view in a titled Scaffold',
+    (tester) async {
+      // Covers the DailyReportScreen StatelessWidget (AppBar + Scaffold that
+      // hosts DailyReportView), which the DailyReportView-only tests skip.
+      final orders = [
+        _order('A', OrderStatus.completed, 8000),
+        _order('B', OrderStatus.inProgress, 5000),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(home: DailyReportScreen(orders: orders)),
+      );
+
+      // App bar title from the screen scaffold.
+      expect(find.widgetWithText(AppBar, 'Daily report'), findsOneWidget);
+      // The embedded DailyReportView renders its content.
+      expect(find.byType(DailyReportView), findsOneWidget);
+      expect(find.text('Revenue'), findsOneWidget);
+      expect(find.text('USh 8,000'), findsOneWidget); // earned (completed A)
+    },
+  );
+
+  testWidgets(
+    'DailyReportScreen forwards expenses to the embedded view',
+    (tester) async {
+      // Exercises the expenses-bearing path of the screen constructor.
+      // Date the expense to today so it falls inside the default daily window
+      // (DailyReportScreen has no injectable clock).
+      final today = DateTime.now();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DailyReportScreen(
+            orders: const [],
+            expenses: [
+              _expense(ExpenseCategory.detergent, 6000,
+                  on: DateTime(today.year, today.month, today.day, 8)),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.widgetWithText(AppBar, 'Daily report'), findsOneWidget);
+      expect(find.text('Expenses'), findsOneWidget);
+      expect(find.text('Detergent & cleaning'), findsOneWidget);
+    },
+  );
 }

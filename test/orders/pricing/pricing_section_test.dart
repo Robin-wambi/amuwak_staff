@@ -122,6 +122,72 @@ void main() {
     expect(picked!.amountUgx, 0);
   });
 
+  testWidgets('the All chip resets the category filter to show everything',
+      (tester) async {
+    final catalog = [
+      CatalogItem(
+          id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning'),
+      CatalogItem(id: 'c2', name: 'Blanket', amountUgx: 8000, category: 'Bulky'),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => showPickLineItemSheet(context, catalog),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    // Narrow to one category, then tap All to restore the full list.
+    await tester.tap(find.byKey(const Key('pick_category_Dry Cleaning')));
+    await tester.pumpAndSettle();
+    expect(find.text('Blanket'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('pick_category_all')));
+    await tester.pumpAndSettle();
+    expect(find.text('Suit'), findsOneWidget);
+    expect(find.text('Blanket'), findsOneWidget);
+  });
+
+  testWidgets('Custom item opens the add sheet and returns the entered item',
+      (tester) async {
+    final catalog = [
+      CatalogItem(
+          id: 'c1', name: 'Suit', amountUgx: 12000, category: 'Dry Cleaning'),
+    ];
+    LineItem? picked;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () async =>
+                picked = await showPickLineItemSheet(context, catalog),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('pick_custom_item')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('line_item_name')), 'Curtain');
+    await tester.enterText(find.byKey(const Key('line_item_amount')), '15000');
+    await tester.tap(find.byKey(const Key('line_item_save')));
+    await tester.pumpAndSettle();
+
+    // The custom item flows back out through the picker's onTap pop.
+    expect(picked, isNotNull);
+    expect(picked!.name, 'Curtain');
+    expect(picked!.amountUgx, 15000);
+  });
+
   testWidgets('no category chips when nothing is categorised', (tester) async {
     final catalog = [
       CatalogItem(id: 'c1', name: 'Plain', amountUgx: 1000),

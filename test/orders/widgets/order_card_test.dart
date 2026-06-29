@@ -202,6 +202,30 @@ void main() {
   });
 
   group('delete', () {
+    testWidgets('Cancel in the confirm dialog dismisses it without deleting',
+        (tester) async {
+      var deleted = false;
+      await tester.pumpWidget(_host(
+        OrderCard(
+          order: _order(),
+          onTap: () {},
+          onDelete: () => deleted = true,
+        ),
+      ));
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(deleted, isFalse);
+    });
+
     testWidgets('a card with onDelete has no swipe Dismissible — delete is '
         'only via the ⋮ menu', (tester) async {
       await tester.pumpWidget(_host(

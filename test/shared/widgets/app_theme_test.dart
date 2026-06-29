@@ -39,4 +39,28 @@ void main() {
     final shape = theme.cardTheme.shape as RoundedRectangleBorder;
     expect(shape.borderRadius, BorderRadius.circular(AppRadii.card));
   });
+
+  group('navigation bar state-resolved styling', () {
+    test('icon colour switches between selected and unselected', () {
+      final iconTheme = theme.navigationBarTheme.iconTheme!;
+      final selected = iconTheme.resolve({WidgetState.selected})!;
+      final unselected = iconTheme.resolve(<WidgetState>{})!;
+
+      expect(selected.color, AppColors.primary);
+      expect(unselected.color, AppColors.secondaryText);
+      expect(selected.size, 24);
+    });
+
+    test('label colour and weight switch between selected and unselected', () {
+      final labelStyle = theme.navigationBarTheme.labelTextStyle!;
+      final selected = labelStyle.resolve({WidgetState.selected})!;
+      final unselected = labelStyle.resolve(<WidgetState>{})!;
+
+      expect(selected.color, AppColors.dark);
+      expect(selected.fontWeight, FontWeight.w700);
+      expect(unselected.color, AppColors.secondaryText);
+      expect(unselected.fontWeight, FontWeight.w600);
+      expect(selected.fontFamily, AppTypography.fontFamily);
+    });
+  });
 }

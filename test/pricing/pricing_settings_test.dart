@@ -65,5 +65,20 @@ void main() {
       expect(s.expressFlatUgx, 2000);
       expect(s.defaultRatePerKgUgx, 5000);
     });
+
+    test('copyWith preserves id, updatedAt and updatedBy', () {
+      final original = PricingSettings.fromSupabase({
+        'id': 'p1',
+        'default_rate_per_kg_ugx': 5000,
+        'updated_at': '2026-06-06T10:00:00Z',
+        'updated_by': 'staff-7',
+      });
+      final s = original.copyWith(expressPct: 25);
+      expect(s.id, 'p1');
+      expect(s.updatedAt, original.updatedAt);
+      expect(s.updatedBy, 'staff-7');
+      expect(s.expressPct, 25.0);
+      expect(s.defaultRatePerKgUgx, 5000);
+    });
   });
 }

@@ -35,5 +35,27 @@ void main() {
         LineItem(name: 'A', amountUgx: 100),
       );
     });
+
+    test('is not equal when name or amount differ, and not equal to other types',
+        () {
+      expect(LineItem(name: 'A', amountUgx: 100) ==
+          LineItem(name: 'B', amountUgx: 100), isFalse);
+      expect(LineItem(name: 'A', amountUgx: 100) ==
+          LineItem(name: 'A', amountUgx: 200), isFalse);
+      // ignore: unrelated_type_equality_checks
+      expect(LineItem(name: 'A', amountUgx: 100) == 'A', isFalse);
+    });
+
+    test('equal items share a hashCode; different items usually do not', () {
+      expect(LineItem(name: 'A', amountUgx: 100).hashCode,
+          LineItem(name: 'A', amountUgx: 100).hashCode);
+      expect(LineItem(name: 'A', amountUgx: 100).hashCode,
+          isNot(LineItem(name: 'B', amountUgx: 100).hashCode));
+    });
+
+    test('toString includes the name and amount', () {
+      expect(LineItem(name: 'Blanket', amountUgx: 8000).toString(),
+          'LineItem(Blanket, 8000)');
+    });
   });
 }
