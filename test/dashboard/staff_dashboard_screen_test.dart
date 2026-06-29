@@ -23,6 +23,8 @@ import 'package:amuwak_staff/src/orders/order_filter_screen.dart';
 import 'package:amuwak_staff/src/orders/order_search_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
+import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
+import 'package:amuwak_staff/src/orders/new_pickup_result.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
@@ -121,6 +123,7 @@ class _ThrowingPricingSettingsRepository extends PricingSettingsRepository {
 Future<void> pumpDashboardWithDb(
   WidgetTester tester, {
   bool lostPhoto = false,
+  OpenNewPickupFn? openNewPickup,
   List<Override> extraOverrides = const [],
 }) async {
   final stubOrdersRepo = _StubOrdersRepository();
@@ -165,8 +168,10 @@ Future<void> pumpDashboardWithDb(
         home: Builder(
           builder: (context) => MediaQuery(
             data: MediaQuery.of(context).copyWith(disableAnimations: true),
-            child:
-                StaffDashboardScreen(retrieveLostPhoto: () async => lostPhoto),
+            child: StaffDashboardScreen(
+              retrieveLostPhoto: () async => lostPhoto,
+              openNewPickup: openNewPickup,
+            ),
           ),
         ),
       ),
@@ -1557,6 +1562,103 @@ void main() {
         address: 'Kira',
         notes: '',
       );
+
+  Future<void> tapNewPickup(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('New pickup', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New pickup'));
+    // _handleNewPickup polls the orders stream up to 20×100ms for the freshly
+    // written order. Those awaited Future.delayed timers are off-tree, so
+    // pumpAndSettle alone won't advance them — step the fake clock through the
+    // poll window, then settle navigation/snackbars.
+    for (var i = 0; i < 22; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'New pickup → startPickupNow=false just returns (no capture screen)',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(
+        tester,
+        openNewPickup: (context, {required settings, required staffId}) async =>
+            const NewPickupResult(orderId: 'o-sched', startPickupNow: false),
+        extraOverrides: [
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+          ...detailsOverrides(),
+        ],
+      );
+
+      await tapNewPickup(tester);
+
+      // A scheduled-for-later pickup does not hand off to capture.
+      expect(find.byType(PickupCaptureScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'New pickup → startPickupNow but the order never streams back shows the '
+    '"open it from the list" hint',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(
+        tester,
+        openNewPickup: (context, {required settings, required staffId}) async =>
+            const NewPickupResult(orderId: 'o-missing', startPickupNow: true),
+        extraOverrides: [
+          // Stream stays empty → the poll window exhausts without finding it.
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value(const []),
+          ),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+          ...detailsOverrides(),
+        ],
+      );
+
+      await tapNewPickup(tester);
+
+      expect(
+        find.textContaining('open it from the list to start pickup'),
+        findsOneWidget,
+      );
+      expect(find.byType(PickupCaptureScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'New pickup → startPickupNow with the order in the stream hands off to '
+    'PickupCaptureScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(
+        tester,
+        openNewPickup: (context, {required settings, required staffId}) async =>
+            const NewPickupResult(orderId: 'o-fresh', startPickupNow: true),
+        extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('fresh')]),
+          ),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+          ...detailsOverrides(),
+        ],
+      );
+
+      await tapNewPickup(tester);
+
+      expect(find.byType(PickupCaptureScreen), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'tapping an order card with a valid session opens OrderDetailsScreen',

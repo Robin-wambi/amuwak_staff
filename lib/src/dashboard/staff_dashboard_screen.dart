@@ -59,11 +59,22 @@ typedef RetrieveLostPhotoFn = Future<bool> Function();
 /// transitive Riverpod provider that `signOutAndReset` would resolve through.
 typedef SignOutFn = Future<void> Function(WidgetRef ref);
 
+/// Optional injectable for tests: opens the New Pickup form and returns its
+/// result, so a test can drive the post-pickup handoff (poll the stream → open
+/// PickupCaptureScreen) without having to complete the whole pickup form. The
+/// default builds and pushes the real [NewPickupScreen].
+typedef OpenNewPickupFn = Future<NewPickupResult?> Function(
+  BuildContext context, {
+  required PricingSettings settings,
+  required String staffId,
+});
+
 class StaffDashboardScreen extends ConsumerStatefulWidget {
   const StaffDashboardScreen({
     super.key,
     this.retrieveLostPhoto,
     this.signOut,
+    this.openNewPickup,
   });
 
   // On Android the OS may kill MainActivity while the camera is open, dropping
@@ -74,6 +85,9 @@ class StaffDashboardScreen extends ConsumerStatefulWidget {
   /// Test seam — defaults to the real `signOutAndReset(...)` flow wired
   /// through the auth + orchestrator + database providers.
   final SignOutFn? signOut;
+
+  /// Test seam — defaults to building + pushing the real [NewPickupScreen].
+  final OpenNewPickupFn? openNewPickup;
 
   @override
   ConsumerState<StaffDashboardScreen> createState() =>
@@ -210,24 +224,30 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       return;
     }
     if (!mounted) return;
-    final result = await Navigator.of(context).push<NewPickupResult>(
-      MaterialPageRoute(
-        builder: (_) => NewPickupScreen(
-          customersRepo: ref.read(customersRepositoryProvider),
-          ordersRepo: ref.read(ordersRepositoryProvider),
-          actorStaffId: staffId,
-          clock: DateTime.now,
-          orderIdGenerator: defaultUuidV7,
-          customerIdGenerator: defaultUuidV7,
-          geolocate: createDefaultGeolocate(),
-          reverseGeocode: createDefaultReverseGeocode(),
-          defaultRatePerKgUgx: settings.defaultRatePerKgUgx,
-          deliveryFeeUgx: settings.deliveryFeeUgx,
-          expressFlatUgx: settings.expressFlatUgx,
-          expressPct: settings.expressPct,
+    final opener = widget.openNewPickup;
+    final NewPickupResult? result;
+    if (opener != null) {
+      result = await opener(context, settings: settings, staffId: staffId);
+    } else {
+      result = await Navigator.of(context).push<NewPickupResult>(
+        MaterialPageRoute(
+          builder: (_) => NewPickupScreen(
+            customersRepo: ref.read(customersRepositoryProvider),
+            ordersRepo: ref.read(ordersRepositoryProvider),
+            actorStaffId: staffId,
+            clock: DateTime.now,
+            orderIdGenerator: defaultUuidV7,
+            customerIdGenerator: defaultUuidV7,
+            geolocate: createDefaultGeolocate(),
+            reverseGeocode: createDefaultReverseGeocode(),
+            defaultRatePerKgUgx: settings.defaultRatePerKgUgx,
+            deliveryFeeUgx: settings.deliveryFeeUgx,
+            expressFlatUgx: settings.expressFlatUgx,
+            expressPct: settings.expressPct,
+          ),
         ),
-      ),
-    );
+      );
+    }
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
     // The order was just written to Supabase; the realtime stream re-emits
