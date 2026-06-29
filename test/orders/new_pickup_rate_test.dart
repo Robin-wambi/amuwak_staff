@@ -82,6 +82,22 @@ void main() {
     );
   }
 
+  /// A tall viewport so the whole form (incl. the required item-count field that
+  /// now sits in the main column) fits without the lazy ListView disposing the
+  /// Create button.
+  void useTallViewport(WidgetTester tester) {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
+
+  /// The item count is a required field now (the DB rejects item_count = 0), so
+  /// every submit must set it first.
+  Future<void> setCount(WidgetTester tester, int n) async {
+    await tester.enterText(find.byKey(const Key('np_count_field')), '$n');
+    await tester.pump();
+  }
+
   testWidgets('shows the default rate when no customer is matched',
       (tester) async {
     await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
@@ -193,6 +209,7 @@ void main() {
   testWidgets(
       'snapshot uses the default rate for an order with no customer override',
       (tester) async {
+    useTallViewport(tester);
     await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
 
     await tester.enterText(find.byKey(const Key('np_name')), 'New Customer');
@@ -203,6 +220,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
@@ -226,6 +244,7 @@ void main() {
           ),
         ]);
 
+    useTallViewport(tester);
     await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
 
     await tester.enterText(
@@ -239,6 +258,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();

@@ -283,6 +283,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       'Phone number (9 digits)',
     if (_addressController.text.trim().isEmpty) 'Address',
     if (_serviceType == null) 'Service type',
+    // The DB rejects an order with item_count = 0 (CHECK item_count > 0), so a
+    // pickup must declare at least one item before it can be created.
+    if (_count < 1) 'Number of items',
     // In "Schedule for later" mode a time must be chosen, otherwise the
     // order would silently fall back to an immediate pickup.
     if (_pickupMode == _PickupTimeMode.scheduled && _scheduledFor == null)
@@ -465,8 +468,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save customer. Please try again.'),
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text('Could not save customer: $e'),
         ),
       );
       return;
@@ -488,9 +492,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
           content: Text(
-            'Could not reserve an order number. '
+            'Could not reserve an order number: $e\n'
             'Check your connection and tap Create pickup again.',
           ),
         ),
@@ -537,9 +542,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
           content: Text(
-            'Customer was saved, but the order could not be saved. '
+            'Could not save the order: $e\n'
             'Tap Create pickup again to retry.',
           ),
         ),
@@ -594,7 +600,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               // Inline errors only after the rider has touched the field, so a
               // freshly-opened form isn't pre-nagged. Pairs with the bottom
               // "Still needed" summary to explain a disabled Create button.
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+              autovalidateMode: AutovalidateMode.always,
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? "Enter the customer's name"
                   : null,
@@ -608,7 +614,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               keyboardType: TextInputType.phone,
               inputFormatters: const [_UgandaNationalDigitsLimiter()],
               decoration: const InputDecoration(labelText: 'Phone'),
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+              autovalidateMode: AutovalidateMode.always,
               // The single easiest field to get subtly wrong (one digit short),
               // so call out the exact requirement inline.
               validator: (v) => ugandaNationalDigits(v ?? '').length == 9
@@ -656,7 +662,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Address',
                           ),
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          autovalidateMode: AutovalidateMode.always,
                           // `controller` is _addressController (passed to
                           // RawAutocomplete above), so `v` reflects the same
                           // value _missingRequirements checks at submit.
@@ -715,12 +721,76 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               key: const Key('np_service_type'),
               decoration: const InputDecoration(labelText: 'Service type'),
               value: _serviceType,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+              autovalidateMode: AutovalidateMode.always,
               validator: (v) => v == null ? 'Choose a service type' : null,
               items: ServiceType.values
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
                   .toList(),
               onChanged: (v) => setState(() => _serviceType = v),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Number of items',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Pieces of clothing to collect — weight is recorded at pickup',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  key: const Key('np_count_dec'),
+                  tooltip: 'Fewer items',
+                  icon: const Icon(Icons.remove_circle_outline),
+                  onPressed: _count > 0 ? () => _changeCount(-1) : null,
+                ),
+                SizedBox(
+                  width: 160,
+                  child: TextField(
+                    key: const Key('np_count_field'),
+                    controller: _countController,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: _onCountTyped,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      suffixText: 'items',
+                      // Required field: flag an unset count up front (always-on)
+                      // so the rider sees the box that still needs a value, not
+                      // just a disabled Create button.
+                      errorText: _count < 1 ? 'Add at least 1 item' : null,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('np_count_inc'),
+                  tooltip: 'More items',
+                  icon: const Icon(Icons.add_circle_outline),
+                  onPressed:
+                      _count < _maxItemCount ? () => _changeCount(1) : null,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             SegmentedButton<_PickupTimeMode>(
@@ -819,67 +889,6 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               ),
             ),
             if (_optionalExpanded) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Number of items',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Pieces of clothing to collect — weight is recorded at pickup',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    key: const Key('np_count_dec'),
-                    tooltip: 'Fewer items',
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: _count > 0 ? () => _changeCount(-1) : null,
-                  ),
-                  SizedBox(
-                    width: 120,
-                    child: TextField(
-                      key: const Key('np_count_field'),
-                      controller: _countController,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      onChanged: _onCountTyped,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        suffixText: 'items',
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    key: const Key('np_count_inc'),
-                    tooltip: 'More items',
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _count < _maxItemCount
-                        ? () => _changeCount(1)
-                        : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               TextFormField(
                 key: const Key('np_notes'),
                 controller: _notesController,

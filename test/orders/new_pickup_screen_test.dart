@@ -147,6 +147,14 @@ void main() {
     return handle;
   }
 
+  /// The item count is now a required field (the DB rejects item_count = 0), so
+  /// every happy-path submit must set it before Create enables. Types the value
+  /// straight into the always-visible count box.
+  Future<void> setCount(WidgetTester tester, int n) async {
+    await tester.enterText(find.byKey(const Key('np_count_field')), '$n');
+    await tester.pump();
+  }
+
   testWidgets(
     'scheduling: quick chips and the custom date/time picker set a pickup time',
     (tester) async {
@@ -203,8 +211,71 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
+  });
+
+  testWidgets('Create stays disabled until item count is at least 1', (
+    tester,
+  ) async {
+    await pumpFormAndOpen(tester);
+    final create = find.widgetWithText(ElevatedButton, 'Create pickup');
+
+    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+    await tester.enterText(
+      find.byKey(const Key('np_phone')),
+      '+256 700 111 222',
+    );
+    await tester.enterText(
+      find.byKey(const Key('np_address')),
+      'Kikoni, Kampala',
+    );
+    await tester.tap(find.byKey(const Key('np_service_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ServiceType.washAndIron.label).last);
+    await tester.pumpAndSettle();
+
+    // Everything else is valid, but the item count is still 0 → Create stays
+    // disabled and the "Still needed" hint names it. (The DB rejects an order
+    // with item_count = 0, so the form must not let one through.)
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNull);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('np_missing_hint'))).data!,
+      contains('Number of items'),
+    );
+
+    // Stepping the count up to 1 satisfies the last requirement.
+    await tester.tap(find.byKey(const Key('np_count_inc')));
+    await tester.pump();
+    expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
+    expect(find.byKey(const Key('np_missing_hint')), findsNothing);
+  });
+
+  testWidgets('the item count box shows an inline error while it is still 0', (
+    tester,
+  ) async {
+    await pumpFormAndOpen(tester);
+
+    // Always-on: a freshly opened form already flags the empty count box so the
+    // rider sees the required field, not just a disabled button.
+    expect(find.text('Add at least 1 item'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('np_count_inc')));
+    await tester.pump();
+    expect(find.text('Add at least 1 item'), findsNothing);
+  });
+
+  testWidgets('required field errors show immediately on a fresh form', (
+    tester,
+  ) async {
+    await pumpFormAndOpen(tester);
+
+    // Always-on validation: every empty required box flags itself up front, not
+    // only after the rider touches it.
+    expect(find.text("Enter the customer's name"), findsOneWidget);
+    expect(find.text('Enter the 9-digit number after +256'), findsOneWidget);
+    expect(find.text('Enter or detect the pickup address'), findsOneWidget);
   });
 
   testWidgets(
@@ -221,8 +292,9 @@ void main() {
       expect(initial, contains('Phone'));
       expect(initial, contains('Address'));
       expect(initial, contains('Service type'));
+      expect(initial, contains('Number of items'));
 
-      // Fill everything except the service type — only that should remain.
+      // Fill everything except the service type and item count — those remain.
       await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
       await tester.enterText(
         find.byKey(const Key('np_phone')),
@@ -237,12 +309,15 @@ void main() {
       expect(partial, isNot(contains('Customer name')));
       expect(partial, isNot(contains('Address')));
       expect(partial, contains('Service type'));
+      expect(partial, contains('Number of items'));
 
-      // Pick it: the hint disappears and Create enables.
+      // Pick the service type and set a count: the hint disappears and Create
+      // enables.
       await tester.tap(find.byKey(const Key('np_service_type')));
       await tester.pumpAndSettle();
       await tester.tap(find.text(ServiceType.washAndIron.label).last);
       await tester.pumpAndSettle();
+      await setCount(tester, 3);
       expect(find.byKey(const Key('np_missing_hint')), findsNothing);
       expect(
         tester
@@ -261,10 +336,10 @@ void main() {
       await pumpFormAndOpen(tester);
       const message = 'Enter the 9-digit number after +256';
 
-      // Pristine field: no premature error.
-      expect(find.text(message), findsNothing);
+      // Always-on validation: the empty required field flags itself up front.
+      expect(find.text(message), findsOneWidget);
 
-      // Too short after the rider edits it — the error appears under the field.
+      // Still too short — the error stays.
       await tester.enterText(find.byKey(const Key('np_phone')), '+256 700');
       await tester.pump();
       expect(find.text(message), findsOneWidget);
@@ -346,6 +421,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
@@ -391,6 +467,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
@@ -425,6 +502,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(ServiceType.washAndIron.label).last);
       await tester.pumpAndSettle();
+      await setCount(tester, 3);
 
       // First attempt: the RPC throws. The form stays open with an error and the
       // order is never written (the reservation throws before the order write).
@@ -448,6 +526,42 @@ void main() {
       expect(handle.popped, isNotNull);
       expect(capturedOrder().orderCode, 'AMW-2026-0042');
       expect(calls, 2);
+    },
+  );
+
+  testWidgets(
+    'a failed order save surfaces the real error and keeps the form open',
+    (tester) async {
+      when(
+        () => ordersRepo.upsertOrder(
+          any(),
+          actorStaffId: any(named: 'actorStaffId'),
+        ),
+      ).thenThrow(Exception('boom-postgrest-23514'));
+      final handle = await pumpFormAndOpen(tester);
+
+      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 700 111 222',
+      );
+      await tester.enterText(
+        find.byKey(const Key('np_address')),
+        'Kikoni, Kampala',
+      );
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
+      await setCount(tester, 3);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+      await tester.pump();
+
+      // The actual error is shown (not a generic "network" message), and the
+      // form stays open so the rider can retry.
+      expect(find.textContaining('boom-postgrest-23514'), findsOneWidget);
+      expect(handle.popped, isNull);
     },
   );
 
@@ -533,6 +647,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.dryCleaning.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
@@ -573,6 +688,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(ServiceType.washAndIron.label).last);
       await tester.pumpAndSettle();
+      await setCount(tester, 3);
       await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
       await tester.pumpAndSettle();
 
@@ -669,6 +785,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.text('Schedule for later'));
     await tester.pumpAndSettle();
@@ -713,6 +830,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     // All required fields filled — in "Pickup now" mode Create is enabled.
     final create = find.widgetWithText(ElevatedButton, 'Create pickup');
@@ -748,8 +866,8 @@ void main() {
     expect(tester.widget<ElevatedButton>(create).onPressed, isNotNull);
   });
 
-  testWidgets('Optional details: expand → stepper increments count, notes '
-      'are persisted in the order row', (tester) async {
+  testWidgets('item-count stepper sets the count; notes (optional) are '
+      'persisted in the order row', (tester) async {
     await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
@@ -763,6 +881,12 @@ void main() {
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
 
+    // The count is a main field now — step it up before reaching the optional
+    // section (notes still live under "Add optional details").
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byKey(const Key('np_count_inc')));
+      await tester.pump();
+    }
     await tester.dragUntilVisible(
       find.text('Add optional details'),
       find.byType(ListView),
@@ -770,10 +894,6 @@ void main() {
     );
     await tester.tap(find.text('Add optional details'));
     await tester.pumpAndSettle();
-    for (var i = 0; i < 4; i++) {
-      await tester.tap(find.byKey(const Key('np_count_inc')));
-      await tester.pump();
-    }
     await tester.dragUntilVisible(
       find.byKey(const Key('np_notes')),
       find.byType(ListView),
@@ -797,18 +917,10 @@ void main() {
     expect(order.notes, 'Gate locked after 6');
   });
 
-  testWidgets('Optional details: item-count stepper caps at 99', (
+  testWidgets('Item count: stepper caps at 99', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
-
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.tap(find.text('Add optional details'));
-    await tester.pumpAndSettle();
 
     // Tap well past the cap; the count must not exceed 99 (no four-digit counts).
     for (var i = 0; i < 105; i++) {
@@ -828,25 +940,19 @@ void main() {
     );
   });
 
-  testWidgets('Optional details: the count is labelled and carries its unit', (
+  testWidgets('Item count: the count is labelled and carries its unit', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.tap(find.text('Add optional details'));
-    await tester.pumpAndSettle();
 
-    // The bare number is gone — a rider now sees what the value means.
+    // The count is a main required field now (not under "Add optional details"),
+    // so it is visible immediately with its label and unit.
     expect(find.text('Number of items'), findsOneWidget);
     expect(find.byKey(const Key('np_count_field')), findsOneWidget);
     expect(find.text('items'), findsOneWidget);
   });
 
-  testWidgets('Optional details: typing a count sets itemCount (tap-to-edit)', (
+  testWidgets('Item count: typing a count sets itemCount (tap-to-edit)', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
@@ -862,18 +968,6 @@ void main() {
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.tap(find.text('Add optional details'));
-    await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_count_field')),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     // Type the count directly instead of tapping + thirty times.
     await tester.enterText(find.byKey(const Key('np_count_field')), '30');
     await tester.pump();
@@ -889,7 +983,7 @@ void main() {
     expect(capturedOrder().itemCount, 30);
   });
 
-  testWidgets('Optional details: a typed count over 99 is clamped to 99', (
+  testWidgets('Item count: a typed count over 99 is clamped to 99', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
@@ -905,18 +999,6 @@ void main() {
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.tap(find.text('Add optional details'));
-    await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_count_field')),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     await tester.enterText(find.byKey(const Key('np_count_field')), '150');
     await tester.pump();
 
@@ -955,6 +1037,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
+    await setCount(tester, 3);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pump(); // kick off the async submit; _saving is now true
