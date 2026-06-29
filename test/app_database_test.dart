@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 
 void main() {
@@ -85,5 +89,35 @@ void main() {
             .getSingle();
     expect(row.updatedBy, 'staff-2');
     expect(row.deletedBy, 'staff-3');
+  });
+
+  test('onUpgrade from v5 adds the orders audit columns', () async {
+    final tempDir = await Directory.systemTemp.createTemp('amuwak_mig_test');
+    final file = File(p.join(tempDir.path, 'v5.sqlite'));
+    try {
+      // Seed a v5-era database: an orders table without the audit columns,
+      // stamped at user_version 5 so opening AppDatabase runs onUpgrade(5 -> 6)
+      // and only the `from < 6` branch fires.
+      final seed = sqlite3.open(file.path);
+      seed.execute(
+        'CREATE TABLE orders (id TEXT NOT NULL PRIMARY KEY, order_code TEXT NOT NULL);',
+      );
+      seed.execute('PRAGMA user_version = 5;');
+      seed.dispose();
+
+      final migrated = AppDatabase.forTesting(NativeDatabase(file));
+      // A query forces the lazy connection open, which runs the migration.
+      final cols =
+          await migrated.customSelect("PRAGMA table_info('orders')").get();
+      final names = cols.map((r) => r.read<String>('name')).toSet();
+      expect(
+        names,
+        containsAll(<String>['updated_by', 'deleted_by']),
+        reason: 'the from < 6 branch should add both audit columns',
+      );
+      await migrated.close();
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
   });
 }

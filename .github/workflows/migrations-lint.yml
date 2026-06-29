@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Reject duplicate migration number prefixes
         run: |
@@ -35,14 +37,22 @@ jobs:
           fi
           echo "No duplicate migration number prefixes."
 
-      - name: Warn on migrations missing a sibling test
+      # Only flag migrations *added in this PR* — warning on the whole (partly
+      # untested) backlog would be noise that trains reviewers to ignore it.
+      - name: Warn on newly added migrations missing a sibling test
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
         run: |
+          git fetch --quiet origin "$BASE"
+          added="$(git diff --name-only --diff-filter=A "origin/${BASE}...HEAD" -- supabase/migrations/ || true)"
           missing=0
-          for f in supabase/migrations/*.sql; do
+          for f in $added; do
+            case "$f" in *.sql) ;; *) continue ;; esac
             base="$(basename "$f" .sql)"
             if [ ! -f "supabase/tests/${base}_test.sql" ]; then
-              echo "::warning::No test for migration ${base} (expected supabase/tests/${base}_test.sql)"
+              echo "::warning::New migration ${base} has no sibling test (expected supabase/tests/${base}_test.sql)"
               missing=1
             fi
           done
-          [ "$missing" -eq 0 ] && echo "Every migration has a sibling test." || true
+          [ "$missing" -eq 0 ] && echo "All newly added migrations have a sibling test." || true
