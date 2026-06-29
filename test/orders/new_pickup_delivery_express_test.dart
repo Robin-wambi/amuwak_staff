@@ -113,12 +113,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(ServiceType.washAndIron.label).last);
     await tester.pumpAndSettle();
-    // Item count is required now (the DB rejects item_count = 0).
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_count_field')),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
+    // Item count is required now (the DB rejects item_count = 0). The tall
+    // viewport from pumpAndOpen keeps the count box on-screen, so no scroll.
     await tester.enterText(find.byKey(const Key('np_count_field')), '3');
     await tester.pump();
   }

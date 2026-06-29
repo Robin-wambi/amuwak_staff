@@ -276,6 +276,9 @@ void main() {
     expect(find.text("Enter the customer's name"), findsOneWidget);
     expect(find.text('Enter the 9-digit number after +256'), findsOneWidget);
     expect(find.text('Enter or detect the pickup address'), findsOneWidget);
+    // The service-type dropdown also pre-flags on open (DropdownButtonFormField
+    // honours AutovalidateMode.always on the first frame).
+    expect(find.text('Choose a service type'), findsOneWidget);
   });
 
   testWidgets(
@@ -562,6 +565,46 @@ void main() {
       // form stays open so the rider can retry.
       expect(find.textContaining('boom-postgrest-23514'), findsOneWidget);
       expect(handle.popped, isNull);
+    },
+  );
+
+  testWidgets(
+    'a failed customer save surfaces the real error and keeps the form open',
+    (tester) async {
+      when(
+        () => customersRepo.upsertCustomer(any()),
+      ).thenThrow(Exception('boom-customer-rls'));
+      final handle = await pumpFormAndOpen(tester);
+
+      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
+      await tester.enterText(
+        find.byKey(const Key('np_phone')),
+        '+256 700 111 222',
+      );
+      await tester.enterText(
+        find.byKey(const Key('np_address')),
+        'Kikoni, Kampala',
+      );
+      await tester.tap(find.byKey(const Key('np_service_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ServiceType.washAndIron.label).last);
+      await tester.pumpAndSettle();
+      await setCount(tester, 3);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
+      await tester.pump();
+
+      // The real error is shown (this catch was previously the opaque generic
+      // message that hid the root bug), and the form stays open to retry.
+      expect(find.textContaining('boom-customer-rls'), findsOneWidget);
+      expect(handle.popped, isNull);
+      // The order write must never run when the customer write failed.
+      verifyNever(
+        () => ordersRepo.upsertOrder(
+          any(),
+          actorStaffId: any(named: 'actorStaffId'),
+        ),
+      );
     },
   );
 
