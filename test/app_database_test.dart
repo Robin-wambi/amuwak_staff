@@ -50,13 +50,40 @@ void main() {
     expect(rows.first.orderCode, 'AMW-1');
   });
 
-  test('schemaVersion is 5', () {
-    expect(db.schemaVersion, 5);
+  test('schemaVersion is 6', () {
+    expect(db.schemaVersion, 6);
   });
 
   test('orders table exposes the pricing columns', () async {
     // A select compiling proves the columns exist.
     final rows = await db.select(db.orders).get();
     expect(rows, isEmpty);
+  });
+
+  test('orders audit pointers (updated_by/deleted_by) round-trip', () async {
+    final now = DateTime.utc(2026, 5, 19);
+    await db.into(db.orders).insert(OrdersCompanion.insert(
+      id: 'order-audit',
+      orderCode: 'AMW-AUDIT',
+      customerName: 'C',
+      phone: '+254700',
+      address: 'A',
+      serviceType: 'wash_fold',
+      status: 'received',
+      intakeMethod: 'walk_in',
+      fulfillmentMethod: 'delivery',
+      itemCount: 1,
+      intakeRecordedBy: 'staff-1',
+      createdBy: 'staff-1',
+      updatedBy: const Value('staff-2'),
+      deletedBy: const Value('staff-3'),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+    ));
+    final row =
+        await (db.select(db.orders)..where((o) => o.id.equals('order-audit')))
+            .getSingle();
+    expect(row.updatedBy, 'staff-2');
+    expect(row.deletedBy, 'staff-3');
   });
 }

@@ -17,6 +17,11 @@ class Orders extends Table {
   TextColumn     get assignedDriver     => text().named('assigned_driver').nullable()();
   TextColumn     get intakeRecordedBy   => text().named('intake_recorded_by')();
   TextColumn     get createdBy          => text().named('created_by')();
+  // Audit pointers for post-creation mutations, mirroring Supabase migration
+  // 0029. Nullable: historical rows have none, and they are write-on-Supabase /
+  // read-back-only here (no on-device UI surfaces them yet).
+  TextColumn     get updatedBy          => text().named('updated_by').nullable()();
+  TextColumn     get deletedBy          => text().named('deleted_by').nullable()();
   DateTimeColumn get createdAt          => dateTime().named('created_at').withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt          => dateTime().named('updated_at').withDefault(currentDateAndTime)();
   DateTimeColumn get deletedAt          => dateTime().named('deleted_at').nullable()();

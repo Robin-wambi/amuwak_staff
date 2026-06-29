@@ -1363,6 +1363,28 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _updatedByMeta = const VerificationMeta(
+    'updatedBy',
+  );
+  @override
+  late final GeneratedColumn<String> updatedBy = GeneratedColumn<String>(
+    'updated_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedByMeta = const VerificationMeta(
+    'deletedBy',
+  );
+  @override
+  late final GeneratedColumn<String> deletedBy = GeneratedColumn<String>(
+    'deleted_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1535,6 +1557,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     assignedDriver,
     intakeRecordedBy,
     createdBy,
+    updatedBy,
+    deletedBy,
     createdAt,
     updatedAt,
     deletedAt,
@@ -1698,6 +1722,18 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       );
     } else if (isInserting) {
       context.missing(_createdByMeta);
+    }
+    if (data.containsKey('updated_by')) {
+      context.handle(
+        _updatedByMeta,
+        updatedBy.isAcceptableOrUnknown(data['updated_by']!, _updatedByMeta),
+      );
+    }
+    if (data.containsKey('deleted_by')) {
+      context.handle(
+        _deletedByMeta,
+        deletedBy.isAcceptableOrUnknown(data['deleted_by']!, _deletedByMeta),
+      );
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -1871,6 +1907,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.string,
         data['${effectivePrefix}created_by'],
       )!,
+      updatedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by'],
+      ),
+      deletedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}deleted_by'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1949,6 +1993,8 @@ class Order extends DataClass implements Insertable<Order> {
   final String? assignedDriver;
   final String intakeRecordedBy;
   final String createdBy;
+  final String? updatedBy;
+  final String? deletedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -1979,6 +2025,8 @@ class Order extends DataClass implements Insertable<Order> {
     this.assignedDriver,
     required this.intakeRecordedBy,
     required this.createdBy,
+    this.updatedBy,
+    this.deletedBy,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -2018,6 +2066,12 @@ class Order extends DataClass implements Insertable<Order> {
     }
     map['intake_recorded_by'] = Variable<String>(intakeRecordedBy);
     map['created_by'] = Variable<String>(createdBy);
+    if (!nullToAbsent || updatedBy != null) {
+      map['updated_by'] = Variable<String>(updatedBy);
+    }
+    if (!nullToAbsent || deletedBy != null) {
+      map['deleted_by'] = Variable<String>(deletedBy);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -2064,6 +2118,12 @@ class Order extends DataClass implements Insertable<Order> {
           : Value(assignedDriver),
       intakeRecordedBy: Value(intakeRecordedBy),
       createdBy: Value(createdBy),
+      updatedBy: updatedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedBy),
+      deletedBy: deletedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedBy),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -2108,6 +2168,8 @@ class Order extends DataClass implements Insertable<Order> {
       assignedDriver: serializer.fromJson<String?>(json['assignedDriver']),
       intakeRecordedBy: serializer.fromJson<String>(json['intakeRecordedBy']),
       createdBy: serializer.fromJson<String>(json['createdBy']),
+      updatedBy: serializer.fromJson<String?>(json['updatedBy']),
+      deletedBy: serializer.fromJson<String?>(json['deletedBy']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -2155,6 +2217,8 @@ class Order extends DataClass implements Insertable<Order> {
       'assignedDriver': serializer.toJson<String?>(assignedDriver),
       'intakeRecordedBy': serializer.toJson<String>(intakeRecordedBy),
       'createdBy': serializer.toJson<String>(createdBy),
+      'updatedBy': serializer.toJson<String?>(updatedBy),
+      'deletedBy': serializer.toJson<String?>(deletedBy),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -2188,6 +2252,8 @@ class Order extends DataClass implements Insertable<Order> {
     Value<String?> assignedDriver = const Value.absent(),
     String? intakeRecordedBy,
     String? createdBy,
+    Value<String?> updatedBy = const Value.absent(),
+    Value<String?> deletedBy = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -2220,6 +2286,8 @@ class Order extends DataClass implements Insertable<Order> {
         : this.assignedDriver,
     intakeRecordedBy: intakeRecordedBy ?? this.intakeRecordedBy,
     createdBy: createdBy ?? this.createdBy,
+    updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
+    deletedBy: deletedBy.present ? deletedBy.value : this.deletedBy,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -2274,6 +2342,8 @@ class Order extends DataClass implements Insertable<Order> {
           ? data.intakeRecordedBy.value
           : this.intakeRecordedBy,
       createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
+      deletedBy: data.deletedBy.present ? data.deletedBy.value : this.deletedBy,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -2323,6 +2393,8 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('assignedDriver: $assignedDriver, ')
           ..write('intakeRecordedBy: $intakeRecordedBy, ')
           ..write('createdBy: $createdBy, ')
+          ..write('updatedBy: $updatedBy, ')
+          ..write('deletedBy: $deletedBy, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -2358,6 +2430,8 @@ class Order extends DataClass implements Insertable<Order> {
     assignedDriver,
     intakeRecordedBy,
     createdBy,
+    updatedBy,
+    deletedBy,
     createdAt,
     updatedAt,
     deletedAt,
@@ -2392,6 +2466,8 @@ class Order extends DataClass implements Insertable<Order> {
           other.assignedDriver == this.assignedDriver &&
           other.intakeRecordedBy == this.intakeRecordedBy &&
           other.createdBy == this.createdBy &&
+          other.updatedBy == this.updatedBy &&
+          other.deletedBy == this.deletedBy &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -2424,6 +2500,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<String?> assignedDriver;
   final Value<String> intakeRecordedBy;
   final Value<String> createdBy;
+  final Value<String?> updatedBy;
+  final Value<String?> deletedBy;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -2455,6 +2533,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.assignedDriver = const Value.absent(),
     this.intakeRecordedBy = const Value.absent(),
     this.createdBy = const Value.absent(),
+    this.updatedBy = const Value.absent(),
+    this.deletedBy = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -2487,6 +2567,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.assignedDriver = const Value.absent(),
     required String intakeRecordedBy,
     required String createdBy,
+    this.updatedBy = const Value.absent(),
+    this.deletedBy = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -2530,6 +2612,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<String>? assignedDriver,
     Expression<String>? intakeRecordedBy,
     Expression<String>? createdBy,
+    Expression<String>? updatedBy,
+    Expression<String>? deletedBy,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -2562,6 +2646,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (assignedDriver != null) 'assigned_driver': assignedDriver,
       if (intakeRecordedBy != null) 'intake_recorded_by': intakeRecordedBy,
       if (createdBy != null) 'created_by': createdBy,
+      if (updatedBy != null) 'updated_by': updatedBy,
+      if (deletedBy != null) 'deleted_by': deletedBy,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -2601,6 +2687,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<String?>? assignedDriver,
     Value<String>? intakeRecordedBy,
     Value<String>? createdBy,
+    Value<String?>? updatedBy,
+    Value<String?>? deletedBy,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -2633,6 +2721,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       assignedDriver: assignedDriver ?? this.assignedDriver,
       intakeRecordedBy: intakeRecordedBy ?? this.intakeRecordedBy,
       createdBy: createdBy ?? this.createdBy,
+      updatedBy: updatedBy ?? this.updatedBy,
+      deletedBy: deletedBy ?? this.deletedBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -2702,6 +2792,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (createdBy.present) {
       map['created_by'] = Variable<String>(createdBy.value);
+    }
+    if (updatedBy.present) {
+      map['updated_by'] = Variable<String>(updatedBy.value);
+    }
+    if (deletedBy.present) {
+      map['deleted_by'] = Variable<String>(deletedBy.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -2773,6 +2869,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('assignedDriver: $assignedDriver, ')
           ..write('intakeRecordedBy: $intakeRecordedBy, ')
           ..write('createdBy: $createdBy, ')
+          ..write('updatedBy: $updatedBy, ')
+          ..write('deletedBy: $deletedBy, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -8604,6 +8702,8 @@ typedef $$OrdersTableCreateCompanionBuilder =
       Value<String?> assignedDriver,
       required String intakeRecordedBy,
       required String createdBy,
+      Value<String?> updatedBy,
+      Value<String?> deletedBy,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -8637,6 +8737,8 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<String?> assignedDriver,
       Value<String> intakeRecordedBy,
       Value<String> createdBy,
+      Value<String?> updatedBy,
+      Value<String?> deletedBy,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -8739,6 +8841,16 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<String> get createdBy => $composableBuilder(
     column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deletedBy => $composableBuilder(
+    column: $table.deletedBy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8897,6 +9009,16 @@ class $$OrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deletedBy => $composableBuilder(
+    column: $table.deletedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9036,6 +9158,12 @@ class $$OrdersTableAnnotationComposer
   GeneratedColumn<String> get createdBy =>
       $composableBuilder(column: $table.createdBy, builder: (column) => column);
 
+  GeneratedColumn<String> get updatedBy =>
+      $composableBuilder(column: $table.updatedBy, builder: (column) => column);
+
+  GeneratedColumn<String> get deletedBy =>
+      $composableBuilder(column: $table.deletedBy, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9134,6 +9262,8 @@ class $$OrdersTableTableManager
                 Value<String?> assignedDriver = const Value.absent(),
                 Value<String> intakeRecordedBy = const Value.absent(),
                 Value<String> createdBy = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
+                Value<String?> deletedBy = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -9165,6 +9295,8 @@ class $$OrdersTableTableManager
                 assignedDriver: assignedDriver,
                 intakeRecordedBy: intakeRecordedBy,
                 createdBy: createdBy,
+                updatedBy: updatedBy,
+                deletedBy: deletedBy,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -9198,6 +9330,8 @@ class $$OrdersTableTableManager
                 Value<String?> assignedDriver = const Value.absent(),
                 required String intakeRecordedBy,
                 required String createdBy,
+                Value<String?> updatedBy = const Value.absent(),
+                Value<String?> deletedBy = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -9229,6 +9363,8 @@ class $$OrdersTableTableManager
                 assignedDriver: assignedDriver,
                 intakeRecordedBy: intakeRecordedBy,
                 createdBy: createdBy,
+                updatedBy: updatedBy,
+                deletedBy: deletedBy,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
