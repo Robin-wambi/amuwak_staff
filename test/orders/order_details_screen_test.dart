@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
@@ -325,6 +326,166 @@ void main() {
       expect(find.textContaining('11 May'), findsOneWidget);
       expect(find.textContaining('22:15'), findsOneWidget);
       expect(find.textContaining('08:30'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tapping the leading back button pops false to the caller',
+    (tester) async {
+      // Covers _handleBackNavigation: the screen pops bool `false` (not a
+      // LaundryOrder) so the dashboard's push<bool> result is well-typed.
+      final storage = InMemoryProofPhotoStorage();
+      bool? popped;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    popped = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailsScreen(
+                          order: _pendingPickup,
+                          photoStorage: storage,
+                          pickPhoto: () async => const [1, 2, 3],
+                          cameraViewBuilder: (context, onDetected) =>
+                              const SizedBox.shrink(),
+                          clock: () => DateTime(2026, 5, 12, 9, 42),
+                          ordersRepo: _MockOrdersRepository(),
+                          proofEventsRepo: _MockProofEventsRepository(),
+                          actorStaffId: 's-test',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await tester.pumpAndSettle();
+
+      // Back on the launcher; the awaited push resolved to `false`.
+      expect(find.text('Open'), findsOneWidget);
+      expect(popped, isFalse);
+    },
+  );
+
+  testWidgets(
+    'a system back gesture is intercepted and pops false (PopScope)',
+    (tester) async {
+      // Covers PopScope.onPopInvokedWithResult's !didPop branch: canPop is
+      // false, so a system back routes through _handleBackNavigation.
+      final storage = InMemoryProofPhotoStorage();
+      bool? popped;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    popped = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailsScreen(
+                          order: _pendingPickup,
+                          photoStorage: storage,
+                          pickPhoto: () async => const [1, 2, 3],
+                          cameraViewBuilder: (context, onDetected) =>
+                              const SizedBox.shrink(),
+                          clock: () => DateTime(2026, 5, 12, 9, 42),
+                          ordersRepo: _MockOrdersRepository(),
+                          proofEventsRepo: _MockProofEventsRepository(),
+                          actorStaffId: 's-test',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+
+      // Simulate the OS back button / predictive-back pop.
+      final dynamic widgetsAppState = tester.state(find.byType(WidgetsApp));
+      await widgetsAppState.didPopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open'), findsOneWidget);
+      expect(popped, isFalse);
+    },
+  );
+
+  testWidgets(
+    'removing a line item on the pricing section drops it from the list',
+    (tester) async {
+      // Covers the details-screen LineItemsEditor.onRemove: a non-pending order
+      // shows the Pricing section; an existing line item can be removed.
+      final storage = InMemoryProofPhotoStorage();
+      final withLineItem = _pendingPickup.copyWith(
+        status: OrderStatus.inProgress,
+        lineItems: [LineItem(name: 'Duvet', amountUgx: 6000)],
+      );
+
+      await tester.pumpWidget(_wrap(withLineItem, storage: storage));
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('remove_line_item_0')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Duvet'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('remove_line_item_0')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Duvet'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'OrderDetailsScreen builds with the default wall-clock when none is '
+    'injected',
+    (tester) async {
+      // Covers the top-level _defaultClock default for `clock`.
+      final storage = InMemoryProofPhotoStorage();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAmuwakTheme(),
+          home: OrderDetailsScreen(
+            order: _pendingPickup,
+            photoStorage: storage,
+            pickPhoto: () async => const [1, 2, 3],
+            cameraViewBuilder: (context, onDetected) =>
+                const SizedBox.shrink(),
+            ordersRepo: _MockOrdersRepository(),
+            proofEventsRepo: _MockProofEventsRepository(),
+            actorStaffId: 's-test',
+          ),
+        ),
+      );
+
+      expect(find.text('Order details'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 }

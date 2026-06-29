@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/pricing/catalog_item.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof/qr_display_widget.dart';
@@ -643,6 +644,176 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('fragile silk'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'count_decrement decrements the count once it is above zero',
+    (tester) async {
+      // Covers the enabled decrement onPressed branch (count > 0): the button
+      // is disabled at 0, then enabled and functional after an increment.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _buildScreen(
+            order: _baseOrder,
+            storage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [1, 2, 3],
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+          ),
+        ),
+      );
+
+      final decrement = find.byKey(const Key('count_decrement'));
+      // At zero the decrement is disabled.
+      expect(tester.widget<IconButton>(decrement).onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      expect(find.text('2'), findsOneWidget);
+
+      // Now enabled — tapping it walks the count back down.
+      expect(tester.widget<IconButton>(decrement).onPressed, isNotNull);
+      await tester.tap(decrement);
+      await tester.pump();
+      expect(find.text('1'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Removing a special line item drops it from the list and the total',
+    (tester) async {
+      // Covers LineItemsEditor.onRemove: add a catalog item, then remove it.
+      const priced = LaundryOrder(
+        orderId: 'AMW-0421',
+        customerName: 'Jane Doe',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 'Today, 09:00',
+        itemCount: 12,
+        phone: '+234000',
+        address: '5 Yaba',
+        notes: '',
+        ratePerKgSnapshotUgx: 5000,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: priced,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [1, 2, 3],
+            clock: () => DateTime(2026, 5, 12, 9, 42),
+            ordersRepo: _okOrdersRepo(),
+            proofEventsRepo: _okProofRepo(),
+            actorStaffId: 's-test',
+            catalogItems: [
+              CatalogItem(id: 'c1', name: 'Blanket', amountUgx: 8000),
+            ],
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('add_line_item')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('add_line_item')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pick_catalog_item_0')));
+      await tester.pumpAndSettle();
+
+      // The line item is now listed.
+      expect(find.text('Blanket'), findsOneWidget);
+
+      // Remove it via the editor's per-row remove button.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('remove_line_item_0')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('remove_line_item_0')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Blanket'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Done re-enables itself and surfaces an error when the proof-event '
+    'insert fails',
+    (tester) async {
+      // Covers the insertEvent catch block: photo save succeeds, but the
+      // proof_events write throws → no pop, Done re-enabled, error shown, and
+      // the status update is never attempted.
+      final ordersRepo = _okOrdersRepo();
+      final proofEventsRepo = _MockProofEventsRepository();
+      when(() => proofEventsRepo.insertEvent(any(),
+              orderId: any(named: 'orderId'),
+              actorStaffId: any(named: 'actorStaffId')))
+          .thenThrow(Exception('proof insert failed'));
+
+      await _pumpAndPushPickup(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: _baseOrder,
+        pickPhoto: () async => const [10, 20, 30],
+        ordersRepo: ordersRepo,
+        proofEventsRepo: proofEventsRepo,
+        proofEventIdGenerator: () => 'pe-insert-fail',
+      );
+
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await _scrollToConfirm(tester);
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Done'));
+      await tester.pumpAndSettle();
+
+      // Did not pop; error shown; Done re-enabled.
+      expect(_lastHandle!.resolved, isFalse);
+      expect(_lastHandle!.result, isNull);
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+      final done = find.widgetWithText(ElevatedButton, 'Done');
+      expect(tester.widget<ElevatedButton>(done).onPressed, isNotNull);
+      expect(find.textContaining('Could not save pickup proof'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // The proof insert failed → status update was never attempted.
+      verifyNever(() => ordersRepo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'),
+          updatedAt: any(named: 'updatedAt')));
+    },
+  );
+
+  testWidgets(
+    'PickupCaptureScreen builds with the default wall-clock when none is '
+    'injected',
+    (tester) async {
+      // Covers the top-level _defaultClock default for `clock`: construct the
+      // screen WITHOUT passing a clock so the default tear-off is exercised.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PickupCaptureScreen(
+            order: _baseOrder,
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [1, 2, 3],
+            ordersRepo: _okOrdersRepo(),
+            proofEventsRepo: _okProofRepo(),
+            actorStaffId: 's-test',
+          ),
+        ),
+      );
+
+      expect(find.text('Confirm pickup'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 }

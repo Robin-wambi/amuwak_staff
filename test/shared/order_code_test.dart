@@ -34,6 +34,16 @@ void main() {
       );
     });
 
+    test('falls back to the sole value for a single-column row without the '
+        'named key', () {
+      // PostgREST sometimes labels the scalar column generically; with only one
+      // column and no next_order_code key, the sole value is the code.
+      expect(
+        parseOrderCodeRpcResult({'?column?': 'AMW-2026-0042'}),
+        'AMW-2026-0042',
+      );
+    });
+
     test('throws a descriptive error on an unexpected shape', () {
       expect(() => parseOrderCodeRpcResult(42), throwsStateError);
       expect(() => parseOrderCodeRpcResult(null), throwsStateError);

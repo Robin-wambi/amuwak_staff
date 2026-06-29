@@ -60,6 +60,19 @@ void main() {
     expect(a, isNot(equals(differentOnColor)));
   });
 
+  test('copyWith overrides only the given roles, preserving the rest', () {
+    const newCompleted = StatusColorPair(Color(0xFF010203), Color(0xFF040506));
+    final updated = status.copyWith(completed: newCompleted);
+
+    expect(updated.of(OrderStatus.completed), newCompleted);
+    // Untouched roles fall through to `this.*`.
+    expect(updated.of(OrderStatus.pendingPickup),
+        status.of(OrderStatus.pendingPickup));
+    expect(updated.of(OrderStatus.inProgress), status.of(OrderStatus.inProgress));
+    expect(updated.of(OrderStatus.readyForDelivery),
+        status.of(OrderStatus.readyForDelivery));
+  });
+
   test('lerp returns a StatusColors and is identity at t=0', () {
     final lerped = status.lerp(status, 0);
     expect(lerped.of(OrderStatus.completed).color,

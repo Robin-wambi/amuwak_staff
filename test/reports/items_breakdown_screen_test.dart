@@ -26,6 +26,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required List<LaundryOrder> orders,
   void Function(LaundryOrder)? onOrderTap,
+  void Function(LaundryOrder)? onAdvanceOrderStatus,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -35,7 +36,10 @@ Future<void> _pump(
         ),
       ],
       child: MaterialApp(
-        home: ItemsBreakdownScreen(onOrderTap: onOrderTap ?? (_) {}),
+        home: ItemsBreakdownScreen(
+          onOrderTap: onOrderTap ?? (_) {},
+          onAdvanceOrderStatus: onAdvanceOrderStatus,
+        ),
       ),
     ),
   );
@@ -105,5 +109,52 @@ void main() {
 
     expect(find.text('No items yet'), findsOneWidget);
     expect(find.byType(OrderCard), findsNothing);
+  });
+
+  testWidgets('shows the error state when the orders stream errors',
+      (tester) async {
+    // Covers ordersAsync.error → EmptyState("Couldn't load orders").
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.error(
+              StateError('stream blew up'),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          home: ItemsBreakdownScreen(onOrderTap: (_) {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("Couldn't load orders"), findsOneWidget);
+    expect(find.text('Please try again.'), findsOneWidget);
+    expect(find.byType(OrderCard), findsNothing);
+  });
+
+  testWidgets(
+      'an order card forwards its advance-status action to onAdvanceOrderStatus',
+      (tester) async {
+    // Covers the onAdvanceStatus closure wired onto each OrderCard (line 107):
+    // an inProgress order offers a proof-less "Mark as ..." action whose tap
+    // invokes the callback with that order.
+    LaundryOrder? advanced;
+    await _pump(
+      tester,
+      orders: [_order('A', 3)], // _order builds inProgress orders
+      onAdvanceOrderStatus: (o) => advanced = o,
+    );
+
+    // Open the card's overflow actions sheet via long-press.
+    await tester.longPress(find.byType(OrderCard));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Mark as'));
+    await tester.pumpAndSettle();
+
+    expect(advanced?.orderId, 'A');
   });
 }

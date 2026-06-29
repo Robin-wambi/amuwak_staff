@@ -58,6 +58,20 @@ void main() {
     });
   });
 
+  group('ReportPeriod labels', () {
+    test('label is the enum display name', () {
+      expect(ReportPeriod.daily.label, 'Daily');
+      expect(ReportPeriod.weekly.label, 'Weekly');
+      expect(ReportPeriod.monthly.label, 'Monthly');
+    });
+
+    test('headingLabel is the current-window noun for each period', () {
+      expect(ReportPeriod.daily.headingLabel, 'Today');
+      expect(ReportPeriod.weekly.headingLabel, 'This week');
+      expect(ReportPeriod.monthly.headingLabel, 'This month');
+    });
+  });
+
   group('DateRange.contains', () {
     test('is half-open: includes start, excludes end', () {
       final w = ReportPeriod.daily.currentWindow(now);

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 
@@ -40,6 +41,18 @@ void main() {
 
     expect(updated, isNot(equals(a)));
     expect(updated.hashCode, isNot(equals(a.hashCode)));
+  });
+
+  test('orders with same-length but differing line items are not equal', () {
+    final withBlanket =
+        a.copyWith(lineItems: [LineItem(name: 'Blanket', amountUgx: 8000)]);
+    final withJacket =
+        a.copyWith(lineItems: [LineItem(name: 'Jacket', amountUgx: 8000)]);
+    final withBlanketAgain =
+        a.copyWith(lineItems: [LineItem(name: 'Blanket', amountUgx: 8000)]);
+
+    expect(withBlanket, isNot(equals(withJacket)));
+    expect(withBlanket, equals(withBlanketAgain));
   });
 
   group('LaundryOrder.proofEvents', () {

@@ -122,6 +122,46 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
+  testWidgets(
+      'an AuthFailure on forgot-password shows the failure message',
+      (tester) async {
+    when(() => auth.sendPasswordReset(any()))
+        .thenThrow(AuthFailure('Email not found'));
+
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Email not found'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('submitting the password field logs in (onFieldSubmitted)',
+      (tester) async {
+    when(() => auth.signInWithEmailPassword(
+        email: any(named: 'email'),
+        password: any(named: 'password'))).thenAnswer((_) async {});
+
+    await _pumpLogin(tester, authService: auth);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'rider1@amuwak.co');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'secret-pass');
+    // Triggers onFieldSubmitted on the password field rather than the button.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    verify(() => auth.signInWithEmailPassword(
+        email: 'rider1@amuwak.co', password: 'secret-pass')).called(1);
+  });
+
   testWidgets('Forgot password with no email prompts for one and does not send',
       (tester) async {
     await _pumpLogin(tester, authService: auth);

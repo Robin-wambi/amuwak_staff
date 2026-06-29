@@ -522,6 +522,74 @@ void main() {
       expect(completers, hasLength(1));
     },
   );
+
+  testWidgets(
+    'Mark delivered re-enables itself and surfaces an error when the '
+    'proof-event insert fails',
+    (tester) async {
+      // Covers the insertEvent catch block: photo save succeeds, the
+      // proof_events write throws → no pop, button re-enabled, error shown, and
+      // updateStatus is never attempted.
+      final ordersRepo = _okOrdersRepo();
+      final proofEventsRepo = _MockProofEventsRepository();
+      when(() => proofEventsRepo.insertEvent(any(),
+              orderId: any(named: 'orderId'),
+              actorStaffId: any(named: 'actorStaffId')))
+          .thenThrow(Exception('proof insert failed'));
+
+      await _pumpAndPushDelivery(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: _orderReadyForDelivery(),
+        pickPhoto: () async => const [50, 60, 70],
+        ordersRepo: ordersRepo,
+        proofEventsRepo: proofEventsRepo,
+        proofEventIdGenerator: () => 'pe-insert-fail',
+      );
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+
+      expect(_lastHandle!.resolved, isFalse);
+      expect(_lastHandle!.result, isNull);
+      expect(find.byType(DeliveryCaptureScreen), findsOneWidget);
+      final markDelivered =
+          find.widgetWithText(ElevatedButton, 'Mark delivered');
+      expect(tester.widget<ElevatedButton>(markDelivered).onPressed, isNotNull);
+      expect(
+          find.textContaining('Could not save delivery proof'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      verifyNever(() => ordersRepo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'),
+          updatedAt: any(named: 'updatedAt')));
+    },
+  );
+
+  testWidgets(
+    'DeliveryCaptureScreen builds with the default wall-clock when none is '
+    'injected',
+    (tester) async {
+      // Covers the top-level _defaultClock default for `clock`.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DeliveryCaptureScreen(
+            order: _orderReadyForDelivery(),
+            photoStorage: InMemoryProofPhotoStorage(),
+            pickPhoto: () async => const [1, 2, 3],
+            ordersRepo: _okOrdersRepo(),
+            proofEventsRepo: _okProofRepo(),
+            actorStaffId: 's-test',
+          ),
+        ),
+      );
+
+      expect(find.text('Hand over'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// Mutable holder for a pushed route's pop result + whether the push resolved.

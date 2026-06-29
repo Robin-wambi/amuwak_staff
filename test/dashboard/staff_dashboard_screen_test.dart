@@ -13,6 +13,7 @@ import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
 import 'package:amuwak_staff/src/shared/motion/animated_gradient_header.dart';
 import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/expenses/expense_entry_screen.dart';
+import 'package:amuwak_staff/src/expenses/expenses_repository.dart';
 import 'package:amuwak_staff/src/notifications/notifications_screen.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/edit_order_screen.dart';
@@ -35,7 +36,13 @@ import 'package:amuwak_staff/src/pricing/pricing_settings_repository.dart';
 import 'package:amuwak_staff/src/pricing/pricing_settings_screen.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
+import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';
+import 'package:amuwak_staff/src/printing/printer_store.dart';
+import 'package:amuwak_staff/src/printing/printing_providers.dart';
+import 'package:amuwak_staff/src/pricing/catalog_item.dart';
+import 'package:amuwak_staff/src/pricing/pricing_catalog_repository.dart';
+import 'package:amuwak_staff/src/pricing/pricing_catalog_screen.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_provider.dart';
 import 'package:amuwak_staff/src/sync/sync_errors_screen.dart';
 import 'package:amuwak_staff/src/sync/sync_status.dart';
@@ -64,6 +71,24 @@ class _MockSupabaseClient extends Mock implements SupabaseClient {}
 class _StubOrdersRepository extends Mock implements OrdersRepository {}
 
 class _StubCustomersRepository extends Mock implements CustomersRepository {}
+
+/// Stubs for the providers `_openOrderDetails` resolves before pushing
+/// OrderDetailsScreen (proof events repo + printer store). The screen only
+/// stores them on construction, so empty mocks are sufficient for a
+/// navigation-shaped test.
+class _StubProofEventsRepository extends Mock
+    implements ProofEventsRepository {}
+
+class _StubPrinterStore extends Mock implements PrinterStore {}
+
+/// Stub catalog repo so PricingCatalogScreen's initState `load` (fetchAll)
+/// resolves without touching Supabase.
+class _StubPricingCatalogRepository extends Mock
+    implements PricingCatalogRepository {}
+
+/// Stub expenses repo so the expense-entry save can be observed without a
+/// live Supabase client.
+class _StubExpensesRepository extends Mock implements ExpensesRepository {}
 
 /// Stub repository that always returns a settings row with [defaultRatePerKgUgx]
 /// so dashboard tests can open NewPickupScreen without hitting Supabase.
@@ -168,6 +193,15 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_fallbackOrder);
     registerFallbackValue(OrderStatus.pendingPickup);
+    registerFallbackValue(
+      Expense(
+        id: 'fallback',
+        category: ExpenseCategory.values.first,
+        amountUgx: 1,
+        note: '',
+        spentAt: DateTime(2026),
+      ),
+    );
   });
 
   testWidgets(
@@ -1490,6 +1524,508 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(InviteStaffScreen), findsOneWidget);
+    },
+  );
+
+  // ------------------------------------------------ Order details + CRUD seams
+
+  /// Overrides every provider `_openOrderDetails` resolves before pushing
+  /// OrderDetailsScreen, plus the catalog warm-up read.
+  List<Override> detailsOverrides({
+    Override? catalog,
+  }) =>
+      [
+        proofEventsRepositoryProvider
+            .overrideWithValue(_StubProofEventsRepository()),
+        labelPrinterProvider.overrideWithValue(null),
+        printerStoreProvider.overrideWithValue(_StubPrinterStore()),
+        catalog ??
+            pricingCatalogProvider.overrideWith(
+              (ref) async => const <CatalogItem>[],
+            ),
+      ];
+
+  LaundryOrder inProgressOrder(String name) => LaundryOrder(
+        orderId: 'o-$name',
+        orderCode: 'AMW-$name',
+        customerName: name,
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.inProgress,
+        timeLabel: 't',
+        itemCount: 3,
+        phone: '0700',
+        address: 'Kira',
+        notes: '',
+      );
+
+  testWidgets(
+    'tapping an order card with a valid session opens OrderDetailsScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Nora')]),
+        ),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ...detailsOverrides(),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nora'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderDetailsScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'opening details still works when the catalog warm-up read fails '
+    '(falls back to free-form entry)',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Cara')]),
+        ),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ...detailsOverrides(
+          catalog: pricingCatalogProvider.overrideWith(
+            (ref) async => throw Exception('catalog down'),
+          ),
+        ),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cara'));
+      await tester.pumpAndSettle();
+
+      // The catch in _loadCatalogItems swallowed the error; details still opened
+      // and no exception leaked to the framework.
+      expect(find.byType(OrderDetailsScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'long-press → Edit details with a null session shows a session-expired '
+    'SnackBar instead of opening EditOrderScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Edi')]),
+        ),
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Edi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditOrderScreen), findsNothing);
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'long-press → Edit details with a valid session opens EditOrderScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final repo = _StubOrdersRepository();
+      when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Eve')]),
+        ),
+        ordersRepositoryProvider.overrideWithValue(repo),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Eve'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditOrderScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'long-press → Delete with a null session shows a session-expired SnackBar '
+    'and never calls softDelete',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final repo = _StubOrdersRepository();
+      when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+      when(() => repo.softDelete(any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Del')]),
+        ),
+        ordersRepositoryProvider.overrideWithValue(repo),
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Del'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete')); // actions-sheet entry
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Delete')); // confirm
+      await tester.pumpAndSettle();
+
+      verifyNever(() =>
+          repo.softDelete(any(), actorStaffId: any(named: 'actorStaffId')));
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'long-press → Mark as Ready with a null session shows a session-expired '
+    'SnackBar and never calls updateStatus',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final repo = _StubOrdersRepository();
+      when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+      when(() => repo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Adv')]),
+        ),
+        ordersRepositoryProvider.overrideWithValue(repo),
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Adv'));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.text('Mark as ${OrderStatus.readyForDelivery.label}'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.updateStatus(any(), any(),
+          actorStaffId: any(named: 'actorStaffId')));
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'long-press → Mark as Ready shows a retry SnackBar when updateStatus fails',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final repo = _StubOrdersRepository();
+      when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+      when(() => repo.updateStatus(any(), any(),
+              actorStaffId: any(named: 'actorStaffId')))
+          .thenThrow(Exception('network down'));
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        ordersStreamProvider.overrideWith(
+          (ref) => Stream<List<LaundryOrder>>.value([inProgressOrder('Err')]),
+        ),
+        ordersRepositoryProvider.overrideWithValue(repo),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+      ]);
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Err'));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.text('Mark as ${OrderStatus.readyForDelivery.label}'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not update status — please retry.'),
+          findsOneWidget);
+    },
+  );
+
+  // ---------------------------------------------- Pricing settings null-session
+
+  testWidgets(
+    'Account tab: tapping Pricing settings with a null session shows a '
+    'session-expired SnackBar instead of opening the settings screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'manager'),
+        currentUserIdProvider.overrideWith((ref) => null),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pricing settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PricingSettingsScreen), findsNothing);
+      expect(find.text('Session expired — please sign in again.'),
+          findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Account tab: Pricing settings → Manage service items opens '
+    'PricingCatalogScreen',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final catalogRepo = _StubPricingCatalogRepository();
+      when(() => catalogRepo.fetchAll())
+          .thenAnswer((_) async => const <CatalogItem>[]);
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentRoleProvider.overrideWith((ref) => 'manager'),
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        pricingCatalogRepositoryProvider.overrideWithValue(catalogRepo),
+      ]);
+
+      await tester.tap(find.text('Account').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pricing settings'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings_manage_catalog')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PricingCatalogScreen), findsOneWidget);
+    },
+  );
+
+  // ---------------------------------------------------- Expense entry save wire
+
+  testWidgets(
+    'Report tab: saving an expense calls addExpense on the repository',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final repo = _StubExpensesRepository();
+      when(() => repo.addExpense(any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+      await pumpDashboardWithDb(tester, extraOverrides: [
+        currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        expensesRepositoryProvider.overrideWithValue(repo),
+      ]);
+
+      await tester.tap(find.text('Report').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Record an expense'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExpenseEntryScreen), findsOneWidget);
+
+      // Only a positive amount is required for the save to fire.
+      await tester.enterText(
+          find.byKey(const Key('expense_amount')), '1500');
+      await tester.ensureVisible(find.byKey(const Key('expense_save')));
+      await tester.tap(find.byKey(const Key('expense_save')));
+      await tester.pumpAndSettle();
+
+      verify(() =>
+              repo.addExpense(any(), actorStaffId: 'staff-1'))
+          .called(1);
+    },
+  );
+
+  // --------------------------------------------------- build() loading/error
+
+  testWidgets(
+    'Orders tab shows a progress indicator while the stream is loading',
+    (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+          ordersStreamProvider.overrideWith((ref) => const Stream.empty()),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Orders tab shows the retry affordance when the stream errors, and Retry '
+    'invalidates the stream',
+    (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+          ordersStreamProvider
+              .overrideWith((ref) => Stream.error(Exception('boom'))),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Orders').last);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('Could not load orders'), findsOneWidget);
+      // Tapping Retry must not throw (invalidate path).
+      await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Report tab shows a progress indicator while the stream is loading',
+    (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+          ordersStreamProvider.overrideWith((ref) => const Stream.empty()),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text('Report').last);
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Report tab shows the retry affordance when the stream errors',
+    (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          supabaseClientProvider.overrideWithValue(_MockSupabaseClient()),
+          ordersStreamProvider
+              .overrideWith((ref) => Stream.error(Exception('boom'))),
+          currentStaffProvider
+              .overrideWith((ref) => Stream<StaffData?>.value(null)),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: StaffDashboardScreen(retrieveLostPhoto: () async => false),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Report').last);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('Could not load orders'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Home "Report" quick action switches to the Report tab',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpDashboardWithDb(tester);
+
+      // Two "Report" texts exist: the Home quick-action card and the bottom-nav
+      // label. The quick-action one lives inside the scrollable ListView; the
+      // nav label inside the NavigationBar. Target the former by excluding any
+      // 'Report' text sitting under the NavigationBar.
+      final homeReport = find.descendant(
+        of: find.byType(ListView),
+        matching: find.text('Report'),
+      );
+      await tester.ensureVisible(homeReport.first);
+      await tester.pumpAndSettle();
+      await tester.tap(homeReport.first, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Daily report'),
+        ),
+        findsOneWidget,
+      );
     },
   );
 }

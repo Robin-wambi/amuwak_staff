@@ -135,6 +135,88 @@ void main() {
         reason: 'no tap affordance when onShowErrors is null');
   });
 
+  testWidgets('shows the offline banner when offline with nothing pending',
+      (t) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final container = ProviderContainer(overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+    ]);
+    addTearDown(container.dispose);
+
+    container.read(onlineProvider.notifier).state = false;
+
+    await t.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(body: SyncStatusBanner()),
+      ),
+    ));
+    await t.pump();
+
+    expect(find.text('Offline'), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_off), findsOneWidget);
+  });
+
+  testWidgets('offline banner appends the pending count when uploads are queued',
+      (t) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final container = ProviderContainer(overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+    ]);
+    addTearDown(container.dispose);
+
+    final outbox = container.read(outboxRepositoryProvider);
+    for (final id in ['p1', 'p2']) {
+      await outbox.enqueue(
+        id: id, forTable: 'orders', op: 'update', rowId: id, payload: const {},
+      );
+    }
+    container.read(onlineProvider.notifier).state = false;
+    await container.read(pendingOutboxCountProvider.future);
+
+    await t.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(body: SyncStatusBanner()),
+      ),
+    ));
+    await t.pump();
+
+    expect(find.text('Offline — 2 pending'), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_off), findsOneWidget);
+  });
+
+  testWidgets('shows the pending-uploads banner when online with a backlog',
+      (t) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final container = ProviderContainer(overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+    ]);
+    addTearDown(container.dispose);
+
+    final outbox = container.read(outboxRepositoryProvider);
+    await outbox.enqueue(
+      id: 'p1', forTable: 'orders', op: 'update', rowId: 'p1',
+      payload: const {},
+    );
+    await container.read(pendingOutboxCountProvider.future);
+
+    await t.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(body: SyncStatusBanner()),
+      ),
+    ));
+    await t.pump();
+
+    // Singular "upload" for a single pending row.
+    expect(find.text('1 pending upload'), findsOneWidget);
+    expect(find.byIcon(Icons.sync), findsOneWidget);
+  });
+
   testWidgets('hides entirely when online, no pending, no errors', (t) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(() async => db.close());
