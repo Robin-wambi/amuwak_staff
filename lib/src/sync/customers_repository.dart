@@ -4,6 +4,13 @@ import '../data/app_database.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
+/// Test seam for the row upsert: given the column map, returns the "selected"
+/// rows (empty ⇒ the write did not persist). Lets unit tests exercise
+/// [CustomersRepository.upsertCustomer]'s payload + missing-write [StateError]
+/// without a live SupabaseClient. Mirrors [OrdersRepository]'s `OrderUpsert`.
+typedef CustomerUpsert =
+    Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
+
 /// Read + write repository for customers — ONLINE-ONLY mode.
 ///
 /// Reads stream live from Supabase; writes upsert directly. The offline-first
@@ -12,15 +19,31 @@ import 'supabase_payloads.dart';
 /// [OrdersRepository]'s shape.
 class CustomersRepository {
   CustomersRepository(
-    this._supabase, {
+    SupabaseClient supabase, {
     DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  })  : _supabase = supabase,
+        _clock = clock ?? DateTime.now,
+        _upsertOverride = null;
 
-  final SupabaseClient _supabase;
+  /// Test seam: inject the raw `upsert(...).select('id')` so unit tests can
+  /// drive [upsertCustomer] (payload shape + no-write [StateError]) without
+  /// mocking SupabaseClient. Mirrors [OrdersRepository.forTest]. Read methods
+  /// are unavailable on a forTest instance (they assert the client is present).
+  CustomersRepository.forTest({
+    required DateTime Function() clock,
+    CustomerUpsert? upsertRow,
+  })  : _supabase = null,
+        _clock = clock,
+        _upsertOverride = upsertRow;
+
+  final SupabaseClient? _supabase;
   final DateTime Function() _clock;
+  final CustomerUpsert? _upsertOverride;
 
   Stream<List<Customer>> watchAll() {
-    return _supabase
+    assert(_supabase != null,
+        'watchAll is not available on a forTest instance');
+    return _supabase!
         .from('customers')
         .stream(primaryKey: ['id'])
         .order('name')
@@ -31,10 +54,12 @@ class CustomersRepository {
   }
 
   Stream<Customer?> watchById(String id) {
+    assert(_supabase != null,
+        'watchById is not available on a forTest instance');
     // Filter soft-deleted client-side (same as watchAll) so a back-office
     // tombstone doesn't surface on detail screens. `.stream()` can't express
     // `IS NULL`.
-    return _supabase
+    return _supabase!
         .from('customers')
         .stream(primaryKey: ['id'])
         .eq('id', id)
@@ -48,9 +73,10 @@ class CustomersRepository {
   /// the current snapshot without subscribing (e.g. phone-on-blur dedup in
   /// the New Pickup form).
   Future<List<Customer>> getAll() async {
+    assert(_supabase != null, 'getAll is not available on a forTest instance');
     // One-shot select (not a stream) so we can exclude soft-deleted rows
     // server-side rather than fetching them and filtering client-side.
-    final rows = await _supabase
+    final rows = await _supabase!
         .from('customers')
         .select()
         .isFilter('deleted_at', null)
@@ -58,11 +84,31 @@ class CustomersRepository {
     return rows.map(customerFromSupabase).toList(growable: false);
   }
 
+  /// Dispatches the customer upsert and returns the selected rows so the caller
+  /// can detect a write that didn't persist (empty ⇒ nothing written, e.g. an
+  /// RLS policy silently dropped it). Routes through the test override when
+  /// constructed via [CustomersRepository.forTest], else the live client.
+  Future<List<Map<String, dynamic>>> _upsertRow(
+      Map<String, dynamic> values) async {
+    final override = _upsertOverride;
+    if (override != null) return override(values);
+    assert(_supabase != null,
+        'forTest instance has no upsertRow — '
+        'pass one to CustomersRepository.forTest(upsertRow: ...)');
+    return _supabase!.from('customers').upsert(values).select('id');
+  }
+
+  /// Upserts a customer. Throws a [StateError] when the write wrote no row (e.g.
+  /// an RLS policy silently dropped it) so a caller never reports "saved" for a
+  /// write that didn't persist — mirroring [OrdersRepository.upsertOrder]. The
+  /// `.select('id')` returning empty is the signal.
   Future<void> upsertCustomer(Customer customer) async {
     final now = _clock();
-    await _supabase
-        .from('customers')
-        .upsert(customerUpsertPayload(customer, now: now));
+    final written = await _upsertRow(customerUpsertPayload(customer, now: now));
+    if (written.isEmpty) {
+      throw StateError(
+          'upsertCustomer: write did not persist customer "${customer.id}"');
+    }
   }
 }
 
