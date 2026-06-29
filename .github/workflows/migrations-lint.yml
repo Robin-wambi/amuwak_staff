@@ -1,0 +1,48 @@
+name: Lint Supabase migrations
+
+# Guards against the duplicate-migration-number class of bug: two different
+# migrations sharing a numeric prefix (e.g. two 0026_*.sql) make `supabase db
+# push` silently skip the second one, leaving a remote schema gap. Runs on every
+# PR so a collision is caught at review time, before it can reach a database.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/workflows/migrations-lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject duplicate migration number prefixes
+        run: |
+          dups="$(ls supabase/migrations \
+            | grep -oE '^[0-9]{4}' \
+            | sort | uniq -d)"
+          if [ -n "$dups" ]; then
+            echo "::error::Duplicate Supabase migration number prefix(es): $dups"
+            echo "Two migrations sharing a number make 'supabase db push' skip"
+            echo "one of them silently. Renumber the newer migration."
+            exit 1
+          fi
+          echo "No duplicate migration number prefixes."
+
+      - name: Warn on migrations missing a sibling test
+        run: |
+          missing=0
+          for f in supabase/migrations/*.sql; do
+            base="$(basename "$f" .sql)"
+            if [ ! -f "supabase/tests/${base}_test.sql" ]; then
+              echo "::warning::No test for migration ${base} (expected supabase/tests/${base}_test.sql)"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] && echo "Every migration has a sibling test." || true
