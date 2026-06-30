@@ -13,6 +13,7 @@ import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
 import 'order_status.dart';
+import 'payment/record_payment_sheet.dart';
 import 'pricing/line_item.dart';
 import 'pricing/pricing_calculator.dart';
 import 'pricing/pricing_inputs.dart';
@@ -136,6 +137,49 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not save pricing — please retry.')),
       );
+    }
+  }
+
+  /// Derived payment state label — paid/partial/unpaid is never stored, it's
+  /// read off collected vs total (see [LaundryOrder.isFullyPaid]).
+  String get _paymentLabel {
+    if (_order.isFullyPaid) return 'Paid';
+    if (_order.paymentAmountUgx == 0) return 'Unpaid';
+    return 'Partial';
+  }
+
+  /// Opens the change calculator to record cash against this order. The applied
+  /// amount is added to the current collected total and persisted as the new
+  /// absolute value, then optimistically reflected locally (this screen isn't
+  /// subscribed to the orders stream).
+  Future<void> _recordPayment() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        child: RecordPaymentSheet(
+          amountDueUgx: _order.outstandingUgx,
+          onConfirm: (applied) async {
+            final newCollected = _order.paymentAmountUgx + applied;
+            await widget.ordersRepo.updatePayment(
+              _order.orderId,
+              newCollected,
+              actorStaffId: widget.actorStaffId,
+            );
+            if (mounted) {
+              setState(() =>
+                  _order = _order.copyWith(paymentAmountUgx: newCollected));
+            }
+          },
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Payment recorded.')));
     }
   }
 
@@ -496,6 +540,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: AppSpacing.md),
+                        _DetailsSection(
+                          title: 'Payment',
+                          children: [
+                            _DetailRow(
+                              icon: Icons.payments_outlined,
+                              label: 'Collected',
+                              value: formatUgx(_order.paymentAmountUgx),
+                            ),
+                            _DetailRow(
+                              icon: Icons.account_balance_wallet_outlined,
+                              label: 'Outstanding',
+                              value: formatUgx(_order.outstandingUgx),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            _PaymentBadge(label: _paymentLabel),
+                            const SizedBox(height: AppSpacing.md),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                key: const Key('details_record_payment'),
+                                onPressed: _order.outstandingUgx == 0
+                                    ? null
+                                    : _recordPayment,
+                                icon: const Icon(Icons.point_of_sale_outlined),
+                                label: const Text('Record payment'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                       const SizedBox(height: AppSpacing.md),
                       _DetailsSection(
@@ -658,6 +732,39 @@ class _StatusChip extends StatelessWidget {
             style: TextStyle(color: onColor, fontWeight: FontWeight.bold),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PaymentBadge extends StatelessWidget {
+  const _PaymentBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // Paid → primary, Partial → tertiary/secondary, Unpaid → error, all tinted.
+    final color = switch (label) {
+      'Paid' => colorScheme.primary,
+      'Unpaid' => colorScheme.error,
+      _ => colorScheme.tertiary,
+    };
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
