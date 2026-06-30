@@ -120,8 +120,9 @@ class _DailyReportViewState extends State<DailyReportView> {
     final totalItems = orders.totalItems;
 
     // Cash-first money view: collected (in hand), outstanding (receivables),
-    // billed (= collected + outstanding). Each with its previous-period figure
-    // for the trend chip.
+    // billed (total charged). In normal operation billed == collected +
+    // outstanding; they diverge only when an order was over-collected. Each
+    // figure carries its previous-period value for the trend chip.
     final collected = orders.collectedUgx;
     final outstanding = orders.outstandingUgx;
     final billed = orders.billedUgx;

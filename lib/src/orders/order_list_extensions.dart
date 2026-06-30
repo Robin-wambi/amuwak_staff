@@ -38,13 +38,21 @@ extension OrderListStats on List<LaundryOrder> {
   int get outstandingUgx =>
       fold<int>(0, (sum, o) => sum + o.outstandingUgx);
 
-  /// Total charged across all orders. Equals [collectedUgx] + [outstandingUgx]
-  /// by construction; an alias of [totalRevenueUgx] read through the finance
-  /// lens.
+  /// Total charged across all orders (an alias of [totalRevenueUgx] read through
+  /// the finance lens). Equals [collectedUgx] + [outstandingUgx] in normal
+  /// operation; the two can exceed billed only if an order was *over-collected*
+  /// (its `total_ugx` revised down after cash was taken), in which case the
+  /// surplus is money owed back to the customer, not extra revenue.
   int get billedUgx => totalRevenueUgx;
 
-  /// Average revenue per order. 0 for an empty list (no divide-by-zero).
-  int get avgOrderValueUgx => isEmpty ? 0 : (billedUgx / length).round();
+  /// Average value of a *priced* order — billed revenue divided by the count of
+  /// orders that actually have a bill (`total_ugx > 0`). Pending/unpriced orders
+  /// are excluded from the denominator so they don't depress the average during
+  /// normal operation. 0 when nothing is priced yet (no divide-by-zero).
+  int get avgOrderValueUgx {
+    final pricedCount = where((o) => o.totalUgx > 0).length;
+    return pricedCount == 0 ? 0 : (billedUgx / pricedCount).round();
+  }
 
   /// Money given away in the period: the absolute sum of the *negative* manual
   /// adjustments (discounts). Positive adjustments (surcharges) are excluded —
@@ -126,8 +134,11 @@ class RevenueBreakdown {
   int get grossChargesUgx =>
       weightChargeUgx + lineItemsUgx + expressUgx + deliveryUgx;
 
-  /// Net sales after adjustments: gross − discounts + surcharges. Equals the
-  /// billed total (Σ total_ugx) for the same orders.
+  /// Net sales after adjustments: gross − discounts + surcharges. Reconciles to
+  /// the billed total (Σ total_ugx) for every order whose stored total was
+  /// stamped by the current pricing calculator (the write-path chokepoint, i.e.
+  /// all live orders). A legacy row whose stored total predates the current
+  /// formula could diverge; none exist in practice.
   int get netSalesUgx => grossChargesUgx - discountsUgx + surchargesUgx;
 }
 

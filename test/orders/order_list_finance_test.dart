@@ -50,6 +50,21 @@ LaundryOrder _orderB() => LaundryOrder(
       paymentAmountUgx: 0,
     );
 
+// A pending-pickup order with no price recorded yet (total 0).
+LaundryOrder _pending() => LaundryOrder(
+      orderId: 'P0',
+      customerName: 'Pending',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 't',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+      totalUgx: 0,
+      paymentAmountUgx: 0,
+    );
+
 void main() {
   group('OrderListStats finance', () {
     final orders = [_orderA(), _orderB()];
@@ -67,12 +82,26 @@ void main() {
       expect(orders.billedUgx, orders.collectedUgx + orders.outstandingUgx);
     });
 
-    test('avgOrderValueUgx is billed divided by order count', () {
+    test('avgOrderValueUgx is billed divided by the count of priced orders', () {
       expect(orders.avgOrderValueUgx, 14300); // 28600 / 2
+    });
+
+    test('avgOrderValueUgx ignores zero-priced (pending) orders', () {
+      // A pending order with no price yet must not drag the average down — the
+      // metric is the average of orders that actually have a bill.
+      final withPending = [
+        _orderA(), // billed 23,600
+        _pending(), // total 0
+      ];
+      expect(withPending.avgOrderValueUgx, 23600); // 23,600 / 1 priced, not / 2
     });
 
     test('avgOrderValueUgx is 0 for an empty list (no divide-by-zero)', () {
       expect(<LaundryOrder>[].avgOrderValueUgx, 0);
+    });
+
+    test('avgOrderValueUgx is 0 when no order is priced yet', () {
+      expect([_pending(), _pending()].avgOrderValueUgx, 0);
     });
 
     test('discountsUgx sums the absolute value of negative adjustments only',
