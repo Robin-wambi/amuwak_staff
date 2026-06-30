@@ -84,6 +84,21 @@ void main() {
     });
   });
 
+  group('orderPaymentUpdatePayload', () {
+    test('carries only payment_amount_ugx, the actor, and a UTC updated_at', () {
+      final now = DateTime(2026, 6, 2, 15, 30);
+      final p = orderPaymentUpdatePayload(6000, actorStaffId: 's1', now: now);
+      expect(
+        p.keys,
+        unorderedEquals(
+            <String>['payment_amount_ugx', 'updated_by', 'updated_at']),
+      );
+      expect(p['payment_amount_ugx'], 6000);
+      expect(p['updated_by'], 's1');
+      expect(p['updated_at'], now.toUtc().toIso8601String());
+    });
+  });
+
   group('orderDetailsUpdatePayload', () {
     test('carries only the descriptive columns + UTC updated_at', () {
       final order = LaundryOrder(
@@ -280,5 +295,25 @@ void main() {
     expect(p['express_flat_snapshot_ugx'], 2000);
     expect(p['express_pct_snapshot'], 30);
     expect(p['total_ugx'], 19500);
+  });
+
+  test('orderUpsertPayload carries payment_amount_ugx so a prepayment persists',
+      () {
+    final order = LaundryOrder(
+      orderId: 'o1',
+      customerName: 'Aisha',
+      serviceType: ServiceType.washAndIron,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 'Pickup: now',
+      itemCount: 1,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+      totalUgx: 10000,
+      paymentAmountUgx: 4000,
+    );
+    final p = orderUpsertPayload(order,
+        actorStaffId: 's1', now: DateTime.utc(2026, 6, 6));
+    expect(p['payment_amount_ugx'], 4000);
   });
 }

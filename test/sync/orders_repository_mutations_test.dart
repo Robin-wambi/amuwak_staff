@@ -232,6 +232,37 @@ void main() {
     });
   });
 
+  group('updatePayment', () {
+    test('dispatches the absolute collected amount + updated_by for the id',
+        () async {
+      late String gotId;
+      late Map<String, dynamic> values;
+      final repo = repoThat(record: (id, v) {
+        gotId = id;
+        values = v;
+      });
+
+      await repo.updatePayment('o1', 6000, actorStaffId: 'staff-7');
+
+      expect(gotId, 'o1');
+      expect(values['payment_amount_ugx'], 6000);
+      expect(values['updated_by'], 'staff-7');
+      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
+      // A payment update must never touch status, pricing, or creation columns.
+      expect(values.containsKey('status'), isFalse);
+      expect(values.containsKey('total_ugx'), isFalse);
+      expect(values.containsKey('created_by'), isFalse);
+    });
+
+    test('throws StateError when no row matched', () async {
+      final repo = repoThat(record: (_, __) {}, matched: false);
+      expect(
+        () => repo.updatePayment('x', 6000, actorStaffId: 's'),
+        throwsStateError,
+      );
+    });
+  });
+
   group('updateStatus', () {
     test('dispatches the folded status + updated_by for the order id', () async {
       late String gotId;

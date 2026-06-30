@@ -2,6 +2,8 @@ import '../shared/order_code.dart';
 import '../shared/phone.dart';
 import 'order.dart';
 import 'order_status.dart';
+import 'pricing/pricing_calculator.dart';
+import 'pricing/pricing_inputs.dart';
 
 extension OrderListStats on List<LaundryOrder> {
   int countByStatus(OrderStatus status) =>
@@ -26,6 +28,118 @@ extension OrderListStats on List<LaundryOrder> {
   /// [earnedRevenueUgx] + [expectedRevenueUgx].
   int get totalRevenueUgx =>
       fold<int>(0, (sum, o) => sum + o.totalUgx);
+
+  /// Cash actually collected across all orders — the real top line.
+  int get collectedUgx =>
+      fold<int>(0, (sum, o) => sum + o.paymentAmountUgx);
+
+  /// Money still owed across all orders (receivables) — each order's balance
+  /// is clamped at 0 so an over-collection can't net off another's debt.
+  int get outstandingUgx =>
+      fold<int>(0, (sum, o) => sum + o.outstandingUgx);
+
+  /// Total charged across all orders (an alias of [totalRevenueUgx] read through
+  /// the finance lens). Equals [collectedUgx] + [outstandingUgx] in normal
+  /// operation; the two can exceed billed only if an order was *over-collected*
+  /// (its `total_ugx` revised down after cash was taken), in which case the
+  /// surplus is money owed back to the customer, not extra revenue.
+  int get billedUgx => totalRevenueUgx;
+
+  /// Average value of a *priced* order — billed revenue divided by the count of
+  /// orders that actually have a bill (`total_ugx > 0`). Pending/unpriced orders
+  /// are excluded from the denominator so they don't depress the average during
+  /// normal operation. 0 when nothing is priced yet (no divide-by-zero).
+  int get avgOrderValueUgx {
+    final pricedCount = where((o) => o.totalUgx > 0).length;
+    return pricedCount == 0 ? 0 : (billedUgx / pricedCount).round();
+  }
+
+  /// Money given away in the period: the absolute sum of the *negative* manual
+  /// adjustments (discounts). Positive adjustments (surcharges) are excluded —
+  /// see [RevenueBreakdown.surchargesUgx].
+  int get discountsUgx => fold<int>(
+      0, (sum, o) => sum + (o.manualAdjustmentUgx < 0 ? -o.manualAdjustmentUgx : 0));
+
+  /// Revenue billed on an estimated weight only (not yet confirmed) — "at risk"
+  /// of changing once the final weight is recorded.
+  int get provisionalRevenueUgx => where((o) => o.finalWeightKg == null)
+      .fold<int>(0, (sum, o) => sum + o.totalUgx);
+
+  /// Revenue billed on a confirmed final weight.
+  int get finalRevenueUgx => where((o) => o.finalWeightKg != null)
+      .fold<int>(0, (sum, o) => sum + o.totalUgx);
+
+  /// The net-sales waterfall over the period: gross charges (weight, line items,
+  /// express, delivery) split out, plus discounts/surcharges, reusing the same
+  /// pricing calculator that stamps `total_ugx` so the breakdown can never
+  /// disagree with the billed total.
+  RevenueBreakdown get revenueBreakdown {
+    var weight = 0, lineItems = 0, express = 0, delivery = 0;
+    var discounts = 0, surcharges = 0;
+    for (final o in this) {
+      final t = recomputeTotal(PricingInputs(
+        ratePerKgUgx: o.ratePerKgSnapshotUgx,
+        estimatedWeightKg: o.estimatedWeightKg,
+        finalWeightKg: o.finalWeightKg,
+        lineItems: o.lineItems,
+        manualAdjustmentUgx: o.manualAdjustmentUgx,
+        deliveryFeeUgx: o.deliveryFeeSnapshotUgx,
+        isExpress: o.isExpress,
+        expressFlatUgx: o.expressFlatSnapshotUgx,
+        expressPct: o.expressPctSnapshot,
+      ));
+      weight += t.weightCharge;
+      lineItems += t.lineItemsSum;
+      express += t.expressSurcharge;
+      delivery += t.deliveryFee;
+      if (o.manualAdjustmentUgx < 0) {
+        discounts += -o.manualAdjustmentUgx;
+      } else {
+        surcharges += o.manualAdjustmentUgx;
+      }
+    }
+    return RevenueBreakdown(
+      weightChargeUgx: weight,
+      lineItemsUgx: lineItems,
+      expressUgx: express,
+      deliveryUgx: delivery,
+      discountsUgx: discounts,
+      surchargesUgx: surcharges,
+    );
+  }
+}
+
+/// The period's revenue split into its charge components plus discounts and
+/// surcharges — the Loyverse/Square "gross → discounts → net" waterfall.
+/// [netSalesUgx] reconciles to the list's billed total by construction.
+class RevenueBreakdown {
+  const RevenueBreakdown({
+    required this.weightChargeUgx,
+    required this.lineItemsUgx,
+    required this.expressUgx,
+    required this.deliveryUgx,
+    required this.discountsUgx,
+    required this.surchargesUgx,
+  });
+
+  final int weightChargeUgx;
+  final int lineItemsUgx;
+  final int expressUgx;
+  final int deliveryUgx;
+  final int discountsUgx;
+  final int surchargesUgx;
+
+  /// Gross charges before any adjustment: weight + line items + express +
+  /// delivery.
+  int get grossChargesUgx =>
+      weightChargeUgx + lineItemsUgx + expressUgx + deliveryUgx;
+
+  /// Net sales after adjustments: gross − discounts + surcharges. Reconciles to
+  /// the billed total (Σ total_ugx) for every order whose stored total was
+  /// stamped by the current pricing calculator (the write-path chokepoint, i.e.
+  /// all live orders). A legacy row whose stored total predates the current
+  /// formula could diverge; none exist in practice.
+  int get netSalesUgx => grossChargesUgx - discountsUgx + surchargesUgx;
 }
 
 /// A run of orders that share a calendar day, with a ready-to-render header

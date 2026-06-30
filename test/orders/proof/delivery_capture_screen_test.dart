@@ -244,6 +244,45 @@ void main() {
   });
 
   testWidgets(
+    'after delivery, offers the change calculator and records the collection',
+    (tester) async {
+      final ordersRepo = _okOrdersRepo();
+      when(() => ordersRepo.updatePayment(any(), any(),
+          actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+      final proofEventsRepo = _okProofRepo();
+
+      await _pumpAndPushDelivery(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        // A 10,000 bill with nothing collected yet → 10,000 outstanding.
+        order: _orderReadyForDelivery().copyWith(totalUgx: 10000),
+        pickPhoto: () async => const [50, 60, 70],
+        ordersRepo: ordersRepo,
+        proofEventsRepo: proofEventsRepo,
+      );
+
+      await tester.tap(find.byKey(const Key('add_handover_photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Mark delivered'));
+      await tester.pumpAndSettle();
+
+      // Delivery succeeded but hasn't popped — the change calculator is shown.
+      expect(find.byKey(const Key('cash_tendered')), findsOneWidget);
+      expect(_lastHandle!.result, isNull);
+
+      await tester.enterText(find.byKey(const Key('cash_tendered')), '10000');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('record_payment_confirm')));
+      await tester.pumpAndSettle();
+
+      verify(() => ordersRepo.updatePayment('AMW-0421', 10000,
+          actorStaffId: 's-test')).called(1);
+      // Once the sheet closes, the delivery flow pops with success.
+      expect(_lastHandle!.result, isTrue);
+    },
+  );
+
+  testWidgets(
     'Mark delivered re-enables itself, surfaces an error, and performs NO repo '
     'writes when photo save fails',
     (tester) async {

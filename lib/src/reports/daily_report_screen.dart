@@ -92,10 +92,16 @@ class _DailyReportViewState extends State<DailyReportView> {
   @override
   Widget build(BuildContext context) {
     // Scope both orders and expenses to the selected period's window so every
-    // figure below — revenue, spend, Net, counts, status — covers the same span.
-    final window = _period.currentWindow((widget.now ?? DateTime.now)());
+    // figure below — money, spend, profit, counts, status — covers the same span.
+    final now = (widget.now ?? DateTime.now)();
+    final window = _period.currentWindow(now);
     final orders = widget.orders.inPeriod(window);
     final expenses = widget.expenses.inPeriod(window);
+    // The adjacent prior window powers the period-over-period trend chips. Past
+    // orders use inPastPeriod (excludes immediate "now" orders) so they don't
+    // leak into the comparison.
+    final prevWindow = _period.previousWindow(now);
+    final prevOrders = widget.orders.inPastPeriod(prevWindow);
     final onOpenFiltered = widget.onOpenFiltered;
     final onOpenItems = widget.onOpenItems;
     final onAddExpense = widget.onAddExpense;
@@ -112,18 +118,30 @@ class _DailyReportViewState extends State<DailyReportView> {
     final completed = OrderFilter.completed.count(orders);
     final pendingWork = OrderFilter.pendingWork.count(orders);
     final totalItems = orders.totalItems;
-    final earnedRevenue = orders.earnedRevenueUgx;
-    final expectedRevenue = orders.expectedRevenueUgx;
-    // total == earned + expected by construction (every order is either
-    // completed or not), so add them rather than make a third list pass.
-    final totalRevenue = earnedRevenue + expectedRevenue;
+
+    // Cash-first money view: collected (in hand), outstanding (receivables),
+    // billed (total charged). In normal operation billed == collected +
+    // outstanding; they diverge only when an order was over-collected. Each
+    // figure carries its previous-period value for the trend chip.
+    final collected = orders.collectedUgx;
+    final outstanding = orders.outstandingUgx;
+    final billed = orders.billedUgx;
+    final prevCollected = prevOrders.collectedUgx;
+    final prevOutstanding = prevOrders.outstandingUgx;
+    final prevBilled = prevOrders.billedUgx;
+
+    final breakdown = orders.revenueBreakdown;
+    final avgOrderValue = orders.avgOrderValueUgx;
+    final provisionalRevenue = orders.provisionalRevenueUgx;
+    final finalRevenue = orders.finalRevenueUgx;
 
     final totalExpenses = expenses.totalExpenseUgx;
     final expensesByCategory = expenses.byCategory;
-    // Net = earned (recognised) revenue minus total spend, both over the
-    // selected period's window. Nets against earnedRevenue, NOT totalRevenue —
-    // expected/outstanding revenue isn't money in hand.
-    final netUgx = earnedRevenue - totalExpenses;
+    // Net PROFIT = cash collected minus spend (not earned/booked) — only money
+    // actually in hand counts. Margin is profit as a % of collected.
+    final netProfit = collected - totalExpenses;
+    final marginPct =
+        collected == 0 ? 0 : (netProfit / collected * 100).round();
     // Show the Expenses section once there's something to show or a way to add:
     // keeps the standalone/test render path (no expenses, no callback) unchanged.
     final showExpenses = expenses.isNotEmpty || onAddExpense != null;
@@ -197,17 +215,25 @@ class _DailyReportViewState extends State<DailyReportView> {
           ),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            'Revenue',
+            'Money',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
-          _RevenueCard(
-            earned: earnedRevenue,
-            expected: expectedRevenue,
-            total: totalRevenue,
-            completed: completed,
-            pendingWork: pendingWork,
+          _MoneySummaryCard(
+            collected: collected,
+            outstanding: outstanding,
+            billed: billed,
+            collectedDelta: collected - prevCollected,
+            outstandingDelta: outstanding - prevOutstanding,
+            billedDelta: billed - prevBilled,
           ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'Revenue breakdown',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _RevenueBreakdownCard(breakdown: breakdown),
           if (showExpenses) ...[
             const SizedBox(height: AppSpacing.xl),
             Row(
@@ -230,11 +256,23 @@ class _DailyReportViewState extends State<DailyReportView> {
             _ExpensesCard(
               byCategory: expensesByCategory,
               totalSpent: totalExpenses,
-              net: netUgx,
+              netProfit: netProfit,
+              marginPct: marginPct,
               periodLabel: _period.headingLabel,
               onTap: onOpenExpenses,
             ),
           ],
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'Unit economics',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _UnitEconomicsRow(
+            avgOrderValueUgx: avgOrderValue,
+            provisionalUgx: provisionalRevenue,
+            finalUgx: finalRevenue,
+          ),
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
@@ -361,20 +399,65 @@ class _ReportMetricCard extends StatelessWidget {
   }
 }
 
-class _RevenueCard extends StatelessWidget {
-  const _RevenueCard({
-    required this.earned,
-    required this.expected,
-    required this.total,
-    required this.completed,
-    required this.pendingWork,
+/// Green used for a "good" trend direction; red for "bad" comes from the
+/// theme's error colour so it tracks dark/light.
+const Color _trendGood = Color(0xFF2E7D32); // green 800
+
+/// A small ▲/▼ + delta chip for period-over-period trends. Renders nothing when
+/// there's no change. [upIsGood] flips the colour semantics: more collected is
+/// good (green up), but more outstanding is bad (red up).
+class _TrendChip extends StatelessWidget {
+  const _TrendChip({required this.deltaUgx, this.upIsGood = true});
+
+  final int deltaUgx;
+  final bool upIsGood;
+
+  @override
+  Widget build(BuildContext context) {
+    if (deltaUgx == 0) return const SizedBox.shrink();
+    final up = deltaUgx > 0;
+    final good = up == upIsGood;
+    final color = good ? _trendGood : Theme.of(context).colorScheme.error;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+          size: 14,
+          color: color,
+        ),
+        const SizedBox(width: 2),
+        Text(
+          formatUgx(deltaUgx.abs()),
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The cash-first hero: Collected / Outstanding / Billed, each with a trend
+/// chip vs the previous comparable period.
+class _MoneySummaryCard extends StatelessWidget {
+  const _MoneySummaryCard({
+    required this.collected,
+    required this.outstanding,
+    required this.billed,
+    required this.collectedDelta,
+    required this.outstandingDelta,
+    required this.billedDelta,
   });
 
-  final int earned;
-  final int expected;
-  final int total;
-  final int completed;
-  final int pendingWork;
+  final int collected;
+  final int outstanding;
+  final int billed;
+  final int collectedDelta;
+  final int outstandingDelta;
+  final int billedDelta;
 
   @override
   Widget build(BuildContext context) {
@@ -382,22 +465,220 @@ class _RevenueCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _RevenueRow(
-            label: 'Earned',
-            subtitle: '$completed completed',
-            amountUgx: earned,
+          _MoneyRow(
+            label: 'Collected',
+            amountUgx: collected,
+            deltaUgx: collectedDelta,
           ),
           const SizedBox(height: AppSpacing.lg - 2),
-          _RevenueRow(
-            label: 'Expected',
-            subtitle: '$pendingWork outstanding',
-            amountUgx: expected,
+          // More money owed is worse, so an upward outstanding trend reads red.
+          _MoneyRow(
+            label: 'Outstanding',
+            amountUgx: outstanding,
+            deltaUgx: outstandingDelta,
+            upIsGood: false,
           ),
           const Divider(height: AppSpacing.xl),
-          _RevenueRow(
-            label: 'Total booked',
-            amountUgx: total,
+          _MoneyRow(
+            label: 'Billed',
+            amountUgx: billed,
+            deltaUgx: billedDelta,
             emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoneyRow extends StatelessWidget {
+  const _MoneyRow({
+    required this.label,
+    required this.amountUgx,
+    required this.deltaUgx,
+    this.upIsGood = true,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final int amountUgx;
+  final int deltaUgx;
+  final bool upIsGood;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: emphasized ? 16 : 15,
+            ),
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              formatUgx(amountUgx),
+              style: TextStyle(
+                color: emphasized ? colorScheme.primary : colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+                fontSize: emphasized ? 18 : 16,
+              ),
+            ),
+            _TrendChip(deltaUgx: deltaUgx, upIsGood: upIsGood),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// The net-sales waterfall: gross charge components, discounts, and net sales.
+/// Component rows are hidden when zero so the card stays tight; Net sales always
+/// shows.
+class _RevenueBreakdownCard extends StatelessWidget {
+  const _RevenueBreakdownCard({required this.breakdown});
+
+  final RevenueBreakdown breakdown;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    void addRow(String label, int amount, {bool force = false}) {
+      if (amount == 0 && !force) return;
+      if (rows.isNotEmpty) {
+        rows.add(const SizedBox(height: AppSpacing.lg - 2));
+      }
+      rows.add(_RevenueRow(label: label, amountUgx: amount));
+    }
+
+    addRow('Weight charges', breakdown.weightChargeUgx);
+    addRow('Line items', breakdown.lineItemsUgx);
+    addRow('Express', breakdown.expressUgx);
+    addRow('Delivery', breakdown.deliveryUgx);
+    addRow('Surcharges', breakdown.surchargesUgx);
+    // Discounts reduce the total, so render the negative amount.
+    if (breakdown.discountsUgx > 0) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.lg - 2));
+      rows.add(_RevenueRow(label: 'Discounts', amountUgx: -breakdown.discountsUgx));
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rows.isEmpty)
+            const Text(
+              'No charges recorded yet.',
+              style: TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            ...rows,
+          const Divider(height: AppSpacing.xl),
+          _RevenueRow(
+            label: 'Net sales',
+            amountUgx: breakdown.netSalesUgx,
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Average order value alongside the provisional-vs-final revenue split.
+class _UnitEconomicsRow extends StatelessWidget {
+  const _UnitEconomicsRow({
+    required this.avgOrderValueUgx,
+    required this.provisionalUgx,
+    required this.finalUgx,
+  });
+
+  final int avgOrderValueUgx;
+  final int provisionalUgx;
+  final int finalUgx;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _MoneyStatCard(
+            title: 'Avg order value',
+            amountUgx: avgOrderValueUgx,
+            icon: Icons.receipt_long_outlined,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RevenueRow(label: 'Provisional', amountUgx: provisionalUgx),
+                const SizedBox(height: AppSpacing.lg - 2),
+                _RevenueRow(label: 'Final', amountUgx: finalUgx),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoneyStatCard extends StatelessWidget {
+  const _MoneyStatCard({
+    required this.title,
+    required this.amountUgx,
+    required this.icon,
+  });
+
+  final String title;
+  final int amountUgx;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.field - 3),
+            ),
+            child: Icon(icon, color: colorScheme.primary),
+          ),
+          const SizedBox(height: AppSpacing.lg - 2),
+          Text(
+            formatUgx(amountUgx),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.xs / 2),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -409,13 +690,11 @@ class _RevenueRow extends StatelessWidget {
   const _RevenueRow({
     required this.label,
     required this.amountUgx,
-    this.subtitle,
     this.emphasized = false,
   });
 
   final String label;
   final int amountUgx;
-  final String? subtitle;
   final bool emphasized;
 
   @override
@@ -425,29 +704,13 @@ class _RevenueRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
-                  fontSize: emphasized ? 16 : 15,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: AppSpacing.xs / 2),
-                Text(
-                  subtitle!,
-                  style: const TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ],
+          child: Text(
+            label,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: emphasized ? 16 : 15,
+            ),
           ),
         ),
         Text(
@@ -467,14 +730,19 @@ class _ExpensesCard extends StatelessWidget {
   const _ExpensesCard({
     required this.byCategory,
     required this.totalSpent,
-    required this.net,
+    required this.netProfit,
+    required this.marginPct,
     required this.periodLabel,
     this.onTap,
   });
 
   final Map<ExpenseCategory, int> byCategory;
   final int totalSpent;
-  final int net;
+
+  /// Cash collected − total spend (can be negative). Margin is that as a % of
+  /// collected.
+  final int netProfit;
+  final int marginPct;
 
   /// The current period's noun ("Today" / "This week" / "This month"), used in
   /// the empty-state line so it tracks the selector.
@@ -519,13 +787,13 @@ class _ExpensesCard extends StatelessWidget {
             emphasized: true,
           ),
           const SizedBox(height: AppSpacing.lg - 2),
-          // Net = earned revenue − total spent. Green-tinted when in the black,
-          // error-tinted when spend has outrun earnings, both from the theme.
+          // Net PROFIT = cash collected − total spent. Green-tinted when in the
+          // black, error-tinted when spend has outrun collections.
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'Net',
+                  'Net profit',
                   style: TextStyle(
                     color: colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
@@ -534,14 +802,23 @@ class _ExpensesCard extends StatelessWidget {
                 ),
               ),
               Text(
-                formatUgx(net),
+                formatUgx(netProfit),
                 style: TextStyle(
-                  color: net < 0 ? colorScheme.error : colorScheme.primary,
+                  color: netProfit < 0 ? colorScheme.error : colorScheme.primary,
                   fontWeight: FontWeight.w800,
                   fontSize: 18,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Margin $marginPct% of collected',
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

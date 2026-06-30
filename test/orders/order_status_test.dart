@@ -45,6 +45,7 @@ drift.Order _orderRow({
     isExpress: false,
     expressFlatSnapshotUgx: 0,
     expressPctSnapshot: 0,
+    paymentAmountUgx: 0,
   );
 }
 
