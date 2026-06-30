@@ -1,4 +1,4 @@
--- 0026_orders_audit_columns_test.sql
+-- 0029_orders_audit_columns_test.sql
 -- Verifies orders.updated_by / orders.deleted_by exist and use ON DELETE SET
 -- NULL: deleting the staff member they point at clears the references instead
 -- of raising a FK error. Runs inside BEGIN ... ROLLBACK so nothing touches real

@@ -266,6 +266,8 @@ class SyncPuller {
         assignedDriver: Value(r['assigned_driver'] as String?),
         intakeRecordedBy: r['intake_recorded_by'] as String,
         createdBy: r['created_by'] as String,
+        updatedBy: Value(r['updated_by'] as String?),
+        deletedBy: Value(r['deleted_by'] as String?),
         createdAt: Value(_dt(r['created_at'])),
         updatedAt: Value(_dt(r['updated_at'])),
         deletedAt: Value(_dtNullable(r['deleted_at'])),

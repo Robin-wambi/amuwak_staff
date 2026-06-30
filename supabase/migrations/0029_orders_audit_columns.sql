@@ -1,4 +1,4 @@
--- 0026_orders_audit_columns.sql
+-- 0029_orders_audit_columns.sql
 -- Audit pointers for order mutations after creation:
 --   * updated_by — the staff member who last edited an order's descriptive or
 --     status fields (the card "Edit details" / "Mark as ..." flows).
@@ -13,7 +13,13 @@
 -- and driver assignment, not by individual columns, so writing these audit
 -- columns is already covered for in_shop/manager (and a driver on their own
 -- assigned order).
+--
+-- IF NOT EXISTS makes this idempotent. This migration was originally shipped as a
+-- duplicate `0026` (silently skipped on remotes that already had a different
+-- 0026) and some environments had the columns added out-of-band during recovery;
+-- the guard lets a `supabase db push` reconcile any of those states as a no-op
+-- instead of failing on "column already exists".
 
 ALTER TABLE orders
-  ADD COLUMN updated_by uuid REFERENCES staff(id) ON DELETE SET NULL,
-  ADD COLUMN deleted_by uuid REFERENCES staff(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES staff(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS deleted_by uuid REFERENCES staff(id) ON DELETE SET NULL;
