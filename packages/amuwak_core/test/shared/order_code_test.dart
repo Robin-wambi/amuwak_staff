@@ -1,4 +1,4 @@
-import 'package:amuwak_staff/src/shared/order_code.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

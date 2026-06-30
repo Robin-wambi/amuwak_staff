@@ -3,9 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:amuwak_core/amuwak_core.dart';
 import '../data/app_database.dart' show Customer;
-import '../shared/format_ugx.dart';
-import '../shared/phone.dart';
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
 import 'geo_services.dart';

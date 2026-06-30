@@ -1,5 +1,4 @@
-import '../shared/order_code.dart';
-import '../shared/phone.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'order.dart';
 import 'order_status.dart';
 

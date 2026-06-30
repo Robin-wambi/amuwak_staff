@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../shared/format_ugx.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../shared/theme/app_spacing.dart';
 import 'pricing_settings.dart';
 

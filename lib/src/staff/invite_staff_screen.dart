@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../shared/email_validation.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';
 import 'invite_staff_service.dart';

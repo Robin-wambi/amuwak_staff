@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../shared/format_ugx.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../shared/theme/app_card.dart';
 import '../shared/theme/app_colors.dart';
 import '../shared/theme/app_radii.dart';

@@ -6,7 +6,7 @@ import '../orders/order.dart';
 import '../orders/order_status.dart';
 import '../orders/pricing/pricing_calculator.dart';
 import '../orders/pricing/pricing_inputs.dart';
-import '../shared/order_code.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
