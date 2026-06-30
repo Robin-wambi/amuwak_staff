@@ -10,6 +10,7 @@ import '../../sync/orders_repository.dart';
 import '../../sync/proof_events_repository.dart';
 import '../order.dart';
 import '../order_status.dart';
+import '../payment/record_payment_sheet.dart';
 import '../proof_event.dart';
 import 'proof_photo_storage.dart';
 
@@ -187,7 +188,38 @@ class _DeliveryCaptureScreenState extends State<DeliveryCaptureScreen> {
     }
 
     if (!mounted) return;
+    // Cash-on-delivery: offer the change calculator before leaving the screen,
+    // defaulting to the order's outstanding balance. Best-effort — a payment
+    // failure shows its own retry SnackBar inside the sheet and doesn't undo the
+    // (already-persisted) delivery.
+    await _collectPaymentIfOwed();
+
+    if (!mounted) return;
     Navigator.pop<bool>(context, true);
+  }
+
+  Future<void> _collectPaymentIfOwed() async {
+    final due = widget.order.outstandingUgx;
+    if (due <= 0) return;
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        child: RecordPaymentSheet(
+          amountDueUgx: due,
+          onConfirm: (applied) async {
+            final newCollected = widget.order.paymentAmountUgx + applied;
+            await widget.ordersRepo.updatePayment(
+              widget.order.orderId,
+              newCollected,
+              actorStaffId: widget.actorStaffId,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
