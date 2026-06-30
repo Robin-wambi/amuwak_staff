@@ -58,6 +58,59 @@ void main() {
     });
   });
 
+  group('ReportPeriod.previousWindow', () {
+    test('daily is the calendar day before the current one', () {
+      final w = ReportPeriod.daily.previousWindow(now);
+      expect(w.start, DateTime(2026, 6, 16));
+      expect(w.end, DateTime(2026, 6, 17));
+    });
+
+    test('weekly is the Monday..Monday week before the current one', () {
+      final w = ReportPeriod.weekly.previousWindow(now);
+      expect(w.start, DateTime(2026, 6, 8));
+      expect(w.end, DateTime(2026, 6, 15));
+    });
+
+    test('monthly is the month before the current one', () {
+      final w = ReportPeriod.monthly.previousWindow(now);
+      expect(w.start, DateTime(2026, 5, 1));
+      expect(w.end, DateTime(2026, 6, 1));
+    });
+
+    test('monthly rolls January back into the prior December', () {
+      final w = ReportPeriod.monthly.previousWindow(DateTime(2026, 1, 9));
+      expect(w.start, DateTime(2025, 12, 1));
+      expect(w.end, DateTime(2026, 1, 1));
+    });
+
+    test('previous window ends exactly where the current window starts', () {
+      for (final p in ReportPeriod.values) {
+        expect(p.previousWindow(now).end, p.currentWindow(now).start);
+      }
+    });
+  });
+
+  group('OrderPeriodFilter.inPastPeriod', () {
+    final lastWeek = ReportPeriod.weekly.previousWindow(now);
+
+    test('keeps orders whose relevant date is inside the past window', () {
+      final inside = _order(scheduledFor: DateTime(2026, 6, 9, 9));
+      expect([inside].inPastPeriod(lastWeek), [inside]);
+    });
+
+    test('drops orders outside the past window', () {
+      final thisWeek = _order(scheduledFor: DateTime(2026, 6, 16, 9));
+      expect([thisWeek].inPastPeriod(lastWeek), isEmpty);
+    });
+
+    test('EXCLUDES a no-relevant-date order (unlike inPeriod)', () {
+      // "Now" orders belong only to the current period; they must never leak
+      // into the previous-period comparison.
+      final immediate = _order(scheduledFor: null);
+      expect([immediate].inPastPeriod(lastWeek), isEmpty);
+    });
+  });
+
   group('ReportPeriod labels', () {
     test('label is the enum display name', () {
       expect(ReportPeriod.daily.label, 'Daily');
