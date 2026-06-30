@@ -47,6 +47,7 @@ drift.Order _orderRow({
     isExpress: false,
     expressFlatSnapshotUgx: 0,
     expressPctSnapshot: 0,
+    paymentAmountUgx: 0,
   );
 }
 
@@ -233,6 +234,7 @@ void main() {
         isExpress: false,
         expressFlatSnapshotUgx: 0,
         expressPctSnapshot: 0,
+        paymentAmountUgx: 0,
       );
       final mapped = LaundryOrder.fromDriftRow(row, const []);
       expect(mapped.orderCode, equals(row.orderCode));
