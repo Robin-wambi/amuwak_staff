@@ -1,0 +1,20 @@
+name: amuwak
+
+packages:
+  - .
+  - packages/**
+  - apps/**
+
+scripts:
+  analyze:
+    description: Analyze all packages.
+    run: flutter analyze
+    exec:
+      concurrency: 1
+  test:
+    description: Run tests in packages that have a test/ dir.
+    run: flutter test
+    exec:
+      concurrency: 1
+    packageFilters:
+      dirExists: test

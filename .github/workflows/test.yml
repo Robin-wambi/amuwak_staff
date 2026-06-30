@@ -1,0 +1,22 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # melos scripts shell out to `melos exec`, so the melos executable must be
+      # on PATH (not just available via `dart run melos`).
+      - run: dart pub global activate melos
+      - run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos run analyze
+      - run: melos run test
