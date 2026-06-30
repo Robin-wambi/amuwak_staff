@@ -42,6 +42,7 @@ Map<String, dynamic> orderUpsertPayload(
       'express_flat_snapshot_ugx': order.expressFlatSnapshotUgx,
       'express_pct_snapshot': order.expressPctSnapshot,
       'total_ugx': order.totalUgx,
+      'payment_amount_ugx': order.paymentAmountUgx,
       'intake_recorded_by': actorStaffId,
       'created_by': actorStaffId,
       'created_at': now.toUtc().toIso8601String(),
@@ -55,6 +56,23 @@ Map<String, dynamic> orderStatusUpdatePayload(
 }) =>
     {
       'status': status.toDbString(),
+      'updated_by': actorStaffId,
+      'updated_at': now.toUtc().toIso8601String(),
+    };
+
+/// The cash-collected column for an order, as an ABSOLUTE cumulative total (not
+/// a delta) — the caller computes the new collected amount from the current
+/// order plus what's just been tendered and passes it whole, mirroring how
+/// [orderStatusUpdatePayload] carries an absolute status. Narrow shape: only
+/// `payment_amount_ugx` (+ updated_by/updated_at), so it can't clobber pricing,
+/// status, or creation columns. [actorStaffId] is recorded as `updated_by`.
+Map<String, dynamic> orderPaymentUpdatePayload(
+  int amountUgx, {
+  required String actorStaffId,
+  required DateTime now,
+}) =>
+    {
+      'payment_amount_ugx': amountUgx,
       'updated_by': actorStaffId,
       'updated_at': now.toUtc().toIso8601String(),
     };

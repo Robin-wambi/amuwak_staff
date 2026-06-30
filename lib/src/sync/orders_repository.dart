@@ -312,6 +312,30 @@ class OrdersRepository {
     }
   }
 
+  /// Records cash collected against an order, as the new ABSOLUTE cumulative
+  /// total (the caller adds what was just tendered to the order's current
+  /// `paymentAmountUgx` and passes the sum). Writes only `payment_amount_ugx`
+  /// (+ updated_at/updated_by) — never status, pricing, or creation columns.
+  /// Paid/partial/unpaid stays derived from this vs `total_ugx`, so there's no
+  /// status column to keep in sync.
+  ///
+  /// Throws a [StateError] when no order matched [orderId] (e.g. soft-deleted
+  /// server-side), matching the sibling write methods so a no-op isn't treated
+  /// as a successful collection.
+  Future<void> updatePayment(
+    String orderId,
+    int amountUgx, {
+    required String actorStaffId,
+  }) async {
+    final updated = await _updateById(
+        orderId,
+        orderPaymentUpdatePayload(amountUgx,
+            actorStaffId: actorStaffId, now: _clock()));
+    if (updated.isEmpty) {
+      throw StateError('updatePayment: no order with id "$orderId"');
+    }
+  }
+
   /// Updates an order's status. [updatedAt] is optional and kept for call-site
   /// compatibility with the offline path (where it stabilised the outbox dedup
   /// key); online it just sets the row's `updated_at`.
