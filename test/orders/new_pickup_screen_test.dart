@@ -252,33 +252,46 @@ void main() {
     expect(find.byKey(const Key('np_missing_hint')), findsNothing);
   });
 
-  testWidgets('the item count box shows an inline error while it is still 0', (
+  testWidgets('the item count box flags 0 only after the rider touches it', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
 
-    // Always-on: a freshly opened form already flags the empty count box so the
-    // rider sees the required field, not just a disabled button.
+    // A freshly opened form does not pre-flag the count box — no red on a form
+    // the rider hasn't interacted with yet.
+    expect(find.text('Add at least 1 item'), findsNothing);
+
+    // Interact and land back on 0: now the requirement is flagged.
+    await tester.tap(find.byKey(const Key('np_count_inc')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('np_count_dec')));
+    await tester.pump();
     expect(find.text('Add at least 1 item'), findsOneWidget);
 
+    // Clears again once there is at least one item.
     await tester.tap(find.byKey(const Key('np_count_inc')));
     await tester.pump();
     expect(find.text('Add at least 1 item'), findsNothing);
   });
 
-  testWidgets('required field errors show immediately on a fresh form', (
+  testWidgets('required field errors stay hidden until the rider interacts', (
     tester,
   ) async {
     await pumpFormAndOpen(tester);
 
-    // Always-on validation: every empty required box flags itself up front, not
-    // only after the rider touches it.
+    // onUserInteraction: a fresh form shows no red errors — the rider isn't
+    // greeted by a wall of "internal errors" before typing anything. The bottom
+    // "Still needed" hint (tested separately) names what's outstanding instead.
+    expect(find.text("Enter the customer's name"), findsNothing);
+    expect(find.text('Enter the 9-digit number after +256'), findsNothing);
+    expect(find.text('Enter or detect the pickup address'), findsNothing);
+    expect(find.text('Choose a service type'), findsNothing);
+
+    // Touching the name field and leaving it empty surfaces its error.
+    await tester.enterText(find.byKey(const Key('np_name')), 'x');
+    await tester.enterText(find.byKey(const Key('np_name')), '');
+    await tester.pump();
     expect(find.text("Enter the customer's name"), findsOneWidget);
-    expect(find.text('Enter the 9-digit number after +256'), findsOneWidget);
-    expect(find.text('Enter or detect the pickup address'), findsOneWidget);
-    // The service-type dropdown also pre-flags on open (DropdownButtonFormField
-    // honours AutovalidateMode.always on the first frame).
-    expect(find.text('Choose a service type'), findsOneWidget);
   });
 
   testWidgets(
@@ -339,10 +352,10 @@ void main() {
       await pumpFormAndOpen(tester);
       const message = 'Enter the 9-digit number after +256';
 
-      // Always-on validation: the empty required field flags itself up front.
-      expect(find.text(message), findsOneWidget);
+      // onUserInteraction: not flagged up front, before the rider edits it.
+      expect(find.text(message), findsNothing);
 
-      // Still too short — the error stays.
+      // Once edited and still too short, the error appears.
       await tester.enterText(find.byKey(const Key('np_phone')), '+256 700');
       await tester.pump();
       expect(find.text(message), findsOneWidget);
@@ -486,7 +499,12 @@ void main() {
       var calls = 0;
       when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
         calls++;
-        if (calls == 1) throw Exception('offline');
+        if (calls == 1) {
+          throw Exception(
+            'PostgrestException(message: relation "next_order_code" does not '
+            'exist, code: 42883, details: Missing RPC)',
+          );
+        }
         return 'AMW-2026-0042';
       });
 
@@ -515,6 +533,8 @@ void main() {
         find.textContaining('Could not reserve an order number'),
         findsOneWidget,
       );
+      expect(find.textContaining('PostgrestException'), findsNothing);
+      expect(find.textContaining('42883'), findsNothing);
       expect(handle.popped, isNull);
       verifyNever(
         () => ordersRepo.upsertOrder(
@@ -533,14 +553,19 @@ void main() {
   );
 
   testWidgets(
-    'a failed order save surfaces the real error and keeps the form open',
+    'a failed order save shows friendly copy and keeps the form open',
     (tester) async {
       when(
         () => ordersRepo.upsertOrder(
           any(),
           actorStaffId: any(named: 'actorStaffId'),
         ),
-      ).thenThrow(Exception('boom-postgrest-23514'));
+      ).thenThrow(
+        Exception(
+          'PostgrestException(message: new row violates row-level security '
+          'policy for table "orders", code: 42501, details: hidden)',
+        ),
+      );
       final handle = await pumpFormAndOpen(tester);
 
       await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
@@ -561,19 +586,28 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
       await tester.pump();
 
-      // The actual error is shown (not a generic "network" message), and the
-      // form stays open so the rider can retry.
-      expect(find.textContaining('boom-postgrest-23514'), findsOneWidget);
+      // The rider sees actionable copy, while raw Postgres/Supabase details
+      // stay in developer logs.
+      expect(
+        find.textContaining('Not allowed on the server (permissions).'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('PostgrestException'), findsNothing);
+      expect(find.textContaining('42501'), findsNothing);
+      expect(find.textContaining('row-level security'), findsNothing);
       expect(handle.popped, isNull);
     },
   );
 
   testWidgets(
-    'a failed customer save surfaces the real error and keeps the form open',
+    'a failed customer save shows friendly copy and keeps the form open',
     (tester) async {
-      when(
-        () => customersRepo.upsertCustomer(any()),
-      ).thenThrow(Exception('boom-customer-rls'));
+      when(() => customersRepo.upsertCustomer(any())).thenThrow(
+        Exception(
+          'PostgrestException(message: permission denied for table customers, '
+          'code: 42501, details: hidden)',
+        ),
+      );
       final handle = await pumpFormAndOpen(tester);
 
       await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
@@ -594,9 +628,15 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
       await tester.pump();
 
-      // The real error is shown (this catch was previously the opaque generic
-      // message that hid the root bug), and the form stays open to retry.
-      expect(find.textContaining('boom-customer-rls'), findsOneWidget);
+      // The rider sees actionable copy, while raw Postgres/Supabase details
+      // stay in developer logs.
+      expect(
+        find.textContaining('Not allowed on the server (permissions).'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('PostgrestException'), findsNothing);
+      expect(find.textContaining('42501'), findsNothing);
+      expect(find.textContaining('permission denied'), findsNothing);
       expect(handle.popped, isNull);
       // The order write must never run when the customer write failed.
       verifyNever(
@@ -960,9 +1000,7 @@ void main() {
     expect(order.notes, 'Gate locked after 6');
   });
 
-  testWidgets('Item count: stepper caps at 99', (
-    tester,
-  ) async {
+  testWidgets('Item count: stepper caps at 99', (tester) async {
     await pumpFormAndOpen(tester);
 
     // Tap well past the cap; the count must not exceed 99 (no four-digit counts).
