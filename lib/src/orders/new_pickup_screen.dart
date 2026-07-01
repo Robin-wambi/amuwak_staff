@@ -7,11 +7,10 @@ import 'package:amuwak_core/amuwak_core.dart';
 import '../data/app_database.dart' show Customer;
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
+import '../sync/sync_failure_policy.dart';
 import 'geo_services.dart';
 import 'new_pickup_result.dart';
 import 'order.dart';
-import 'order_status.dart';
-import 'service_type.dart';
 
 enum _PickupTimeMode { now, scheduled }
 
@@ -31,6 +30,18 @@ bool scheduledTimeIsInPast(DateTime chosen, DateTime now) {
     now.minute,
   );
   return chosen.isBefore(nowMinute);
+}
+
+String _friendlyCreatePickupFailure(Object error, {required String fallback}) {
+  final friendly = friendlySyncError(error.toString());
+  if (friendly.startsWith('Connection problem')) {
+    return 'Connection problem. Check your connection and try again.';
+  }
+  if (friendly == 'Could not be saved.' ||
+      friendly == 'Could not be saved (server rejected it).') {
+    return fallback;
+  }
+  return friendly;
 }
 
 class NewPickupScreen extends StatefulWidget {
@@ -102,6 +113,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   bool _includeDelivery = true;
   bool _isExpress = false;
   int _count = 0;
+  // Whether the rider has touched the count control yet. The count error only
+  // shows after interaction (mirroring the fields' onUserInteraction) so a fresh
+  // form isn't pre-flagged.
+  bool _countTouched = false;
   // Guards against fat-fingering a four-digit item count on the stepper.
   static const _maxItemCount = 99;
   // Mirrors [_count] so the value can be typed directly (tap-to-edit) as well
@@ -116,6 +131,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   void _changeCount(int delta) {
     final next = (_count + delta).clamp(0, _maxItemCount);
     setState(() {
+      _countTouched = true;
       _count = next;
       _countController.text = '$next';
       _countController.selection = TextSelection.collapsed(
@@ -131,7 +147,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     final parsed = raw.trim().isEmpty ? 0 : int.tryParse(raw.trim());
     if (parsed == null) return;
     final clamped = parsed.clamp(0, _maxItemCount);
-    setState(() => _count = clamped);
+    setState(() {
+      _countTouched = true;
+      _count = clamped;
+    });
     if (clamped != parsed) {
       _countController.text = '$clamped';
       _countController.selection = TextSelection.collapsed(
@@ -466,11 +485,15 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       );
       if (!mounted) return;
       setState(() => _saving = false);
+      final reason = _friendlyCreatePickupFailure(
+        e,
+        fallback: 'The server did not accept the customer record.',
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
           content: Text(
-            'Could not save customer: $e\n'
+            'Could not save customer. $reason\n'
             'Tap Create pickup again to retry.',
           ),
         ),
@@ -493,12 +516,16 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       );
       if (!mounted) return;
       setState(() => _saving = false);
+      final reason = _friendlyCreatePickupFailure(
+        e,
+        fallback: 'The server did not accept the request.',
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
           content: Text(
-            'Could not reserve an order number: $e\n'
-            'Check your connection and tap Create pickup again.',
+            'Could not reserve an order number. $reason\n'
+            'Tap Create pickup again to retry.',
           ),
         ),
       );
@@ -543,11 +570,15 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       );
       if (!mounted) return;
       setState(() => _saving = false);
+      final reason = _friendlyCreatePickupFailure(
+        e,
+        fallback: 'The server did not accept the order.',
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
           content: Text(
-            'Could not save the order: $e\n'
+            'Could not save the order. $reason\n'
             'Tap Create pickup again to retry.',
           ),
         ),
@@ -599,11 +630,10 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Customer name'),
               textCapitalization: TextCapitalization.words,
-              // Always-on: empty required boxes flag themselves from form open
-              // so the rider sees exactly which fields need a value, not just a
-              // disabled Create button. Pairs with the bottom "Still needed"
-              // summary.
-              autovalidateMode: AutovalidateMode.always,
+              // Validate only after the rider edits this field, so a fresh form
+              // isn't pre-flagged with red errors. The bottom "Still needed"
+              // summary names any field that's outstanding before then.
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? "Enter the customer's name"
                   : null,
@@ -617,7 +647,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               keyboardType: TextInputType.phone,
               inputFormatters: const [_UgandaNationalDigitsLimiter()],
               decoration: const InputDecoration(labelText: 'Phone'),
-              autovalidateMode: AutovalidateMode.always,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               // The single easiest field to get subtly wrong (one digit short),
               // so call out the exact requirement inline.
               validator: (v) => ugandaNationalDigits(v ?? '').length == 9
@@ -665,7 +695,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Address',
                           ),
-                          autovalidateMode: AutovalidateMode.always,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           // `controller` is _addressController (passed to
                           // RawAutocomplete above), so `v` reflects the same
                           // value _missingRequirements checks at submit.
@@ -724,7 +754,7 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
               key: const Key('np_service_type'),
               decoration: const InputDecoration(labelText: 'Service type'),
               value: _serviceType,
-              autovalidateMode: AutovalidateMode.always,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) => v == null ? 'Choose a service type' : null,
               items: ServiceType.values
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
@@ -779,10 +809,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                     decoration: InputDecoration(
                       isDense: true,
                       suffixText: 'items',
-                      // Required field: flag an unset count up front (always-on)
-                      // so the rider sees the box that still needs a value, not
-                      // just a disabled Create button.
-                      errorText: _count < 1 ? 'Add at least 1 item' : null,
+                      // Required field: flag an unset count once the rider has
+                      // touched the control (not on a fresh form). The bottom
+                      // "Still needed" hint names it before then.
+                      errorText: _countTouched && _count < 1
+                          ? 'Add at least 1 item'
+                          : null,
                     ),
                   ),
                 ),
@@ -790,8 +822,9 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
                   key: const Key('np_count_inc'),
                   tooltip: 'More items',
                   icon: const Icon(Icons.add_circle_outline),
-                  onPressed:
-                      _count < _maxItemCount ? () => _changeCount(1) : null,
+                  onPressed: _count < _maxItemCount
+                      ? () => _changeCount(1)
+                      : null,
                 ),
               ],
             ),
