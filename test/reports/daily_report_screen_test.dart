@@ -6,6 +6,7 @@ import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_filter.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
@@ -24,6 +25,18 @@ Expense _expense(ExpenseCategory category, int amountUgx, {DateTime? on}) =>
 // Fixed reference clock so the report's period window is deterministic in tests.
 DateTime _fixedNow() => DateTime(2026, 6, 17, 12);
 
+// Scrolls the (lazily-built) ListView until [finder] is on screen. Used by the
+// narrow-phone tests, which pump a short surface where lower sections would
+// otherwise be off-screen and not in the tree.
+Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    280,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pump();
+}
+
 LaundryOrder _order(
   String id,
   OrderStatus status,
@@ -31,6 +44,7 @@ LaundryOrder _order(
   int paid = 0,
   DateTime? scheduledFor,
   double? finalWeightKg,
+  DateTime? deliveredAt,
 }) =>
     LaundryOrder(
       orderId: id,
@@ -47,10 +61,20 @@ LaundryOrder _order(
       paymentAmountUgx: paid,
       scheduledFor: scheduledFor,
       finalWeightKg: finalWeightKg,
+      proofEvents: [
+        if (deliveredAt != null)
+          ProofEvent(
+            id: 'delivery-$id',
+            type: ProofEventType.delivery,
+            capturedAt: deliveredAt,
+            count: 1,
+            photoPaths: const [],
+          ),
+      ],
     );
 
 // Pumps the report on a tall surface so the whole (lazily-built) ListView is
-// realised — the lower sections (Expenses, Unit economics, metric cards, work
+// realised — the lower sections (Expenses, Unit economics, metric strip, work
 // summary) would otherwise be off-screen and not in the tree to find.
 Future<void> _pumpReport(
   WidgetTester tester,
@@ -198,8 +222,70 @@ void main() {
     });
   });
 
+  group('Monthly revenue tracker', () {
+    testWidgets('sums current-month completed deliveries only', (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 10000,
+            deliveredAt: DateTime(2026, 6, 1, 10)),
+        _order('B', OrderStatus.completed, 12000,
+            deliveredAt: DateTime(2026, 6, 17, 9)),
+        // Not completed → excluded.
+        _order('P', OrderStatus.inProgress, 5000,
+            deliveredAt: DateTime(2026, 6, 12, 9)),
+        // Previous month → excluded.
+        _order('OLD', OrderStatus.completed, 7000,
+            deliveredAt: DateTime(2026, 5, 31, 9)),
+        // After "now" (day 17) → excluded.
+        _order('FUTURE', OrderStatus.completed, 9000,
+            deliveredAt: DateTime(2026, 6, 20, 9)),
+      ];
+
+      await _pumpReport(tester, orders);
+
+      final tracker = find.ancestor(
+        of: find.text('This month revenue tracker'),
+        matching: find.byType(AppCard),
+      );
+
+      expect(find.descendant(of: tracker, matching: find.text('June 2026')),
+          findsOneWidget);
+      // Earned = A (10,000) + B (12,000); OLD/FUTURE/P excluded.
+      expect(find.descendant(of: tracker, matching: find.text('USh 22,000')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: tracker, matching: find.text('2 completed deliveries')),
+          findsOneWidget);
+      expect(find.descendant(of: tracker, matching: find.byType(CustomPaint)),
+          findsWidgets);
+    });
+
+    testWidgets('shows zero for an empty current month', (tester) async {
+      final orders = [
+        _order('OLD', OrderStatus.completed, 7000,
+            deliveredAt: DateTime(2026, 5, 31, 9)),
+        _order('P', OrderStatus.inProgress, 9000,
+            deliveredAt: DateTime(2026, 6, 10, 9)),
+      ];
+
+      await _pumpReport(tester, orders);
+
+      final tracker = find.ancestor(
+        of: find.text('This month revenue tracker'),
+        matching: find.byType(AppCard),
+      );
+
+      expect(find.descendant(of: tracker, matching: find.text('USh 0')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: tracker, matching: find.text('0 completed deliveries')),
+          findsOneWidget);
+    });
+  });
+
   group('Navigation + status (unchanged behaviour)', () {
-    testWidgets('each card invokes the right navigation callback',
+    testWidgets('each metric cell invokes the right navigation callback',
         (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -226,7 +312,10 @@ void main() {
         ),
       ));
 
+      await _scrollUntilVisible(tester, find.text('Orders'));
       await tester.tap(find.text('Orders'));
+      // 'Completed' also appears in the Status breakdown card, so tap the metric
+      // cell via its unique icon instead of the ambiguous label.
       await tester.tap(find.byIcon(Icons.check_circle_outline_rounded));
       await tester.tap(find.text('Pending work'));
       await tester.tap(find.text('Items'));
@@ -240,7 +329,53 @@ void main() {
       expect(itemsTaps, 1);
     });
 
-    testWidgets('Completed and Pending work cards show their OrderFilter counts',
+    testWidgets('metric strip uses an equal-cell 2x2 grid below the wide '
+        'breakpoint', (tester) async {
+      // Below _ReportMetricStrip._wideBreakpoint (560) the strip lays out 2x2.
+      // Pumped at 500 rather than a phone-width 360 because the finance-grade
+      // _UnitEconomicsRow above the strip has a pre-existing overflow at ~360
+      // (the unbreakable "Provisional" label + its amount don't fit its half-
+      // width column); that is unrelated to the strip and tracked separately.
+      tester.view.physicalSize = const Size(500, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              _order('A', OrderStatus.completed, 8000),
+              _order('B', OrderStatus.inProgress, 5000),
+            ],
+          ),
+        ),
+      ));
+
+      await _scrollUntilVisible(tester, find.text('Orders'));
+
+      Finder metricCell(String title) => find
+          .ancestor(of: find.text(title), matching: find.byType(InkWell))
+          .first;
+
+      final first = tester.getSize(metricCell('Orders'));
+      for (final title in const ['Items', 'Completed', 'Pending work']) {
+        final size = tester.getSize(metricCell(title));
+        expect(size.width, first.width, reason: '$title width');
+        expect(size.height, first.height, reason: '$title height');
+      }
+    });
+
+    testWidgets('cells are inert when no callbacks are provided',
+        (tester) async {
+      await _pumpReport(tester, [_order('A', OrderStatus.completed, 8000)]);
+
+      await tester.tap(find.text('Orders'), warnIfMissed: false);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'Completed and Pending work cells show their OrderFilter counts',
         (tester) async {
       final orders = [
         _order('A', OrderStatus.completed, 1000),
@@ -282,6 +417,10 @@ void main() {
       ),
     ));
 
+    // The Expenses card sits well down the report (below Money, Revenue
+    // breakdown, and the monthly tracker), so scroll it into the lazy ListView
+    // before asserting on it.
+    await _scrollUntilVisible(tester, find.text('Expenses'));
     expect(find.text('Expenses'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.add));
     expect(addTaps, 1);
