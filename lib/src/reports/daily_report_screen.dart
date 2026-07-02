@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../expenses/expense.dart';
@@ -97,6 +99,14 @@ class _DailyReportViewState extends State<DailyReportView> {
     final window = _period.currentWindow(now);
     final orders = widget.orders.inPeriod(window);
     final expenses = widget.expenses.inPeriod(window);
+    // The monthly revenue tracker is deliberately period-INDEPENDENT: unlike
+    // every other figure on this screen (scoped to `window`), it always spans
+    // the current calendar month, so it reads from the unscoped `widget.orders`
+    // rather than the period-scoped `orders`.
+    final monthlyRevenue = _MonthlyRevenueSeries.fromOrders(
+      widget.orders,
+      now: now,
+    );
     // The adjacent prior window powers the period-over-period trend chips. Past
     // orders use inPastPeriod (excludes immediate "now" orders) so they don't
     // leak into the comparison.
@@ -234,6 +244,8 @@ class _DailyReportViewState extends State<DailyReportView> {
           ),
           const SizedBox(height: AppSpacing.md),
           _RevenueBreakdownCard(breakdown: breakdown),
+          const SizedBox(height: AppSpacing.md),
+          _MonthlyRevenueTrackerCard(series: monthlyRevenue),
           if (showExpenses) ...[
             const SizedBox(height: AppSpacing.xl),
             Row(
@@ -274,48 +286,21 @@ class _DailyReportViewState extends State<DailyReportView> {
             finalUgx: finalRevenue,
           ),
           const SizedBox(height: AppSpacing.xl),
-          Row(
-            children: [
-              Expanded(
-                child: _ReportMetricCard(
-                  title: 'Orders',
-                  value: '$totalOrders',
-                  icon: Icons.assignment_outlined,
-                  onTap: openFilter(OrderFilter.all, 'Orders'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _ReportMetricCard(
-                  title: 'Items',
-                  value: '$totalItems',
-                  icon: Icons.inventory_2_outlined,
-                  onTap: onOpenItems,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _ReportMetricCard(
-                  title: OrderStatus.completed.label,
-                  value: '$completed',
-                  icon: Icons.check_circle_outline_rounded,
-                  onTap: openFilter(OrderFilter.completed, OrderStatus.completed.label),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _ReportMetricCard(
-                  title: 'Pending work',
-                  value: '$pendingWork',
-                  icon: Icons.pending_actions_outlined,
-                  onTap: openFilter(OrderFilter.pendingWork, 'Pending work'),
-                ),
-              ),
-            ],
+          _ReportMetricStrip(
+            totalOrders: totalOrders,
+            totalItems: totalItems,
+            completed: completed,
+            pendingWork: pendingWork,
+            onOpenOrders: openFilter(OrderFilter.all, 'Orders'),
+            onOpenItems: onOpenItems,
+            onOpenCompleted: openFilter(
+              OrderFilter.completed,
+              OrderStatus.completed.label,
+            ),
+            onOpenPendingWork: openFilter(
+              OrderFilter.pendingWork,
+              'Pending work',
+            ),
           ),
           const SizedBox(height: AppSpacing.xxl),
           Text(
@@ -349,8 +334,122 @@ class _DailyReportViewState extends State<DailyReportView> {
   }
 }
 
-class _ReportMetricCard extends StatelessWidget {
-  const _ReportMetricCard({
+/// A compact, equal-cell metric strip (Orders / Items / Completed / Pending
+/// work). Renders 1×4 on wide surfaces and 2×2 on narrow phones, all within a
+/// single card. Replaces the earlier pair of two-up [_ReportMetricCard] rows.
+class _ReportMetricStrip extends StatelessWidget {
+  const _ReportMetricStrip({
+    required this.totalOrders,
+    required this.totalItems,
+    required this.completed,
+    required this.pendingWork,
+    this.onOpenOrders,
+    this.onOpenItems,
+    this.onOpenCompleted,
+    this.onOpenPendingWork,
+  });
+
+  static const _cellExtent = 140.0;
+  static const _wideBreakpoint = 560.0;
+
+  final int totalOrders;
+  final int totalItems;
+  final int completed;
+  final int pendingWork;
+  final VoidCallback? onOpenOrders;
+  final VoidCallback? onOpenItems;
+  final VoidCallback? onOpenCompleted;
+  final VoidCallback? onOpenPendingWork;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = [
+      _ReportMetricData(
+        title: 'Orders',
+        value: '$totalOrders',
+        icon: Icons.assignment_outlined,
+        onTap: onOpenOrders,
+      ),
+      _ReportMetricData(
+        title: 'Items',
+        value: '$totalItems',
+        icon: Icons.inventory_2_outlined,
+        onTap: onOpenItems,
+      ),
+      _ReportMetricData(
+        title: OrderStatus.completed.label,
+        value: '$completed',
+        icon: Icons.check_circle_outline_rounded,
+        onTap: onOpenCompleted,
+      ),
+      _ReportMetricData(
+        title: 'Pending work',
+        value: '$pendingWork',
+        icon: Icons.pending_actions_outlined,
+        onTap: onOpenPendingWork,
+      ),
+    ];
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= _wideBreakpoint) {
+            return SizedBox(
+              height: _cellExtent,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _rowChildren(metrics),
+              ),
+            );
+          }
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: _cellExtent,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _rowChildren(metrics.take(2).toList()),
+                ),
+              ),
+              const Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.cardBorder,
+              ),
+              SizedBox(
+                height: _cellExtent,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _rowChildren(metrics.skip(2).toList()),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _rowChildren(List<_ReportMetricData> metrics) {
+    return [
+      for (var i = 0; i < metrics.length; i++) ...[
+        Expanded(child: _ReportMetricCell(metric: metrics[i])),
+        if (i != metrics.length - 1)
+          const VerticalDivider(
+            width: 1,
+            thickness: 1,
+            color: AppColors.cardBorder,
+          ),
+      ],
+    ];
+  }
+}
+
+class _ReportMetricData {
+  const _ReportMetricData({
     required this.title,
     required this.value,
     required this.icon,
@@ -361,39 +460,59 @@ class _ReportMetricCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final VoidCallback? onTap;
+}
+
+class _ReportMetricCell extends StatelessWidget {
+  const _ReportMetricCell({required this.metric});
+
+  final _ReportMetricData metric;
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    return AppCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.field - 3),
-            ),
-            child: Icon(icon, color: colorScheme.primary),
+    return Semantics(
+      button: metric.onTap != null,
+      label: '${metric.title}, ${metric.value}',
+      child: InkWell(
+        onTap: metric.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
           ),
-          const SizedBox(height: AppSpacing.lg - 2),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineMedium,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.field - 7),
+                ),
+                child: Icon(metric.icon, color: colorScheme.primary, size: 20),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                metric.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.headlineMedium,
+              ),
+              const SizedBox(height: AppSpacing.xs / 2),
+              Text(
+                metric.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs / 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -726,6 +845,263 @@ class _RevenueRow extends StatelessWidget {
   }
 }
 
+/// A this-month cumulative-revenue tracker: the total earned from completed
+/// deliveries so far this calendar month, with a small sparkline of the daily
+/// running total. Deliberately independent of the period selector (see the
+/// call site in [_DailyReportViewState.build]).
+class _MonthlyRevenueSeries {
+  const _MonthlyRevenueSeries({
+    required this.monthLabel,
+    required this.shortMonthLabel,
+    required this.totalUgx,
+    required this.completedOrders,
+    required this.points,
+  });
+
+  final String monthLabel;
+  final String shortMonthLabel;
+  final int totalUgx;
+  final int completedOrders;
+  final List<_MonthlyRevenuePoint> points;
+
+  static const _monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  static const _monthShortNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  factory _MonthlyRevenueSeries.fromOrders(
+    List<LaundryOrder> orders, {
+    required DateTime now,
+  }) {
+    final localNow = now.toLocal();
+    final dailyTotals = List<int>.filled(localNow.day, 0);
+    var completedOrders = 0;
+
+    for (final order in orders) {
+      if (order.status != OrderStatus.completed) continue;
+      final date = order.relevantDate?.toLocal();
+      if (date == null) continue;
+      if (date.year != localNow.year || date.month != localNow.month) continue;
+      if (date.day > localNow.day) continue;
+
+      dailyTotals[date.day - 1] += order.totalUgx;
+      completedOrders++;
+    }
+
+    var runningTotal = 0;
+    final points = <_MonthlyRevenuePoint>[];
+    for (var i = 0; i < dailyTotals.length; i++) {
+      runningTotal += dailyTotals[i];
+      points.add(_MonthlyRevenuePoint(cumulativeUgx: runningTotal));
+    }
+
+    return _MonthlyRevenueSeries(
+      monthLabel: '${_monthNames[localNow.month - 1]} ${localNow.year}',
+      shortMonthLabel: _monthShortNames[localNow.month - 1],
+      totalUgx: runningTotal,
+      completedOrders: completedOrders,
+      points: points,
+    );
+  }
+}
+
+class _MonthlyRevenuePoint {
+  const _MonthlyRevenuePoint({required this.cumulativeUgx});
+
+  final int cumulativeUgx;
+}
+
+class _MonthlyRevenueTrackerCard extends StatelessWidget {
+  const _MonthlyRevenueTrackerCard({required this.series});
+
+  final _MonthlyRevenueSeries series;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final completedLabel = series.completedOrders == 1
+        ? '1 completed delivery'
+        : '${series.completedOrders} completed deliveries';
+
+    return AppCard(
+      child: Semantics(
+        label:
+            'This month revenue tracker, ${formatUgx(series.totalUgx)}, '
+            '$completedLabel in ${series.monthLabel}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'This month revenue tracker',
+                        style: textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Text(series.monthLabel, style: textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatUgx(series.totalUgx),
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs / 2),
+                    Text(completedLabel, style: textTheme.bodySmall),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              height: 116,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _MonthlyRevenueChartPainter(
+                  points: series.points,
+                  lineColor: colorScheme.primary,
+                  gridColor: AppColors.cardBorder,
+                  fillColor: colorScheme.primary.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Text('1 ${series.shortMonthLabel}', style: textTheme.bodySmall),
+                const Spacer(),
+                Text('Today', style: textTheme.bodySmall),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthlyRevenueChartPainter extends CustomPainter {
+  const _MonthlyRevenueChartPainter({
+    required this.points,
+    required this.lineColor,
+    required this.gridColor,
+    required this.fillColor,
+  });
+
+  final List<_MonthlyRevenuePoint> points;
+  final Color lineColor;
+  final Color gridColor;
+  final Color fillColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || points.isEmpty) return;
+
+    final chart = Rect.fromLTWH(0, 8, size.width, size.height - 16);
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    for (final fraction in const [0.0, 0.5, 1.0]) {
+      final y = chart.top + chart.height * fraction;
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), gridPaint);
+    }
+
+    final maxRevenue = math.max(
+      1,
+      points.fold<int>(0, (max, p) => math.max(max, p.cumulativeUgx)),
+    );
+
+    Offset offsetFor(int index, _MonthlyRevenuePoint point) {
+      final x = points.length == 1
+          ? chart.left
+          : chart.left + (chart.width * index / (points.length - 1));
+      final y =
+          chart.bottom - (chart.height * point.cumulativeUgx / maxRevenue);
+      return Offset(x, y);
+    }
+
+    final linePath = Path();
+    for (var i = 0; i < points.length; i++) {
+      final offset = offsetFor(i, points[i]);
+      if (i == 0) {
+        linePath.moveTo(offset.dx, offset.dy);
+      } else {
+        linePath.lineTo(offset.dx, offset.dy);
+      }
+    }
+
+    final fillPath = Path.from(linePath)
+      ..lineTo(chart.right, chart.bottom)
+      ..lineTo(chart.left, chart.bottom)
+      ..close();
+
+    canvas.drawPath(fillPath, Paint()..color = fillColor);
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..color = lineColor
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    final last = offsetFor(points.length - 1, points.last);
+    canvas.drawCircle(
+      last,
+      7,
+      Paint()
+        ..color = lineColor.withValues(alpha: 0.16)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawCircle(last, 4, Paint()..color = lineColor);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MonthlyRevenueChartPainter oldDelegate) {
+    return oldDelegate.points != points ||
+        oldDelegate.lineColor != lineColor ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.fillColor != fillColor;
+  }
+}
+
 class _ExpensesCard extends StatelessWidget {
   const _ExpensesCard({
     required this.byCategory,
@@ -970,9 +1346,13 @@ class _WorkSummaryCard extends StatelessWidget {
               Icon(Icons.summarize_outlined,
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                "$periodLabel's progress",
-                style: Theme.of(context).textTheme.titleMedium,
+              Expanded(
+                child: Text(
+                  "$periodLabel's progress",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
             ],
           ),
