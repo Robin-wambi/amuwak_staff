@@ -132,6 +132,7 @@ class _DailyReportViewState extends State<DailyReportView> {
 
     final breakdown = orders.revenueBreakdown;
     final avgOrderValue = orders.avgOrderValueUgx;
+    final prevAvgOrderValue = prevOrders.avgOrderValueUgx;
     final provisionalRevenue = orders.provisionalRevenueUgx;
     final finalRevenue = orders.finalRevenueUgx;
 
@@ -268,10 +269,11 @@ class _DailyReportViewState extends State<DailyReportView> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
-          _UnitEconomicsRow(
+          _UnitEconomicsCard(
             avgOrderValueUgx: avgOrderValue,
-            provisionalUgx: provisionalRevenue,
-            finalUgx: finalRevenue,
+            avgDeltaUgx: avgOrderValue - prevAvgOrderValue,
+            estimatedUgx: provisionalRevenue,
+            confirmedUgx: finalRevenue,
           ),
           const SizedBox(height: AppSpacing.xl),
           Row(
@@ -597,91 +599,188 @@ class _RevenueBreakdownCard extends StatelessWidget {
   }
 }
 
-/// Average order value alongside the provisional-vs-final revenue split.
-class _UnitEconomicsRow extends StatelessWidget {
-  const _UnitEconomicsRow({
+/// Unit economics as a single full-width card: average order value is the hero
+/// metric (with a period-over-period trend chip for context), and below it a
+/// "revenue confidence" proportion bar splits confirmed revenue (orders with a
+/// recorded final weight) from estimated revenue (still provisional). Rendered
+/// full-width by design so no metric is squeezed into a too-narrow column on
+/// small phones.
+class _UnitEconomicsCard extends StatelessWidget {
+  const _UnitEconomicsCard({
     required this.avgOrderValueUgx,
-    required this.provisionalUgx,
-    required this.finalUgx,
+    required this.avgDeltaUgx,
+    required this.estimatedUgx,
+    required this.confirmedUgx,
   });
 
   final int avgOrderValueUgx;
-  final int provisionalUgx;
-  final int finalUgx;
+  final int avgDeltaUgx;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _MoneyStatCard(
-            title: 'Avg order value',
-            amountUgx: avgOrderValueUgx,
-            icon: Icons.receipt_long_outlined,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _RevenueRow(label: 'Provisional', amountUgx: provisionalUgx),
-                const SizedBox(height: AppSpacing.lg - 2),
-                _RevenueRow(label: 'Final', amountUgx: finalUgx),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+  /// Revenue from orders still on an estimated (provisional) weight/price.
+  final int estimatedUgx;
 
-class _MoneyStatCard extends StatelessWidget {
-  const _MoneyStatCard({
-    required this.title,
-    required this.amountUgx,
-    required this.icon,
-  });
-
-  final String title;
-  final int amountUgx;
-  final IconData icon;
+  /// Revenue from orders whose final weight has been recorded.
+  final int confirmedUgx;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final total = confirmedUgx + estimatedUgx;
+    final confirmedFraction = total == 0 ? 0.0 : confirmedUgx / total;
+    final confirmedPct = (confirmedFraction * 100).round();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.field - 3),
-            ),
-            child: Icon(icon, color: colorScheme.primary),
+          // Hero metric: average order value, with a trend chip vs the previous
+          // comparable period.
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.field - 3),
+                ),
+                child: Icon(Icons.receipt_long_outlined,
+                    color: colorScheme.primary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Avg order value',
+                      style: TextStyle(
+                        color: AppColors.secondaryText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs / 2),
+                    Text(
+                      formatUgx(avgOrderValueUgx),
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+              _TrendChip(deltaUgx: avgDeltaUgx),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg - 2),
-          Text(
-            formatUgx(amountUgx),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          const Divider(height: AppSpacing.xl),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Revenue confidence',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '$confirmedPct% confirmed',
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs / 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: AppSpacing.sm),
+          // Confirmed vs estimated split, using the same bar language as the
+          // status breakdown so the two read consistently.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.chip),
+            child: LinearProgressIndicator(
+              value: confirmedFraction,
+              minHeight: 9,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
             ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _ConfidenceLegend(
+                  label: 'Confirmed',
+                  amountUgx: confirmedUgx,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _ConfidenceLegend(
+                  label: 'Estimated',
+                  amountUgx: estimatedUgx,
+                  color: colorScheme.primary.withValues(alpha: 0.28),
+                  alignEnd: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One side of the revenue-confidence split: a colour dot + label with the
+/// amount beneath it. Stacked (not a single row) so the label and amount never
+/// have to share one line on a narrow phone.
+class _ConfidenceLegend extends StatelessWidget {
+  const _ConfidenceLegend({
+    required this.label,
+    required this.amountUgx,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final int amountUgx;
+  final Color color;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final cross =
+        alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    return Column(
+      crossAxisAlignment: cross,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs / 2),
+        Text(
+          formatUgx(amountUgx),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+        ),
+      ],
     );
   }
 }
@@ -970,9 +1069,13 @@ class _WorkSummaryCard extends StatelessWidget {
               Icon(Icons.summarize_outlined,
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                "$periodLabel's progress",
-                style: Theme.of(context).textTheme.titleMedium,
+              Expanded(
+                child: Text(
+                  "$periodLabel's progress",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
             ],
           ),

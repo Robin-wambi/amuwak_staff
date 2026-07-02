@@ -182,19 +182,49 @@ void main() {
   });
 
   group('Unit economics', () {
-    testWidgets('shows average order value and provisional vs final',
+    testWidgets('shows avg order value hero and the confidence split',
         (tester) async {
       final orders = [
         _order('A', OrderStatus.completed, 10000, paid: 10000, finalWeightKg: 2),
-        _order('B', OrderStatus.inProgress, 6000), // provisional (no final wt)
+        _order('B', OrderStatus.inProgress, 6000), // estimated (no final wt)
       ];
 
       await _pumpReport(tester, orders);
 
+      // Hero metric.
       expect(find.text('Avg order value'), findsOneWidget);
       expect(find.text('USh 8,000'), findsWidgets); // 16,000 / 2
-      expect(find.text('Provisional'), findsOneWidget);
-      expect(find.text('Final'), findsOneWidget);
+      // Revenue-confidence split (renamed from Provisional/Final).
+      expect(find.text('Revenue confidence'), findsOneWidget);
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.text('Estimated'), findsOneWidget);
+      expect(find.textContaining('% confirmed'), findsOneWidget);
+    });
+
+    testWidgets('report renders without overflow on a 360px phone',
+        (tester) async {
+      // The full-width _UnitEconomicsCard replaced a two-column row that
+      // overflowed at ~360 (the unbreakable "Provisional" label + its amount
+      // did not fit a half-width column). Render the whole report at 360 and
+      // assert no RenderFlex overflow was thrown.
+      tester.view.physicalSize = const Size(360, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              _order('A', OrderStatus.completed, 10000,
+                  paid: 10000, finalWeightKg: 2),
+              _order('B', OrderStatus.inProgress, 6000),
+            ],
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
     });
   });
 
