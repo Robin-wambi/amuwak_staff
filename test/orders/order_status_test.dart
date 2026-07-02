@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_core/amuwak_core.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
 
 void main() {
   group('OrderStatus', () {
