@@ -5,8 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
@@ -177,31 +176,19 @@ void main() {
 
   testWidgets('rate label live-updates as a custom rate is typed',
       (tester) async {
+    // A tall viewport so the whole form (and the optional custom-rate field) is
+    // visible without scroll gymnastics — matches the sibling tests and is
+    // robust to the form's height changing as validation errors appear/clear.
+    useTallViewport(tester);
     await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
     expect(find.text('Rate: USh 5,000/kg'), findsOneWidget);
 
     // Expand optional details and enter a custom rate.
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     await tester.tap(find.text('Add optional details'));
     await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_custom_rate')),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     await tester.enterText(find.byKey(const Key('np_custom_rate')), '4500');
     await tester.pump();
 
-    // Scroll the label back into view and confirm it reflects the typed rate.
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_rate')),
-      find.byType(ListView),
-      const Offset(0, 200),
-    );
     expect(find.text('Rate: USh 4,500/kg'), findsOneWidget);
     expect(find.text('Rate: USh 5,000/kg'), findsNothing);
   });

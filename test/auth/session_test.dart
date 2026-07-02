@@ -126,4 +126,34 @@ void main() {
       expect(container.read(currentUserIdProvider), isNull);
     });
   });
+
+  group('currentAuthEventProvider', () {
+    test('exposes the latest auth lifecycle event from the stream', () async {
+      final auth = _MockAuthService();
+      final container = ProviderContainer(overrides: [
+        authServiceProvider.overrideWithValue(auth),
+        authStateProvider.overrideWith(
+          (ref) => Stream.value(AuthState(AuthChangeEvent.signedIn, null)),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      // Let the StreamProvider resolve its first value before reading.
+      await container.read(authStateProvider.future);
+      expect(container.read(currentAuthEventProvider),
+          AuthChangeEvent.signedIn);
+    });
+
+    test('is null before the auth stream has emitted', () {
+      final auth = _MockAuthService();
+      final container = ProviderContainer(overrides: [
+        authServiceProvider.overrideWithValue(auth),
+        authStateProvider
+            .overrideWith((ref) => const Stream<AuthState>.empty()),
+      ]);
+      addTearDown(container.dispose);
+
+      expect(container.read(currentAuthEventProvider), isNull);
+    });
+  });
 }

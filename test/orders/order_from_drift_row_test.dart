@@ -2,9 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/data/app_database.dart' as drift;
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 
 drift.Order _orderRow({
   String id = 'AMW-1024',
@@ -92,6 +91,18 @@ void main() {
         final mapped = LaundryOrder.fromDriftRow(row, const []);
         expect(mapped.status, expected, reason: 'for "$pgStatus"');
       });
+    });
+
+    test('every OrderStatus round-trips through toDbString → fromDriftRow', () {
+      // The Drift row stores the Postgres canonical string; mapping it back must
+      // recover the same enum for every status (guards the toDbString/mapper
+      // pair against drift). Lives here, not in amuwak_core, because it depends
+      // on the app-level LaundryOrder + Drift row.
+      for (final s in OrderStatus.values) {
+        final row = _orderRow(status: s.toDbString());
+        final mapped = LaundryOrder.fromDriftRow(row, const []);
+        expect(mapped.status, s, reason: 'for ${s.name} (db: ${s.toDbString()})');
+      }
     });
 
     test('unknown status falls back to pendingPickup instead of throwing', () {
