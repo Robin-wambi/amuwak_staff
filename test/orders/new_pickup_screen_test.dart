@@ -66,32 +66,41 @@ void main() {
     // Default: no existing customers (phone-match lookup finds nothing) and
     // writes succeed.
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
-    when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
     when(
-      () => ordersRepo.reserveOrderCode(),
-    ).thenAnswer((_) async => 'AMW-2026-0001');
-    when(
-      () => ordersRepo.upsertOrder(
+      () => ordersRepo.createPickup(
+        any(),
         any(),
         actorStaffId: any(named: 'actorStaffId'),
       ),
-    ).thenAnswer((_) async {});
+    ).thenAnswer(
+      (_) async => (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'),
+    );
     // initState loads address suggestions from customers + orders.
     when(
       () => ordersRepo.getAll(),
     ).thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
-  /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
-  Customer capturedCustomer() =>
-      verify(() => customersRepo.upsertCustomer(captureAny())).captured.single
-          as Customer;
+  /// Captures the (order, customer) passed to [OrdersRepository.createPickup] in
+  /// a single verify. mocktail marks a call verified once captured, so two
+  /// separate verifies of the same call would fail — capture both at once.
+  ({LaundryOrder order, Customer customer}) capturedPickup() {
+    final args = verify(
+      () => ordersRepo.createPickup(
+        captureAny(),
+        captureAny(),
+        actorStaffId: any(named: 'actorStaffId'),
+      ),
+    ).captured;
+    return (order: args[0] as LaundryOrder, customer: args[1] as Customer);
+  }
 
-  /// Captures the single [LaundryOrder] passed to [OrdersRepository.upsertOrder].
+  /// Captures the [LaundryOrder] passed to [OrdersRepository.createPickup].
   LaundryOrder capturedOrder() =>
       verify(
-            () => ordersRepo.upsertOrder(
+            () => ordersRepo.createPickup(
               captureAny(),
+              any(),
               actorStaffId: any(named: 'actorStaffId'),
             ),
           ).captured.single
@@ -444,66 +453,40 @@ void main() {
     expect(handle.popped!.orderId, 'uuid-order-1');
     expect(handle.popped!.startPickupNow, isTrue);
 
-    final customer = capturedCustomer();
+    final pickup = capturedPickup();
+    final customer = pickup.customer;
     expect(customer.id, 'uuid-cust-1');
     expect(customer.name, 'Jane Doe');
 
-    final order = capturedOrder();
+    final order = pickup.order;
     expect(order.orderId, 'uuid-order-1');
     expect(order.customerId, 'uuid-cust-1');
     expect(order.customerName, 'Jane Doe');
     expect(order.serviceType, ServiceType.washAndIron);
     expect(order.status, OrderStatus.pendingPickup);
     expect(order.scheduledFor, isNull);
-    // order_code is whatever the server-backed generator returns, not a
-    // locally-derived value.
-    expect(order.orderCode, 'AMW-2026-0001');
-  });
-
-  testWidgets('order_code comes from the repository (server) reservation', (
-    tester,
-  ) async {
-    when(
-      () => ordersRepo.reserveOrderCode(),
-    ).thenAnswer((_) async => 'AMW-2026-0042');
-    final handle = await pumpFormAndOpen(tester);
-
-    await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-    await tester.enterText(
-      find.byKey(const Key('np_phone')),
-      '+256 700 111 222',
-    );
-    await tester.enterText(
-      find.byKey(const Key('np_address')),
-      'Kikoni, Kampala',
-    );
-    await tester.tap(find.byKey(const Key('np_service_type')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(ServiceType.washAndIron.label).last);
-    await tester.pumpAndSettle();
-    await setCount(tester, 3);
-
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
-    await tester.pumpAndSettle();
-
-    expect(handle.popped, isNotNull);
-    expect(capturedOrder().orderCode, 'AMW-2026-0042');
   });
 
   testWidgets(
-    'a failed order-code reservation surfaces an error and writes no order; '
+    'a failed create_pickup surfaces a friendly error and pops nothing; '
     'a retry then succeeds',
     (tester) async {
       var calls = 0;
-      when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) async {
+      when(
+        () => ordersRepo.createPickup(
+          any(),
+          any(),
+          actorStaffId: any(named: 'actorStaffId'),
+        ),
+      ).thenAnswer((_) async {
         calls++;
         if (calls == 1) {
           throw Exception(
-            'PostgrestException(message: relation "next_order_code" does not '
-            'exist, code: 42883, details: Missing RPC)',
+            'PostgrestException(message: could not connect to server, '
+            'code: 08006, details: network)',
           );
         }
-        return 'AMW-2026-0042';
+        return (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0042');
       });
 
       final handle = await pumpFormAndOpen(tester);
@@ -523,38 +506,28 @@ void main() {
       await tester.pumpAndSettle();
       await setCount(tester, 3);
 
-      // First attempt: the RPC throws. The form stays open with an error and the
-      // order is never written (the reservation throws before the order write).
+      // First attempt: the RPC throws. The form stays open with an error.
       await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
       await tester.pump();
-      expect(
-        find.textContaining('Could not reserve an order number'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Could not save the pickup'), findsOneWidget);
       expect(find.textContaining('PostgrestException'), findsNothing);
-      expect(find.textContaining('42883'), findsNothing);
       expect(handle.popped, isNull);
-      verifyNever(
-        () => ordersRepo.upsertOrder(
-          any(),
-          actorStaffId: any(named: 'actorStaffId'),
-        ),
-      );
 
-      // Second attempt: the RPC succeeds and the order is written with its code.
+      // Second attempt: the RPC succeeds and the form pops. The cached
+      // customer/order ids make the retry idempotent server-side.
       await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
       await tester.pumpAndSettle();
       expect(handle.popped, isNotNull);
-      expect(capturedOrder().orderCode, 'AMW-2026-0042');
       expect(calls, 2);
     },
   );
 
   testWidgets(
-    'a failed order save shows friendly copy and keeps the form open',
+    'a failed create_pickup shows friendly copy, not raw Postgres details',
     (tester) async {
       when(
-        () => ordersRepo.upsertOrder(
+        () => ordersRepo.createPickup(
+          any(),
           any(),
           actorStaffId: any(named: 'actorStaffId'),
         ),
@@ -597,63 +570,14 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a failed customer save shows friendly copy and keeps the form open',
-    (tester) async {
-      when(() => customersRepo.upsertCustomer(any())).thenThrow(
-        Exception(
-          'PostgrestException(message: permission denied for table customers, '
-          'code: 42501, details: hidden)',
-        ),
-      );
-      final handle = await pumpFormAndOpen(tester);
-
-      await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
-      await tester.enterText(
-        find.byKey(const Key('np_phone')),
-        '+256 700 111 222',
-      );
-      await tester.enterText(
-        find.byKey(const Key('np_address')),
-        'Kikoni, Kampala',
-      );
-      await tester.tap(find.byKey(const Key('np_service_type')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(ServiceType.washAndIron.label).last);
-      await tester.pumpAndSettle();
-      await setCount(tester, 3);
-
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
-      await tester.pump();
-
-      // The rider sees actionable copy, while raw Postgres/Supabase details
-      // stay in developer logs.
-      expect(
-        find.textContaining('Not allowed on the server (permissions).'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('PostgrestException'), findsNothing);
-      expect(find.textContaining('42501'), findsNothing);
-      expect(find.textContaining('permission denied'), findsNothing);
-      expect(handle.popped, isNull);
-      // The order write must never run when the customer write failed.
-      verifyNever(
-        () => ordersRepo.upsertOrder(
-          any(),
-          actorStaffId: any(named: 'actorStaffId'),
-        ),
-      );
-    },
-  );
-
   testWidgets('Cancel returns null and writes nothing', (tester) async {
     final handle = await pumpFormAndOpen(tester);
     await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
     await tester.pumpAndSettle();
     expect(handle.popped, isNull);
-    verifyNever(() => customersRepo.upsertCustomer(any()));
     verifyNever(
-      () => ordersRepo.upsertOrder(
+      () => ordersRepo.createPickup(
+        any(),
         any(),
         actorStaffId: any(named: 'actorStaffId'),
       ),
@@ -732,8 +656,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    expect(capturedCustomer().id, 'existing-cust-2');
-    expect(capturedOrder().customerId, 'existing-cust-2');
+    final pickup = capturedPickup();
+    expect(pickup.customer.id, 'existing-cust-2');
+    expect(pickup.order.customerId, 'existing-cust-2');
   });
 
   testWidgets(
@@ -775,10 +700,10 @@ void main() {
 
       // Cached match id was dropped → a fresh customer id is used, and the order
       // points at the new row (NOT the originally matched 'existing-cust-edited').
-      final customer = capturedCustomer();
-      expect(customer.id, 'uuid-cust-1');
-      expect(customer.id, isNot('existing-cust-edited'));
-      expect(capturedOrder().customerId, 'uuid-cust-1');
+      final pickup = capturedPickup();
+      expect(pickup.customer.id, 'uuid-cust-1');
+      expect(pickup.customer.id, isNot('existing-cust-edited'));
+      expect(pickup.order.customerId, 'uuid-cust-1');
     },
   );
 
@@ -1097,10 +1022,16 @@ void main() {
   testWidgets('Create pickup shows a spinner while the submit is in flight', (
     tester,
   ) async {
-    // Gate the order-code reservation so the submit stays in flight while we
-    // assert, then release it to let the form finish.
-    final gate = Completer<String>();
-    when(() => ordersRepo.reserveOrderCode()).thenAnswer((_) => gate.future);
+    // Gate the create_pickup RPC so the submit stays in flight while we assert,
+    // then release it to let the form finish.
+    final gate = Completer<({String orderId, String orderCode})>();
+    when(
+      () => ordersRepo.createPickup(
+        any(),
+        any(),
+        actorStaffId: any(named: 'actorStaffId'),
+      ),
+    ).thenAnswer((_) => gate.future);
     final handle = await pumpFormAndOpen(tester);
 
     await tester.enterText(find.byKey(const Key('np_name')), 'Jane Doe');
@@ -1125,7 +1056,7 @@ void main() {
     expect(find.text('Create pickup'), findsNothing);
 
     // Let the submit complete so the widget isn't torn down mid-flight.
-    gate.complete('AMW-2026-0001');
+    gate.complete((orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'));
     await tester.pumpAndSettle();
     expect(handle.popped, isNotNull);
   });

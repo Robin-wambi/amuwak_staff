@@ -102,7 +102,6 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
   // create a duplicate customer row by tapping "Create pickup" again.
   String? _pendingCustomerId;
   String? _pendingOrderId;
-  String? _pendingOrderCode;
   _PickupTimeMode _pickupMode = _PickupTimeMode.now;
   DateTime? _scheduledFor;
   // Which quick-chip preset is currently selected, if any. Cleared when
@@ -474,67 +473,12 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
           ? _matchedCustomerRate
           : customRate,
     );
-    try {
-      await widget.customersRepo.upsertCustomer(customer);
-    } catch (e, st) {
-      developer.log(
-        'upsertCustomer failed during pickup creation.',
-        name: 'NewPickupScreen',
-        error: e,
-        stackTrace: st,
-      );
-      if (!mounted) return;
-      setState(() => _saving = false);
-      final reason = _friendlyCreatePickupFailure(
-        e,
-        fallback: 'The server did not accept the customer record.',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 8),
-          content: Text(
-            'Could not save customer. $reason\n'
-            'Tap Create pickup again to retry.',
-          ),
-        ),
-      );
-      return;
-    }
     final orderId = _pendingOrderId ??= widget.orderIdGenerator();
-    // `??=` so a retried submit reuses the first code instead of burning a
-    // second value off the server-side counter.
-    final String orderCode;
-    try {
-      orderCode = _pendingOrderCode ??= await widget.ordersRepo
-          .reserveOrderCode();
-    } catch (e, st) {
-      developer.log(
-        'reserveOrderCode failed during pickup creation.',
-        name: 'NewPickupScreen',
-        error: e,
-        stackTrace: st,
-      );
-      if (!mounted) return;
-      setState(() => _saving = false);
-      final reason = _friendlyCreatePickupFailure(
-        e,
-        fallback: 'The server did not accept the request.',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 8),
-          content: Text(
-            'Could not reserve an order number. $reason\n'
-            'Tap Create pickup again to retry.',
-          ),
-        ),
-      );
-      return;
-    }
     final scheduled = _scheduledFor;
+    // orderCode is minted server-side by create_pickup; the local order carries
+    // the default (orderId) until the realtime stream re-delivers the coded row.
     final order = LaundryOrder(
       orderId: orderId,
-      orderCode: orderCode,
       customerId: customer.id,
       customerName: customer.name,
       phone: customer.phone,
@@ -557,13 +501,20 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       expressPctSnapshot: _isExpress ? widget.expressPct : 0,
     );
     try {
-      await widget.ordersRepo.upsertOrder(
+      // One SECURITY DEFINER RPC upserts the customer and inserts the order
+      // atomically with server-set attribution (order code, assigned_driver,
+      // created_by). A rider can't write `customers`/`orders` directly, so this
+      // is the only path that works for the driver role — and it can't leave an
+      // orphan customer if the order fails. The cached customer/order ids make a
+      // retry idempotent (the RPC's ON CONFLICT returns the existing code).
+      await widget.ordersRepo.createPickup(
         order,
+        customer,
         actorStaffId: widget.actorStaffId,
       );
     } catch (e, st) {
       developer.log(
-        'upsertOrder failed during pickup creation.',
+        'create_pickup failed during pickup creation.',
         name: 'NewPickupScreen',
         error: e,
         stackTrace: st,
@@ -572,13 +523,13 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
       setState(() => _saving = false);
       final reason = _friendlyCreatePickupFailure(
         e,
-        fallback: 'The server did not accept the order.',
+        fallback: 'The server did not accept the pickup.',
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
           content: Text(
-            'Could not save the order. $reason\n'
+            'Could not save the pickup. $reason\n'
             'Tap Create pickup again to retry.',
           ),
         ),

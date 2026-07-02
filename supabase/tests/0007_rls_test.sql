@@ -33,10 +33,6 @@ INSERT INTO public.orders (
    '00000000-0000-0000-0000-000000000003');
 
 -- ---- Driver 1's view ----
--- Since 0039 (rider_manager_access) collapses 'driver' -> 'manager' in
--- auth_staff_role(), a driver now has manager parity: it reads every order, not
--- just its own assigned/unassigned ones. These two assertions assert that
--- elevated behaviour (they asserted the old driver-only scoping before 0039).
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 
@@ -44,19 +40,19 @@ SELECT is(
   (SELECT count(*) FROM public.orders
    WHERE id IN ('00000000-0000-0000-0000-000000000201',
                 '00000000-0000-0000-0000-000000000202'))::int,
-  2, 'driver1 (manager parity, 0039) sees all orders');
+  1, 'driver1 sees only their own assigned order');
 
 SELECT is(
-  (SELECT count(*) FROM public.orders
-   WHERE id = '00000000-0000-0000-0000-000000000202')::int,
-  1, 'driver1 (manager parity, 0039) sees driver2''s order too');
+  (SELECT order_code FROM public.orders
+   WHERE id IN ('00000000-0000-0000-0000-000000000201',
+                '00000000-0000-0000-0000-000000000202')),
+  'AMW-RLS-1', 'driver1 sees AMW-RLS-1');
 
--- driver1 can now read driver2's status events (none seeded, so still 0, but
--- the manager-parity read policy would permit them).
+-- driver1 cannot read driver2's status events
 SELECT is(
   (SELECT count(*) FROM public.order_status_events
    WHERE order_id = '00000000-0000-0000-0000-000000000202')::int,
-  0, 'no driver2 status events were seeded');
+  0, 'driver1 cannot see driver2 status events');
 
 -- ---- In-shop staff view ----
 RESET ROLE;

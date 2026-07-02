@@ -55,11 +55,10 @@ void main() {
     customersRepo = _MockCustomersRepository();
     ordersRepo = _MockOrdersRepository();
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
-    when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0001');
-    when(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(() => ordersRepo.createPickup(any(), any(),
+            actorStaffId: any(named: 'actorStaffId')))
+        .thenAnswer((_) async =>
+            (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'));
     // initState loads address suggestions from customers + orders.
     when(() => ordersRepo.getAll())
         .thenAnswer((_) async => const <LaundryOrder>[]);
@@ -212,8 +211,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final captured = verify(() => ordersRepo.upsertOrder(
+    final captured = verify(() => ordersRepo.createPickup(
           captureAny(),
+          any(),
           actorStaffId: any(named: 'actorStaffId'),
         )).captured.single as LaundryOrder;
     expect(captured.ratePerKgSnapshotUgx, 5000.0);
@@ -250,8 +250,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final captured = verify(() => ordersRepo.upsertOrder(
+    final captured = verify(() => ordersRepo.createPickup(
           captureAny(),
+          any(),
           actorStaffId: any(named: 'actorStaffId'),
         )).captured.single as LaundryOrder;
     expect(captured.ratePerKgSnapshotUgx, 4000.0);

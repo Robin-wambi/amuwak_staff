@@ -6,8 +6,7 @@ import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_result.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
@@ -57,26 +56,26 @@ void main() {
     customersRepo = _MockCustomersRepository();
     ordersRepo = _MockOrdersRepository();
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
-    when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0001');
-    when(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(() => ordersRepo.createPickup(any(), any(),
+            actorStaffId: any(named: 'actorStaffId')))
+        .thenAnswer((_) async =>
+            (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'));
     // initState loads address suggestions from customers + orders.
     when(() => ordersRepo.getAll())
         .thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
-  /// Captures the single [Customer] passed to [CustomersRepository.upsertCustomer].
-  Customer capturedCustomer() =>
-      verify(() => customersRepo.upsertCustomer(captureAny())).captured.single
-          as Customer;
-
-  /// Captures the single [LaundryOrder] passed to [OrdersRepository.upsertOrder].
-  LaundryOrder capturedOrder() => verify(() => ordersRepo.upsertOrder(
-        captureAny(),
-        actorStaffId: any(named: 'actorStaffId'),
-      )).captured.single as LaundryOrder;
+  /// Captures the (order, customer) passed to [OrdersRepository.createPickup] in
+  /// a single verify. mocktail marks a call verified once captured, so two
+  /// separate verifies of the same call would fail — capture both at once.
+  ({LaundryOrder order, Customer customer}) capturedPickup() {
+    final args = verify(() => ordersRepo.createPickup(
+          captureAny(),
+          captureAny(),
+          actorStaffId: any(named: 'actorStaffId'),
+        )).captured;
+    return (order: args[0] as LaundryOrder, customer: args[1] as Customer);
+  }
 
   Future<_FormHandle> pumpFormAndOpen(WidgetTester tester) async {
     final handle = _FormHandle();
@@ -151,7 +150,7 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final customer = capturedCustomer();
+    final customer = capturedPickup().customer;
     expect(customer.customRatePerKgUgx, isNull,
         reason: 'blank custom rate field should save null override');
   });
@@ -200,7 +199,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The customer's stored rate must be preserved — NOT erased to null.
-    final customer = capturedCustomer();
+    final customer = capturedPickup().customer;
     expect(
       customer.customRatePerKgUgx,
       4000.0,
@@ -263,11 +262,12 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
+    final pickup = capturedPickup();
     // The order is billed at the typed one-off rate...
-    expect(capturedOrder().ratePerKgSnapshotUgx, 6000.0,
+    expect(pickup.order.ratePerKgSnapshotUgx, 6000.0,
         reason: 'the order snapshot should use the typed one-off rate');
     // ...but the matched customer's standing rate is left untouched.
-    expect(capturedCustomer().customRatePerKgUgx, 4000.0,
+    expect(pickup.customer.customRatePerKgUgx, 4000.0,
         reason: 'a one-off custom rate must not overwrite the returning '
             'customer\'s stored standing rate');
   });
@@ -311,12 +311,10 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final customer = capturedCustomer();
-    expect(customer.customRatePerKgUgx, 4000.0,
+    final pickup = capturedPickup();
+    expect(pickup.customer.customRatePerKgUgx, 4000.0,
         reason: 'custom rate should be saved on the customer');
-
-    final order = capturedOrder();
-    expect(order.ratePerKgSnapshotUgx, 4000.0,
+    expect(pickup.order.ratePerKgSnapshotUgx, 4000.0,
         reason: 'order snapshot should use the typed custom rate');
   });
 
@@ -360,9 +358,10 @@ void main() {
 
     // 4000.7 must be persisted as the rounded whole UGX it is displayed as,
     // consistent with the settings-screen rate handling.
-    expect(capturedCustomer().customRatePerKgUgx, 4001.0,
+    final pickup = capturedPickup();
+    expect(pickup.customer.customRatePerKgUgx, 4001.0,
         reason: 'custom rate should be rounded on the customer');
-    expect(capturedOrder().ratePerKgSnapshotUgx, 4001.0,
+    expect(pickup.order.ratePerKgSnapshotUgx, 4001.0,
         reason: 'order snapshot should use the rounded custom rate');
   });
 }

@@ -6,8 +6,7 @@ import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_result.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 
@@ -47,17 +46,17 @@ void main() {
     customersRepo = _MockCustomersRepository();
     ordersRepo = _MockOrdersRepository();
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
-    when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0001');
-    when(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(() => ordersRepo.createPickup(any(), any(),
+            actorStaffId: any(named: 'actorStaffId')))
+        .thenAnswer((_) async =>
+            (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'));
     when(() => ordersRepo.getAll())
         .thenAnswer((_) async => const <LaundryOrder>[]);
   });
 
-  LaundryOrder capturedOrder() => verify(() => ordersRepo.upsertOrder(
+  LaundryOrder capturedOrder() => verify(() => ordersRepo.createPickup(
         captureAny(),
+        any(),
         actorStaffId: any(named: 'actorStaffId'),
       )).captured.single as LaundryOrder;
 

@@ -31,20 +31,16 @@ INSERT INTO public.orders (
   '00000000-0000-0000-0000-000000000301'
 );
 
--- 1. Reassigning an order to another (real) driver.
--- Before 0039 a driver was blocked here by orders_update's WITH CHECK. Since
--- 0039 (rider_manager_access) collapses 'driver' -> 'manager', a rider now has
--- manager parity and CAN reassign — the target is a valid active driver, so the
--- assigned_driver trigger also passes.
+-- 1. Driver cannot reassign their own order to driver2 (WITH CHECK)
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000301';
 
-PREPARE ok_reassign AS
+PREPARE bad_reassign AS
   UPDATE public.orders
      SET assigned_driver = '00000000-0000-0000-0000-000000000302'
    WHERE id = '00000000-0000-0000-0000-000000000401';
-SELECT lives_ok('ok_reassign',
-  'rider (manager parity, 0039) can reassign an order to another driver');
+SELECT throws_ok('bad_reassign', '42501',
+  NULL, 'driver cannot reassign their own order to another driver');
 
 -- 2. Driver cannot INSERT an order at status='completed'
 PREPARE bad_initial_status AS
