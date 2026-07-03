@@ -26,8 +26,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Merge app + amuwak_core coverage. A file like order_code.dart is only partly
-# exercised by app tests but fully by amuwak_core's own suite; cov.awk takes the
-# max hit per line, so concatenating both lcov files merges them. The core paths
+# exercised by app tests but fully by amuwak_core's own suite; the inline awk
+# (below) takes the max hit per line, so concatenating both lcov files merges them. The core paths
 # are package-relative (lib/...), so prefix them to match how the app references
 # them (packages/amuwak_core/lib/...).
 LCOV="$(mktemp)"

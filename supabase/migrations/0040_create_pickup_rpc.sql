@@ -62,7 +62,13 @@ BEGIN
   END IF;
 
   -- Upsert the customer (bypasses customers_write via SECURITY DEFINER; only
-  -- reachable after the staff check above).
+  -- reachable after the staff check above). Intentional shared-CRM behaviour:
+  -- passing an existing customer id overwrites the stored
+  -- name/phone/address/notes/custom_rate_per_kg_ugx. Customers are shared,
+  -- non-owned records (this mirrors the unscoped customers_write RLS policy for
+  -- in_shop/manager), so any active staff caller -- including a driver via this
+  -- RPC -- may update a known id, including billing-relevant fields. This is
+  -- deliberate, not a per-owner write.
   INSERT INTO customers (
     id, name, phone, address, notes, custom_rate_per_kg_ugx, created_at, updated_at
   ) VALUES (
