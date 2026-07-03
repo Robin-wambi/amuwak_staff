@@ -271,7 +271,12 @@ class _DailyReportViewState extends State<DailyReportView> {
           const SizedBox(height: AppSpacing.md),
           _UnitEconomicsCard(
             avgOrderValueUgx: avgOrderValue,
-            avgDeltaUgx: avgOrderValue - prevAvgOrderValue,
+            // No priced orders last period → avg is 0, which isn't a real
+            // baseline; pass null so the trend chip is hidden rather than
+            // showing a spurious full-value jump.
+            avgDeltaUgx: prevAvgOrderValue == 0
+                ? null
+                : avgOrderValue - prevAvgOrderValue,
             estimatedUgx: provisionalRevenue,
             confirmedUgx: finalRevenue,
           ),
@@ -406,18 +411,22 @@ class _ReportMetricCard extends StatelessWidget {
 const Color _trendGood = Color(0xFF2E7D32); // green 800
 
 /// A small ▲/▼ + delta chip for period-over-period trends. Renders nothing when
-/// there's no change. [upIsGood] flips the colour semantics: more collected is
-/// good (green up), but more outstanding is bad (red up).
+/// there's no change, or when [deltaUgx] is null — meaning there's no comparable
+/// prior baseline to trend against (e.g. the previous period had no priced
+/// orders), so a raw delta would fabricate a misleading swing from zero.
+/// [upIsGood] flips the colour semantics: more collected is good (green up), but
+/// more outstanding is bad (red up).
 class _TrendChip extends StatelessWidget {
   const _TrendChip({required this.deltaUgx, this.upIsGood = true});
 
-  final int deltaUgx;
+  final int? deltaUgx;
   final bool upIsGood;
 
   @override
   Widget build(BuildContext context) {
-    if (deltaUgx == 0) return const SizedBox.shrink();
-    final up = deltaUgx > 0;
+    final delta = deltaUgx;
+    if (delta == null || delta == 0) return const SizedBox.shrink();
+    final up = delta > 0;
     final good = up == upIsGood;
     final color = good ? _trendGood : Theme.of(context).colorScheme.error;
     return Row(
@@ -430,7 +439,7 @@ class _TrendChip extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         Text(
-          formatUgx(deltaUgx.abs()),
+          formatUgx(delta.abs()),
           style: TextStyle(
             color: color,
             fontSize: 12,
@@ -614,7 +623,10 @@ class _UnitEconomicsCard extends StatelessWidget {
   });
 
   final int avgOrderValueUgx;
-  final int avgDeltaUgx;
+
+  /// Period-over-period change in average order value, or null when the previous
+  /// period has no comparable baseline (no priced orders) — see [_TrendChip].
+  final int? avgDeltaUgx;
 
   /// Revenue from orders still on an estimated (provisional) weight/price.
   final int estimatedUgx;
@@ -661,10 +673,18 @@ class _UnitEconomicsCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs / 2),
-                    Text(
-                      formatUgx(avgOrderValueUgx),
-                      style: const TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w800),
+                    // Scale the hero down to fit its column rather than wrapping
+                    // onto a second line when the amount is large (many digits)
+                    // and the trend chip has squeezed the available width.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatUgx(avgOrderValueUgx),
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ],
                 ),
