@@ -33,6 +33,7 @@ class LaundryOrder {
     this.isExpress = false,
     this.expressFlatSnapshotUgx = 0,
     this.expressPctSnapshot = 0,
+    this.paymentAmountUgx = 0,
   }) : orderCode = orderCode ?? orderId;
 
   final String orderId;
@@ -67,6 +68,20 @@ class LaundryOrder {
   /// recomputes correctly once the final weight is recorded.
   final int expressFlatSnapshotUgx;
   final double expressPctSnapshot;
+
+  /// Cumulative cash collected against this order. The single stored source of
+  /// truth for payment; paid/partial/unpaid is *derived* (see [outstandingUgx]
+  /// and [isFullyPaid]), never stored, so it can't drift from a later total
+  /// change. See Supabase migration 0031.
+  final int paymentAmountUgx;
+
+  /// Money still owed: [totalUgx] minus what's been collected, clamped so an
+  /// over-collection (change handed back in cash) never reads as negative.
+  int get outstandingUgx => (totalUgx - paymentAmountUgx).clamp(0, totalUgx);
+
+  /// Whether the order is settled — collected covers a non-zero total. A
+  /// zero-total order is never "paid" (there's nothing to pay).
+  bool get isFullyPaid => totalUgx > 0 && paymentAmountUgx >= totalUgx;
 
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
   ProofEvent? get deliveryProof => _firstOfType(ProofEventType.delivery);
@@ -143,6 +158,7 @@ class LaundryOrder {
       isExpress: row.isExpress,
       expressFlatSnapshotUgx: row.expressFlatSnapshotUgx,
       expressPctSnapshot: row.expressPctSnapshot,
+      paymentAmountUgx: row.paymentAmountUgx,
     );
   }
 
@@ -206,6 +222,9 @@ class LaundryOrder {
           (row['express_flat_snapshot_ugx'] as num?)?.toInt() ?? 0,
       expressPctSnapshot:
           (row['express_pct_snapshot'] as num?)?.toDouble() ?? 0,
+      // Same degrade-to-0 rule: a row predating the payment column reads as
+      // "nothing collected yet" rather than erroring the stream.
+      paymentAmountUgx: (row['payment_amount_ugx'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -313,6 +332,7 @@ class LaundryOrder {
     bool? isExpress,
     int? expressFlatSnapshotUgx,
     double? expressPctSnapshot,
+    int? paymentAmountUgx,
     bool clearEstimatedWeight = false,
     bool clearFinalWeight = false,
   }) {
@@ -348,6 +368,7 @@ class LaundryOrder {
       expressFlatSnapshotUgx:
           expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
       expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
+      paymentAmountUgx: paymentAmountUgx ?? this.paymentAmountUgx,
     );
   }
 
@@ -377,7 +398,8 @@ class LaundryOrder {
         other.deliveryFeeSnapshotUgx != deliveryFeeSnapshotUgx ||
         other.isExpress != isExpress ||
         other.expressFlatSnapshotUgx != expressFlatSnapshotUgx ||
-        other.expressPctSnapshot != expressPctSnapshot) {
+        other.expressPctSnapshot != expressPctSnapshot ||
+        other.paymentAmountUgx != paymentAmountUgx) {
       return false;
     }
     if (lineItems.length != other.lineItems.length) return false;
@@ -421,6 +443,7 @@ class LaundryOrder {
           isExpress,
           expressFlatSnapshotUgx,
           expressPctSnapshot,
+          paymentAmountUgx,
         ),
       );
 }

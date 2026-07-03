@@ -38,6 +38,10 @@ class Orders extends Table {
   IntColumn      get expressFlatSnapshotUgx => integer().named('express_flat_snapshot_ugx').withDefault(const Constant(0))();
   RealColumn     get expressPctSnapshot     => real().named('express_pct_snapshot').withDefault(const Constant(0))();
 
+  // Cumulative cash collected against the order (Supabase migration 0031).
+  // Outstanding = total_ugx - this; paid/partial/unpaid is derived, not stored.
+  IntColumn      get paymentAmountUgx       => integer().named('payment_amount_ugx').withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

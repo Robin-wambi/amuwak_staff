@@ -5,7 +5,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_staff/src/orders/new_pickup_screen.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_core/amuwak_core.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/sync/customers_repository.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 

@@ -1539,6 +1539,18 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         requiredDuringInsert: false,
         defaultValue: const Constant(0),
       );
+  static const VerificationMeta _paymentAmountUgxMeta = const VerificationMeta(
+    'paymentAmountUgx',
+  );
+  @override
+  late final GeneratedColumn<int> paymentAmountUgx = GeneratedColumn<int>(
+    'payment_amount_ugx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1572,6 +1584,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     isExpress,
     expressFlatSnapshotUgx,
     expressPctSnapshot,
+    paymentAmountUgx,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1834,6 +1847,15 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         ),
       );
     }
+    if (data.containsKey('payment_amount_ugx')) {
+      context.handle(
+        _paymentAmountUgxMeta,
+        paymentAmountUgx.isAcceptableOrUnknown(
+          data['payment_amount_ugx']!,
+          _paymentAmountUgxMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1967,6 +1989,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.double,
         data['${effectivePrefix}express_pct_snapshot'],
       )!,
+      paymentAmountUgx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}payment_amount_ugx'],
+      )!,
     );
   }
 
@@ -2008,6 +2034,7 @@ class Order extends DataClass implements Insertable<Order> {
   final bool isExpress;
   final int expressFlatSnapshotUgx;
   final double expressPctSnapshot;
+  final int paymentAmountUgx;
   const Order({
     required this.id,
     required this.orderCode,
@@ -2040,6 +2067,7 @@ class Order extends DataClass implements Insertable<Order> {
     required this.isExpress,
     required this.expressFlatSnapshotUgx,
     required this.expressPctSnapshot,
+    required this.paymentAmountUgx,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2091,6 +2119,7 @@ class Order extends DataClass implements Insertable<Order> {
     map['is_express'] = Variable<bool>(isExpress);
     map['express_flat_snapshot_ugx'] = Variable<int>(expressFlatSnapshotUgx);
     map['express_pct_snapshot'] = Variable<double>(expressPctSnapshot);
+    map['payment_amount_ugx'] = Variable<int>(paymentAmountUgx);
     return map;
   }
 
@@ -2143,6 +2172,7 @@ class Order extends DataClass implements Insertable<Order> {
       isExpress: Value(isExpress),
       expressFlatSnapshotUgx: Value(expressFlatSnapshotUgx),
       expressPctSnapshot: Value(expressPctSnapshot),
+      paymentAmountUgx: Value(paymentAmountUgx),
     );
   }
 
@@ -2195,6 +2225,7 @@ class Order extends DataClass implements Insertable<Order> {
       expressPctSnapshot: serializer.fromJson<double>(
         json['expressPctSnapshot'],
       ),
+      paymentAmountUgx: serializer.fromJson<int>(json['paymentAmountUgx']),
     );
   }
   @override
@@ -2232,6 +2263,7 @@ class Order extends DataClass implements Insertable<Order> {
       'isExpress': serializer.toJson<bool>(isExpress),
       'expressFlatSnapshotUgx': serializer.toJson<int>(expressFlatSnapshotUgx),
       'expressPctSnapshot': serializer.toJson<double>(expressPctSnapshot),
+      'paymentAmountUgx': serializer.toJson<int>(paymentAmountUgx),
     };
   }
 
@@ -2267,6 +2299,7 @@ class Order extends DataClass implements Insertable<Order> {
     bool? isExpress,
     int? expressFlatSnapshotUgx,
     double? expressPctSnapshot,
+    int? paymentAmountUgx,
   }) => Order(
     id: id ?? this.id,
     orderCode: orderCode ?? this.orderCode,
@@ -2307,6 +2340,7 @@ class Order extends DataClass implements Insertable<Order> {
     expressFlatSnapshotUgx:
         expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
     expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
+    paymentAmountUgx: paymentAmountUgx ?? this.paymentAmountUgx,
   );
   Order copyWithCompanion(OrdersCompanion data) {
     return Order(
@@ -2371,6 +2405,9 @@ class Order extends DataClass implements Insertable<Order> {
       expressPctSnapshot: data.expressPctSnapshot.present
           ? data.expressPctSnapshot.value
           : this.expressPctSnapshot,
+      paymentAmountUgx: data.paymentAmountUgx.present
+          ? data.paymentAmountUgx.value
+          : this.paymentAmountUgx,
     );
   }
 
@@ -2407,7 +2444,8 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('deliveryFeeSnapshotUgx: $deliveryFeeSnapshotUgx, ')
           ..write('isExpress: $isExpress, ')
           ..write('expressFlatSnapshotUgx: $expressFlatSnapshotUgx, ')
-          ..write('expressPctSnapshot: $expressPctSnapshot')
+          ..write('expressPctSnapshot: $expressPctSnapshot, ')
+          ..write('paymentAmountUgx: $paymentAmountUgx')
           ..write(')'))
         .toString();
   }
@@ -2445,6 +2483,7 @@ class Order extends DataClass implements Insertable<Order> {
     isExpress,
     expressFlatSnapshotUgx,
     expressPctSnapshot,
+    paymentAmountUgx,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2480,7 +2519,8 @@ class Order extends DataClass implements Insertable<Order> {
           other.deliveryFeeSnapshotUgx == this.deliveryFeeSnapshotUgx &&
           other.isExpress == this.isExpress &&
           other.expressFlatSnapshotUgx == this.expressFlatSnapshotUgx &&
-          other.expressPctSnapshot == this.expressPctSnapshot);
+          other.expressPctSnapshot == this.expressPctSnapshot &&
+          other.paymentAmountUgx == this.paymentAmountUgx);
 }
 
 class OrdersCompanion extends UpdateCompanion<Order> {
@@ -2515,6 +2555,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<bool> isExpress;
   final Value<int> expressFlatSnapshotUgx;
   final Value<double> expressPctSnapshot;
+  final Value<int> paymentAmountUgx;
   final Value<int> rowid;
   const OrdersCompanion({
     this.id = const Value.absent(),
@@ -2548,6 +2589,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.isExpress = const Value.absent(),
     this.expressFlatSnapshotUgx = const Value.absent(),
     this.expressPctSnapshot = const Value.absent(),
+    this.paymentAmountUgx = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OrdersCompanion.insert({
@@ -2582,6 +2624,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.isExpress = const Value.absent(),
     this.expressFlatSnapshotUgx = const Value.absent(),
     this.expressPctSnapshot = const Value.absent(),
+    this.paymentAmountUgx = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        orderCode = Value(orderCode),
@@ -2627,6 +2670,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<bool>? isExpress,
     Expression<int>? expressFlatSnapshotUgx,
     Expression<double>? expressPctSnapshot,
+    Expression<int>? paymentAmountUgx,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2666,6 +2710,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
         'express_flat_snapshot_ugx': expressFlatSnapshotUgx,
       if (expressPctSnapshot != null)
         'express_pct_snapshot': expressPctSnapshot,
+      if (paymentAmountUgx != null) 'payment_amount_ugx': paymentAmountUgx,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2702,6 +2747,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<bool>? isExpress,
     Value<int>? expressFlatSnapshotUgx,
     Value<double>? expressPctSnapshot,
+    Value<int>? paymentAmountUgx,
     Value<int>? rowid,
   }) {
     return OrdersCompanion(
@@ -2738,6 +2784,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       expressFlatSnapshotUgx:
           expressFlatSnapshotUgx ?? this.expressFlatSnapshotUgx,
       expressPctSnapshot: expressPctSnapshot ?? this.expressPctSnapshot,
+      paymentAmountUgx: paymentAmountUgx ?? this.paymentAmountUgx,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2844,6 +2891,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (expressPctSnapshot.present) {
       map['express_pct_snapshot'] = Variable<double>(expressPctSnapshot.value);
     }
+    if (paymentAmountUgx.present) {
+      map['payment_amount_ugx'] = Variable<int>(paymentAmountUgx.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2884,6 +2934,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('isExpress: $isExpress, ')
           ..write('expressFlatSnapshotUgx: $expressFlatSnapshotUgx, ')
           ..write('expressPctSnapshot: $expressPctSnapshot, ')
+          ..write('paymentAmountUgx: $paymentAmountUgx, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8717,6 +8768,7 @@ typedef $$OrdersTableCreateCompanionBuilder =
       Value<bool> isExpress,
       Value<int> expressFlatSnapshotUgx,
       Value<double> expressPctSnapshot,
+      Value<int> paymentAmountUgx,
       Value<int> rowid,
     });
 typedef $$OrdersTableUpdateCompanionBuilder =
@@ -8752,6 +8804,7 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<bool> isExpress,
       Value<int> expressFlatSnapshotUgx,
       Value<double> expressPctSnapshot,
+      Value<int> paymentAmountUgx,
       Value<int> rowid,
     });
 
@@ -8916,6 +8969,11 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<double> get expressPctSnapshot => $composableBuilder(
     column: $table.expressPctSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paymentAmountUgx => $composableBuilder(
+    column: $table.paymentAmountUgx,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9083,6 +9141,11 @@ class $$OrdersTableOrderingComposer
     column: $table.expressPctSnapshot,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get paymentAmountUgx => $composableBuilder(
+    column: $table.paymentAmountUgx,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$OrdersTableAnnotationComposer
@@ -9216,6 +9279,11 @@ class $$OrdersTableAnnotationComposer
     column: $table.expressPctSnapshot,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get paymentAmountUgx => $composableBuilder(
+    column: $table.paymentAmountUgx,
+    builder: (column) => column,
+  );
 }
 
 class $$OrdersTableTableManager
@@ -9277,6 +9345,7 @@ class $$OrdersTableTableManager
                 Value<bool> isExpress = const Value.absent(),
                 Value<int> expressFlatSnapshotUgx = const Value.absent(),
                 Value<double> expressPctSnapshot = const Value.absent(),
+                Value<int> paymentAmountUgx = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion(
                 id: id,
@@ -9310,6 +9379,7 @@ class $$OrdersTableTableManager
                 isExpress: isExpress,
                 expressFlatSnapshotUgx: expressFlatSnapshotUgx,
                 expressPctSnapshot: expressPctSnapshot,
+                paymentAmountUgx: paymentAmountUgx,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9345,6 +9415,7 @@ class $$OrdersTableTableManager
                 Value<bool> isExpress = const Value.absent(),
                 Value<int> expressFlatSnapshotUgx = const Value.absent(),
                 Value<double> expressPctSnapshot = const Value.absent(),
+                Value<int> paymentAmountUgx = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion.insert(
                 id: id,
@@ -9378,6 +9449,7 @@ class $$OrdersTableTableManager
                 isExpress: isExpress,
                 expressFlatSnapshotUgx: expressFlatSnapshotUgx,
                 expressPctSnapshot: expressPctSnapshot,
+                paymentAmountUgx: paymentAmountUgx,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

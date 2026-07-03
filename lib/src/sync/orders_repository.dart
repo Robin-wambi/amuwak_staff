@@ -7,6 +7,7 @@ import '../orders/order.dart';
 import '../orders/pricing/pricing_calculator.dart';
 import '../orders/pricing/pricing_inputs.dart';
 import 'package:amuwak_core/amuwak_core.dart';
+import '../orders/order_status.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
@@ -363,6 +364,30 @@ class OrdersRepository {
         orderSoftDeletePayload(actorStaffId: actorStaffId, now: _clock()));
     if (updated.isEmpty) {
       throw StateError('softDelete: no order with id "$orderId"');
+    }
+  }
+
+  /// Records cash collected against an order, as the new ABSOLUTE cumulative
+  /// total (the caller adds what was just tendered to the order's current
+  /// `paymentAmountUgx` and passes the sum). Writes only `payment_amount_ugx`
+  /// (+ updated_at/updated_by) — never status, pricing, or creation columns.
+  /// Paid/partial/unpaid stays derived from this vs `total_ugx`, so there's no
+  /// status column to keep in sync.
+  ///
+  /// Throws a [StateError] when no order matched [orderId] (e.g. soft-deleted
+  /// server-side), matching the sibling write methods so a no-op isn't treated
+  /// as a successful collection.
+  Future<void> updatePayment(
+    String orderId,
+    int amountUgx, {
+    required String actorStaffId,
+  }) async {
+    final updated = await _updateById(
+        orderId,
+        orderPaymentUpdatePayload(amountUgx,
+            actorStaffId: actorStaffId, now: _clock()));
+    if (updated.isEmpty) {
+      throw StateError('updatePayment: no order with id "$orderId"');
     }
   }
 

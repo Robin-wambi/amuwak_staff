@@ -5,6 +5,8 @@ import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_filter.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
 import 'package:amuwak_staff/src/shared/theme/app_card.dart';
@@ -23,7 +25,28 @@ Expense _expense(ExpenseCategory category, int amountUgx, {DateTime? on}) =>
 // Fixed reference clock so the report's period window is deterministic in tests.
 DateTime _fixedNow() => DateTime(2026, 6, 17, 12);
 
-LaundryOrder _order(String id, OrderStatus status, int totalUgx) => LaundryOrder(
+// Scrolls the (lazily-built) ListView until [finder] is on screen. Used by the
+// narrow-phone tests, which pump a short surface where lower sections would
+// otherwise be off-screen and not in the tree.
+Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    280,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pump();
+}
+
+LaundryOrder _order(
+  String id,
+  OrderStatus status,
+  int totalUgx, {
+  int paid = 0,
+  DateTime? scheduledFor,
+  double? finalWeightKg,
+  DateTime? deliveredAt,
+}) =>
+    LaundryOrder(
       orderId: id,
       orderCode: id,
       customerName: 'X',
@@ -35,178 +58,349 @@ LaundryOrder _order(String id, OrderStatus status, int totalUgx) => LaundryOrder
       address: 'addr',
       notes: '',
       totalUgx: totalUgx,
+      paymentAmountUgx: paid,
+      scheduledFor: scheduledFor,
+      finalWeightKg: finalWeightKg,
+      proofEvents: [
+        if (deliveredAt != null)
+          ProofEvent(
+            id: 'delivery-$id',
+            type: ProofEventType.delivery,
+            capturedAt: deliveredAt,
+            count: 1,
+            photoPaths: const [],
+          ),
+      ],
     );
 
+// Pumps the report on a tall surface so the whole (lazily-built) ListView is
+// realised — the lower sections (Expenses, Unit economics, metric strip, work
+// summary) would otherwise be off-screen and not in the tree to find.
+Future<void> _pumpReport(
+  WidgetTester tester,
+  List<LaundryOrder> orders, {
+  List<Expense> expenses = const [],
+}) async {
+  tester.view.physicalSize = const Size(1200, 3200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(MaterialApp(
+    home: Scaffold(
+      body: DailyReportView(orders: orders, expenses: expenses, now: _fixedNow),
+    ),
+  ));
+}
+
 void main() {
-  testWidgets('renders earned, expected, and total booked revenue',
-      (tester) async {
-    final orders = [
-      _order('A', OrderStatus.completed, 8000),
-      _order('B', OrderStatus.completed, 12000),
-      _order('C', OrderStatus.inProgress, 5000),
-      _order('D', OrderStatus.pendingPickup, 3000),
-    ];
+  group('Money summary', () {
+    testWidgets('shows collected, outstanding, and billed', (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 10000, paid: 10000),
+        _order('B', OrderStatus.inProgress, 6000, paid: 2000),
+      ];
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: DailyReportView(orders: orders)),
-    ));
+      await _pumpReport(tester, orders);
 
-    // Section heading present.
-    expect(find.text('Revenue'), findsOneWidget);
-    expect(find.text('Earned'), findsOneWidget);
-    expect(find.text('Expected'), findsOneWidget);
-    expect(find.text('Total booked'), findsOneWidget);
+      expect(find.text('Money'), findsOneWidget);
+      expect(find.text('Collected'), findsOneWidget);
+      expect(find.text('USh 12,000'), findsWidgets); // 10,000 + 2,000
+      expect(find.text('Outstanding'), findsOneWidget);
+      expect(find.text('USh 4,000'), findsWidgets); // B: 6,000 - 2,000
+      expect(find.text('Billed'), findsOneWidget);
+      expect(find.text('USh 16,000'), findsWidgets); // collected + outstanding
+    });
 
-    // Earned = completed totals (8000 + 12000).
-    expect(find.text('USh 20,000'), findsOneWidget);
-    // Expected = non-completed totals (5000 + 3000).
-    expect(find.text('USh 8,000'), findsOneWidget);
-    // Total booked = earned + expected.
-    expect(find.text('USh 28,000'), findsOneWidget);
+    testWidgets('shows an up trend vs the previous day', (tester) async {
+      final orders = [
+        // Today (in the current daily window).
+        _order('today', OrderStatus.completed, 10000,
+            paid: 10000, scheduledFor: DateTime(2026, 6, 17, 9)),
+        // Yesterday (in the previous daily window).
+        _order('yest', OrderStatus.completed, 4000,
+            paid: 4000, scheduledFor: DateTime(2026, 6, 16, 9)),
+      ];
+
+      await _pumpReport(tester, orders);
+
+      // Collected today (10,000) is up vs yesterday (4,000) → an up indicator.
+      expect(find.byIcon(Icons.arrow_upward_rounded), findsWidgets);
+    });
   });
 
-  testWidgets('shows zero revenue for an empty order list', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(body: DailyReportView(orders: [])),
-    ));
+  group('Revenue breakdown', () {
+    testWidgets('splits gross charges, discounts, and net sales',
+        (tester) async {
+      final priced = LaundryOrder(
+        orderId: 'P',
+        orderCode: 'P',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.completed,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+        ratePerKgSnapshotUgx: 5000,
+        finalWeightKg: 2, // 10,000 weight charge
+        lineItems: [LineItem(name: 'Blanket', amountUgx: 8000)],
+        isExpress: true,
+        expressFlatSnapshotUgx: 1000,
+        expressPctSnapshot: 20, // 1000 + 20% of 18000 = 4600
+        deliveryFeeSnapshotUgx: 3000,
+        manualAdjustmentUgx: -2000,
+        totalUgx: 23600,
+        paymentAmountUgx: 23600,
+      );
 
-    expect(find.text('Revenue'), findsOneWidget);
-    // Earned, Expected, and Total booked all render USh 0.
-    expect(find.text('USh 0'), findsNWidgets(3));
+      await _pumpReport(tester, [priced]);
+
+      expect(find.text('Revenue breakdown'), findsOneWidget);
+      expect(find.text('Weight charges'), findsOneWidget);
+      expect(find.text('USh 10,000'), findsWidgets);
+      expect(find.text('Line items'), findsOneWidget);
+      expect(find.text('USh 8,000'), findsWidgets);
+      expect(find.text('Express'), findsOneWidget);
+      expect(find.text('USh 4,600'), findsWidgets);
+      expect(find.text('Delivery'), findsOneWidget);
+      expect(find.text('USh 3,000'), findsWidgets);
+      expect(find.text('Discounts'), findsOneWidget);
+      expect(find.text('USh -2,000'), findsWidgets);
+      expect(find.text('Net sales'), findsOneWidget);
+      expect(find.text('USh 23,600'), findsWidgets);
+    });
   });
 
-  testWidgets('each card invokes the right navigation callback', (tester) async {
-    tester.view.physicalSize = const Size(800, 1600);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+  group('Profit', () {
+    testWidgets('shows total spent, net profit, and margin', (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 10000, paid: 10000),
+        _order('B', OrderStatus.completed, 12000, paid: 12000), // collected 22k
+        _order('C', OrderStatus.inProgress, 5000), // unpaid
+      ];
+      final expenses = [
+        _expense(ExpenseCategory.detergent, 6000),
+        _expense(ExpenseCategory.packaging, 2000), // spent 8,000
+      ];
 
-    final filters = <OrderFilter>[];
-    final titles = <String?>[];
-    var itemsTaps = 0;
+      await _pumpReport(tester, orders, expenses: expenses);
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: DailyReportView(
-          orders: [
-            _order('A', OrderStatus.completed, 8000),
-            _order('B', OrderStatus.inProgress, 5000),
-          ],
-          onOpenFiltered: (f, {title}) {
-            filters.add(f);
-            titles.add(title);
-          },
-          onOpenItems: () => itemsTaps++,
-        ),
-      ),
-    ));
+      expect(find.text('Total spent'), findsOneWidget);
+      expect(find.text('USh 8,000'), findsWidgets);
+      expect(find.text('Net profit'), findsOneWidget);
+      expect(find.text('USh 14,000'), findsWidgets); // 22,000 - 8,000
+      // Margin = 14,000 / 22,000 collected = 63.6% → 64%.
+      expect(find.textContaining('64%'), findsOneWidget);
+    });
 
-    await tester.tap(find.text('Orders'));
-    // 'Completed' also appears in the Status breakdown card, so tap the metric
-    // card via its unique icon instead of the ambiguous label.
-    await tester.tap(find.byIcon(Icons.check_circle_outline_rounded));
-    await tester.tap(find.text('Pending work'));
-    await tester.tap(find.text('Items'));
+    testWidgets('net profit goes negative when spend exceeds collected',
+        (tester) async {
+      final orders = [_order('A', OrderStatus.completed, 10000, paid: 10000)];
+      final expenses = [_expense(ExpenseCategory.fuel, 18000)];
 
-    expect(filters, [
-      OrderFilter.all,
-      OrderFilter.completed,
-      OrderFilter.pendingWork,
-    ]);
-    expect(titles, ['Orders', 'Completed', 'Pending work']);
-    expect(itemsTaps, 1);
+      await _pumpReport(tester, orders, expenses: expenses);
+
+      // Net profit = 10,000 collected − 18,000 spent = −8,000.
+      expect(find.text('USh -8,000'), findsWidgets);
+    });
   });
 
-  testWidgets('cards are inert when no callbacks are provided', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: DailyReportView(orders: [
-          _order('A', OrderStatus.completed, 8000),
-        ]),
-      ),
-    ));
+  group('Unit economics', () {
+    testWidgets('shows average order value and provisional vs final',
+        (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 10000, paid: 10000, finalWeightKg: 2),
+        _order('B', OrderStatus.inProgress, 6000), // provisional (no final wt)
+      ];
 
-    await tester.tap(find.text('Orders'), warnIfMissed: false);
-    expect(tester.takeException(), isNull);
+      await _pumpReport(tester, orders);
+
+      expect(find.text('Avg order value'), findsOneWidget);
+      expect(find.text('USh 8,000'), findsWidgets); // 16,000 / 2
+      expect(find.text('Provisional'), findsOneWidget);
+      expect(find.text('Final'), findsOneWidget);
+    });
   });
 
-  testWidgets(
-      'Completed and Pending work cards show their OrderFilter counts',
-      (tester) async {
-    final orders = [
-      _order('A', OrderStatus.completed, 1000),
-      _order('B', OrderStatus.completed, 1000),
-      _order('C', OrderStatus.inProgress, 1000),
-      _order('D', OrderStatus.pendingPickup, 1000),
-      _order('E', OrderStatus.readyForDelivery, 1000),
-    ];
-    // 2 completed, 3 not-completed (pending work).
-    expect(OrderFilter.completed.count(orders), 2);
-    expect(OrderFilter.pendingWork.count(orders), 3);
+  group('Monthly revenue tracker', () {
+    testWidgets('sums current-month completed deliveries only', (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 10000,
+            deliveredAt: DateTime(2026, 6, 1, 10)),
+        _order('B', OrderStatus.completed, 12000,
+            deliveredAt: DateTime(2026, 6, 17, 9)),
+        // Not completed → excluded.
+        _order('P', OrderStatus.inProgress, 5000,
+            deliveredAt: DateTime(2026, 6, 12, 9)),
+        // Previous month → excluded.
+        _order('OLD', OrderStatus.completed, 7000,
+            deliveredAt: DateTime(2026, 5, 31, 9)),
+        // After "now" (day 17) → excluded.
+        _order('FUTURE', OrderStatus.completed, 9000,
+            deliveredAt: DateTime(2026, 6, 20, 9)),
+      ];
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: DailyReportView(orders: orders)),
-    ));
+      await _pumpReport(tester, orders);
 
-    // The number on each tappable card equals the count of the list it opens —
-    // scope to the card via its unique icon to avoid matching the same digit
-    // elsewhere on the report.
-    Finder valueInCard(IconData icon, String value) => find.descendant(
-          of: find.ancestor(
-            of: find.byIcon(icon),
-            matching: find.byType(AppCard),
+      final tracker = find.ancestor(
+        of: find.text('This month revenue tracker'),
+        matching: find.byType(AppCard),
+      );
+
+      expect(find.descendant(of: tracker, matching: find.text('June 2026')),
+          findsOneWidget);
+      // Earned = A (10,000) + B (12,000); OLD/FUTURE/P excluded.
+      expect(find.descendant(of: tracker, matching: find.text('USh 22,000')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: tracker, matching: find.text('2 completed deliveries')),
+          findsOneWidget);
+      expect(find.descendant(of: tracker, matching: find.byType(CustomPaint)),
+          findsWidgets);
+    });
+
+    testWidgets('shows zero for an empty current month', (tester) async {
+      final orders = [
+        _order('OLD', OrderStatus.completed, 7000,
+            deliveredAt: DateTime(2026, 5, 31, 9)),
+        _order('P', OrderStatus.inProgress, 9000,
+            deliveredAt: DateTime(2026, 6, 10, 9)),
+      ];
+
+      await _pumpReport(tester, orders);
+
+      final tracker = find.ancestor(
+        of: find.text('This month revenue tracker'),
+        matching: find.byType(AppCard),
+      );
+
+      expect(find.descendant(of: tracker, matching: find.text('USh 0')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: tracker, matching: find.text('0 completed deliveries')),
+          findsOneWidget);
+    });
+  });
+
+  group('Navigation + status (unchanged behaviour)', () {
+    testWidgets('each metric cell invokes the right navigation callback',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final filters = <OrderFilter>[];
+      final titles = <String?>[];
+      var itemsTaps = 0;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              _order('A', OrderStatus.completed, 8000),
+              _order('B', OrderStatus.inProgress, 5000),
+            ],
+            onOpenFiltered: (f, {title}) {
+              filters.add(f);
+              titles.add(title);
+            },
+            onOpenItems: () => itemsTaps++,
           ),
-          matching: find.text(value),
-        );
+        ),
+      ));
 
-    expect(valueInCard(Icons.check_circle_outline_rounded, '2'), findsOneWidget);
-    expect(valueInCard(Icons.pending_actions_outlined, '3'), findsOneWidget);
-  });
+      await _scrollUntilVisible(tester, find.text('Orders'));
+      await tester.tap(find.text('Orders'));
+      // 'Completed' also appears in the Status breakdown card, so tap the metric
+      // cell via its unique icon instead of the ambiguous label.
+      await tester.tap(find.byIcon(Icons.check_circle_outline_rounded));
+      await tester.tap(find.text('Pending work'));
+      await tester.tap(find.text('Items'));
 
-  testWidgets('shows per-category spend, total spent, and net profit',
-      (tester) async {
-    final orders = [
-      _order('A', OrderStatus.completed, 10000),
-      _order('B', OrderStatus.completed, 12000), // earned = 22,000
-      _order('C', OrderStatus.inProgress, 5000), // expected = 5,000
-    ];
-    final expenses = [
-      _expense(ExpenseCategory.detergent, 6000),
-      _expense(ExpenseCategory.packaging, 3000), // total spent = 9,000
-    ];
+      expect(filters, [
+        OrderFilter.all,
+        OrderFilter.completed,
+        OrderFilter.pendingWork,
+      ]);
+      expect(titles, ['Orders', 'Completed', 'Pending work']);
+      expect(itemsTaps, 1);
+    });
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: DailyReportView(
-            orders: orders, expenses: expenses, now: _fixedNow),
-      ),
-    ));
+    testWidgets('metric strip uses an equal-cell 2x2 grid below the wide '
+        'breakpoint', (tester) async {
+      // Below _ReportMetricStrip._wideBreakpoint (560) the strip lays out 2x2.
+      // Pumped at 500 rather than a phone-width 360 because the finance-grade
+      // _UnitEconomicsRow above the strip has a pre-existing overflow at ~360
+      // (the unbreakable "Provisional" label + its amount don't fit its half-
+      // width column); that is unrelated to the strip and tracked separately.
+      tester.view.physicalSize = const Size(500, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-    expect(find.text('Expenses'), findsOneWidget);
-    expect(find.text('Detergent & cleaning'), findsOneWidget);
-    expect(find.text('USh 6,000'), findsOneWidget);
-    expect(find.text('Packaging'), findsOneWidget);
-    expect(find.text('USh 3,000'), findsOneWidget);
-    expect(find.text('Total spent'), findsOneWidget);
-    expect(find.text('USh 9,000'), findsOneWidget);
-    // Net = earned (22,000) − total spent (9,000).
-    expect(find.text('Net'), findsOneWidget);
-    expect(find.text('USh 13,000'), findsOneWidget);
-  });
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              _order('A', OrderStatus.completed, 8000),
+              _order('B', OrderStatus.inProgress, 5000),
+            ],
+          ),
+        ),
+      ));
 
-  testWidgets('net goes negative when spend exceeds earned revenue',
-      (tester) async {
-    final orders = [_order('A', OrderStatus.completed, 10000)]; // earned 10,000
-    final expenses = [_expense(ExpenseCategory.fuel, 18000)]; // spent 18,000
+      await _scrollUntilVisible(tester, find.text('Orders'));
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: DailyReportView(
-            orders: orders, expenses: expenses, now: _fixedNow),
-      ),
-    ));
+      Finder metricCell(String title) => find
+          .ancestor(of: find.text(title), matching: find.byType(InkWell))
+          .first;
 
-    // Net = 10,000 − 18,000 = −8,000.
-    expect(find.text('USh -8,000'), findsOneWidget);
+      final first = tester.getSize(metricCell('Orders'));
+      for (final title in const ['Items', 'Completed', 'Pending work']) {
+        final size = tester.getSize(metricCell(title));
+        expect(size.width, first.width, reason: '$title width');
+        expect(size.height, first.height, reason: '$title height');
+      }
+    });
+
+    testWidgets('cells are inert when no callbacks are provided',
+        (tester) async {
+      await _pumpReport(tester, [_order('A', OrderStatus.completed, 8000)]);
+
+      await tester.tap(find.text('Orders'), warnIfMissed: false);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'Completed and Pending work cells show their OrderFilter counts',
+        (tester) async {
+      final orders = [
+        _order('A', OrderStatus.completed, 1000),
+        _order('B', OrderStatus.completed, 1000),
+        _order('C', OrderStatus.inProgress, 1000),
+        _order('D', OrderStatus.pendingPickup, 1000),
+        _order('E', OrderStatus.readyForDelivery, 1000),
+      ];
+      expect(OrderFilter.completed.count(orders), 2);
+      expect(OrderFilter.pendingWork.count(orders), 3);
+
+      await _pumpReport(tester, orders);
+
+      Finder valueInCard(IconData icon, String value) => find.descendant(
+            of: find.ancestor(
+              of: find.byIcon(icon),
+              matching: find.byType(AppCard),
+            ),
+            matching: find.text(value),
+          );
+
+      expect(
+          valueInCard(Icons.check_circle_outline_rounded, '2'), findsOneWidget);
+      expect(valueInCard(Icons.pending_actions_outlined, '3'), findsOneWidget);
+    });
   });
 
   testWidgets('shows the Expenses card with an Add action even when empty',
@@ -217,13 +411,16 @@ void main() {
       home: Scaffold(
         body: DailyReportView(
           orders: const [],
+          now: _fixedNow,
           onAddExpense: () => addTaps++,
         ),
       ),
     ));
 
-    // The card renders (so staff can record the first expense of the day) even
-    // with no expenses yet.
+    // The Expenses card sits well down the report (below Money, Revenue
+    // breakdown, and the monthly tracker), so scroll it into the lazy ListView
+    // before asserting on it.
+    await _scrollUntilVisible(tester, find.text('Expenses'));
     expect(find.text('Expenses'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.add));
     expect(addTaps, 1);
@@ -231,12 +428,6 @@ void main() {
 
   testWidgets('switching Daily→Weekly rescopes the period and its spend',
       (tester) async {
-    tester.view.physicalSize = const Size(800, 1600);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    // now = Wed 2026-06-17. Its week starts Mon 2026-06-15. Two expenses fall
-    // today and one on Monday; the Monday one is in the week but not the day.
     final expenses = [
       _expense(ExpenseCategory.detergent, 6000), // today (06-17)
       _expense(ExpenseCategory.packaging, 2000), // today (06-17)
@@ -244,72 +435,32 @@ void main() {
           on: DateTime(2026, 6, 15, 8)), // Monday — same week, not today
     ];
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: DailyReportView(
-            orders: const [], expenses: expenses, now: _fixedNow),
-      ),
-    ));
+    await _pumpReport(tester, const [], expenses: expenses);
 
-    // Daily: header + work-summary heading say Today; only today's spend counts.
     expect(find.text("Today's report"), findsOneWidget);
     expect(find.text("Today's progress"), findsOneWidget);
-    expect(find.text('USh 8,000'), findsOneWidget); // total spent (daily)
+    expect(find.text('USh 8,000'), findsWidgets); // total spent (daily)
 
     await tester.tap(find.text('Weekly'));
     await tester.pumpAndSettle();
 
-    // Weekly: labels follow the period and Monday's 9,000 folds in (8,000 + 9,000).
     expect(find.text("This week's report"), findsOneWidget);
     expect(find.text("This week's progress"), findsOneWidget);
-    expect(find.text('USh 17,000'), findsOneWidget); // total spent (weekly)
+    expect(find.text('USh 17,000'), findsWidgets); // total spent (weekly)
   });
 
-  testWidgets(
-    'DailyReportScreen wraps the report view in a titled Scaffold',
-    (tester) async {
-      // Covers the DailyReportScreen StatelessWidget (AppBar + Scaffold that
-      // hosts DailyReportView), which the DailyReportView-only tests skip.
-      final orders = [
-        _order('A', OrderStatus.completed, 8000),
-        _order('B', OrderStatus.inProgress, 5000),
-      ];
+  testWidgets('DailyReportScreen wraps the report view in a titled Scaffold',
+      (tester) async {
+    final orders = [
+      _order('A', OrderStatus.completed, 8000, paid: 8000),
+      _order('B', OrderStatus.inProgress, 5000),
+    ];
 
-      await tester.pumpWidget(
-        MaterialApp(home: DailyReportScreen(orders: orders)),
-      );
+    await tester.pumpWidget(MaterialApp(home: DailyReportScreen(orders: orders)));
 
-      // App bar title from the screen scaffold.
-      expect(find.widgetWithText(AppBar, 'Daily report'), findsOneWidget);
-      // The embedded DailyReportView renders its content.
-      expect(find.byType(DailyReportView), findsOneWidget);
-      expect(find.text('Revenue'), findsOneWidget);
-      expect(find.text('USh 8,000'), findsOneWidget); // earned (completed A)
-    },
-  );
-
-  testWidgets(
-    'DailyReportScreen forwards expenses to the embedded view',
-    (tester) async {
-      // Exercises the expenses-bearing path of the screen constructor.
-      // Date the expense to today so it falls inside the default daily window
-      // (DailyReportScreen has no injectable clock).
-      final today = DateTime.now();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DailyReportScreen(
-            orders: const [],
-            expenses: [
-              _expense(ExpenseCategory.detergent, 6000,
-                  on: DateTime(today.year, today.month, today.day, 8)),
-            ],
-          ),
-        ),
-      );
-
-      expect(find.widgetWithText(AppBar, 'Daily report'), findsOneWidget);
-      expect(find.text('Expenses'), findsOneWidget);
-      expect(find.text('Detergent & cleaning'), findsOneWidget);
-    },
-  );
+    expect(find.widgetWithText(AppBar, 'Daily report'), findsOneWidget);
+    expect(find.byType(DailyReportView), findsOneWidget);
+    expect(find.text('Money'), findsOneWidget);
+    expect(find.text('USh 8,000'), findsWidgets); // collected (A)
+  });
 }
