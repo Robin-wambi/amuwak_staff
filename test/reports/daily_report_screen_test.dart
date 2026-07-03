@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/expenses/expense.dart';
@@ -206,19 +207,113 @@ void main() {
   });
 
   group('Unit economics', () {
-    testWidgets('shows average order value and provisional vs final',
+    testWidgets('shows avg order value hero and the confidence split',
         (tester) async {
       final orders = [
         _order('A', OrderStatus.completed, 10000, paid: 10000, finalWeightKg: 2),
-        _order('B', OrderStatus.inProgress, 6000), // provisional (no final wt)
+        _order('B', OrderStatus.inProgress, 6000), // estimated (no final wt)
+      ];
+
+      await _pumpReport(tester, orders);
+
+      // Hero metric.
+      expect(find.text('Avg order value'), findsOneWidget);
+      expect(find.text('USh 8,000'), findsWidgets); // 16,000 / 2
+      // Revenue-confidence split (renamed from Provisional/Final).
+      expect(find.text('Revenue confidence'), findsOneWidget);
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.text('Estimated'), findsOneWidget);
+      expect(find.textContaining('% confirmed'), findsOneWidget);
+    });
+
+    testWidgets('report renders without overflow on a 360px phone',
+        (tester) async {
+      // The full-width _UnitEconomicsCard replaced a two-column row that
+      // overflowed at ~360 (the unbreakable "Provisional" label + its amount
+      // did not fit a half-width column). Render the whole report at 360 and
+      // assert no RenderFlex overflow was thrown.
+      tester.view.physicalSize = const Size(360, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              _order('A', OrderStatus.completed, 10000,
+                  paid: 10000, finalWeightKg: 2),
+              _order('B', OrderStatus.inProgress, 6000),
+            ],
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('hides the avg-order-value trend when the previous period '
+        'had no priced orders', (tester) async {
+      // Today has a priced order; the previous day has none. avgOrderValueUgx
+      // returns 0 when nothing is priced, so a raw delta would fabricate a
+      // huge "up" chip against a non-existent baseline. The chip must be hidden.
+      final orders = [
+        _order('today', OrderStatus.completed, 10000,
+            paid: 10000, scheduledFor: DateTime(2026, 6, 17, 9)),
       ];
 
       await _pumpReport(tester, orders);
 
       expect(find.text('Avg order value'), findsOneWidget);
-      expect(find.text('USh 8,000'), findsWidgets); // 16,000 / 2
-      expect(find.text('Provisional'), findsOneWidget);
-      expect(find.text('Final'), findsOneWidget);
+      final aovCard = find.ancestor(
+        of: find.text('Avg order value'),
+        matching: find.byType(AppCard),
+      );
+      expect(
+        find.descendant(
+            of: aovCard, matching: find.byIcon(Icons.arrow_upward_rounded)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+            of: aovCard, matching: find.byIcon(Icons.arrow_downward_rounded)),
+        findsNothing,
+      );
+    });
+
+    testWidgets('keeps the avg-order-value hero on one line for large amounts '
+        'at 360px', (tester) async {
+      tester.view.physicalSize = const Size(360, 8000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              // Two large orders today whose AVERAGE (USh 12,345,678) is the
+              // hero — chosen so that value is unique in the tree (it isn't the
+              // billed/collected total 24,691,356 nor an estimated-revenue
+              // figure). A tiny order yesterday keeps the trend chip rendering,
+              // squeezing the hero's column to a narrow width.
+              _order('big1', OrderStatus.completed, 20000000,
+                  paid: 20000000, scheduledFor: DateTime(2026, 6, 17, 9)),
+              _order('big2', OrderStatus.completed, 4691356,
+                  paid: 4691356, scheduledFor: DateTime(2026, 6, 17, 10)),
+              _order('yest', OrderStatus.completed, 100,
+                  paid: 100, scheduledFor: DateTime(2026, 6, 16, 9)),
+            ],
+          ),
+        ),
+      ));
+
+      // The hero number must not wrap onto a second line — it should scale down
+      // to fit its column instead. A single line of the 22px hero lays out well
+      // under 40px tall; a wrapped second line pushes it past that.
+      final hero =
+          tester.renderObject<RenderParagraph>(find.text('USh 12,345,678'));
+      expect(hero.size.height, lessThan(40));
     });
   });
 

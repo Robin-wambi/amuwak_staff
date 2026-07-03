@@ -142,6 +142,7 @@ class _DailyReportViewState extends State<DailyReportView> {
 
     final breakdown = orders.revenueBreakdown;
     final avgOrderValue = orders.avgOrderValueUgx;
+    final prevAvgOrderValue = prevOrders.avgOrderValueUgx;
     final provisionalRevenue = orders.provisionalRevenueUgx;
     final finalRevenue = orders.finalRevenueUgx;
 
@@ -280,10 +281,16 @@ class _DailyReportViewState extends State<DailyReportView> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
-          _UnitEconomicsRow(
+          _UnitEconomicsCard(
             avgOrderValueUgx: avgOrderValue,
-            provisionalUgx: provisionalRevenue,
-            finalUgx: finalRevenue,
+            // No priced orders last period → avg is 0, which isn't a real
+            // baseline; pass null so the trend chip is hidden rather than
+            // showing a spurious full-value jump.
+            avgDeltaUgx: prevAvgOrderValue == 0
+                ? null
+                : avgOrderValue - prevAvgOrderValue,
+            estimatedUgx: provisionalRevenue,
+            confirmedUgx: finalRevenue,
           ),
           const SizedBox(height: AppSpacing.xl),
           _ReportMetricStrip(
@@ -523,18 +530,22 @@ class _ReportMetricCell extends StatelessWidget {
 const Color _trendGood = Color(0xFF2E7D32); // green 800
 
 /// A small ▲/▼ + delta chip for period-over-period trends. Renders nothing when
-/// there's no change. [upIsGood] flips the colour semantics: more collected is
-/// good (green up), but more outstanding is bad (red up).
+/// there's no change, or when [deltaUgx] is null — meaning there's no comparable
+/// prior baseline to trend against (e.g. the previous period had no priced
+/// orders), so a raw delta would fabricate a misleading swing from zero.
+/// [upIsGood] flips the colour semantics: more collected is good (green up), but
+/// more outstanding is bad (red up).
 class _TrendChip extends StatelessWidget {
   const _TrendChip({required this.deltaUgx, this.upIsGood = true});
 
-  final int deltaUgx;
+  final int? deltaUgx;
   final bool upIsGood;
 
   @override
   Widget build(BuildContext context) {
-    if (deltaUgx == 0) return const SizedBox.shrink();
-    final up = deltaUgx > 0;
+    final delta = deltaUgx;
+    if (delta == null || delta == 0) return const SizedBox.shrink();
+    final up = delta > 0;
     final good = up == upIsGood;
     final color = good ? _trendGood : Theme.of(context).colorScheme.error;
     return Row(
@@ -547,7 +558,7 @@ class _TrendChip extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         Text(
-          formatUgx(deltaUgx.abs()),
+          formatUgx(delta.abs()),
           style: TextStyle(
             color: color,
             fontSize: 12,
@@ -716,91 +727,199 @@ class _RevenueBreakdownCard extends StatelessWidget {
   }
 }
 
-/// Average order value alongside the provisional-vs-final revenue split.
-class _UnitEconomicsRow extends StatelessWidget {
-  const _UnitEconomicsRow({
+/// Unit economics as a single full-width card: average order value is the hero
+/// metric (with a period-over-period trend chip for context), and below it a
+/// "revenue confidence" proportion bar splits confirmed revenue (orders with a
+/// recorded final weight) from estimated revenue (still provisional). Rendered
+/// full-width by design so no metric is squeezed into a too-narrow column on
+/// small phones.
+class _UnitEconomicsCard extends StatelessWidget {
+  const _UnitEconomicsCard({
     required this.avgOrderValueUgx,
-    required this.provisionalUgx,
-    required this.finalUgx,
+    required this.avgDeltaUgx,
+    required this.estimatedUgx,
+    required this.confirmedUgx,
   });
 
   final int avgOrderValueUgx;
-  final int provisionalUgx;
-  final int finalUgx;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _MoneyStatCard(
-            title: 'Avg order value',
-            amountUgx: avgOrderValueUgx,
-            icon: Icons.receipt_long_outlined,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _RevenueRow(label: 'Provisional', amountUgx: provisionalUgx),
-                const SizedBox(height: AppSpacing.lg - 2),
-                _RevenueRow(label: 'Final', amountUgx: finalUgx),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+  /// Period-over-period change in average order value, or null when the previous
+  /// period has no comparable baseline (no priced orders) — see [_TrendChip].
+  final int? avgDeltaUgx;
 
-class _MoneyStatCard extends StatelessWidget {
-  const _MoneyStatCard({
-    required this.title,
-    required this.amountUgx,
-    required this.icon,
-  });
+  /// Revenue from orders still on an estimated (provisional) weight/price.
+  final int estimatedUgx;
 
-  final String title;
-  final int amountUgx;
-  final IconData icon;
+  /// Revenue from orders whose final weight has been recorded.
+  final int confirmedUgx;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final total = confirmedUgx + estimatedUgx;
+    final confirmedFraction = total == 0 ? 0.0 : confirmedUgx / total;
+    final confirmedPct = (confirmedFraction * 100).round();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.field - 3),
-            ),
-            child: Icon(icon, color: colorScheme.primary),
+          // Hero metric: average order value, with a trend chip vs the previous
+          // comparable period.
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.field - 3),
+                ),
+                child: Icon(Icons.receipt_long_outlined,
+                    color: colorScheme.primary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Avg order value',
+                      style: TextStyle(
+                        color: AppColors.secondaryText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs / 2),
+                    // Scale the hero down to fit its column rather than wrapping
+                    // onto a second line when the amount is large (many digits)
+                    // and the trend chip has squeezed the available width.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        formatUgx(avgOrderValueUgx),
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _TrendChip(deltaUgx: avgDeltaUgx),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg - 2),
-          Text(
-            formatUgx(amountUgx),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          const Divider(height: AppSpacing.xl),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Revenue confidence',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '$confirmedPct% confirmed',
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs / 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: AppSpacing.sm),
+          // Confirmed vs estimated split, using the same bar language as the
+          // status breakdown so the two read consistently.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.chip),
+            child: LinearProgressIndicator(
+              value: confirmedFraction,
+              minHeight: 9,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
             ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _ConfidenceLegend(
+                  label: 'Confirmed',
+                  amountUgx: confirmedUgx,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _ConfidenceLegend(
+                  label: 'Estimated',
+                  amountUgx: estimatedUgx,
+                  color: colorScheme.primary.withValues(alpha: 0.28),
+                  alignEnd: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One side of the revenue-confidence split: a colour dot + label with the
+/// amount beneath it. Stacked (not a single row) so the label and amount never
+/// have to share one line on a narrow phone.
+class _ConfidenceLegend extends StatelessWidget {
+  const _ConfidenceLegend({
+    required this.label,
+    required this.amountUgx,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final int amountUgx;
+  final Color color;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final cross =
+        alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    return Column(
+      crossAxisAlignment: cross,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs / 2),
+        Text(
+          formatUgx(amountUgx),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+        ),
+      ],
     );
   }
 }
