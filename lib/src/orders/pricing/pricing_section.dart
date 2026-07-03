@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../pricing/catalog_item.dart';
-import '../../shared/format_ugx.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../../shared/theme/app_card.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';

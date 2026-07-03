@@ -1,3 +1,4 @@
+import 'package:amuwak_staff/src/data/app_database.dart' show Customer;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
 import 'package:amuwak_staff/src/orders/service_type.dart';
@@ -286,6 +287,72 @@ void main() {
       expect(
         () => repo.updateStatus('x', OrderStatus.completed, actorStaffId: 's'),
         throwsStateError,
+      );
+    });
+  });
+
+  group('createPickup', () {
+    Customer customer({String id = 'c1'}) => Customer(
+          id: id,
+          name: 'Ada',
+          phone: '0700',
+          address: 'Kira',
+          notes: null,
+          createdAt: clock,
+          updatedAt: clock,
+          deletedAt: null,
+          customRatePerKgUgx: null,
+        );
+
+    test('calls the create_pickup RPC with p_customer + p_order and returns '
+        'the server order id + minted code', () async {
+      String? seenFn;
+      Map<String, dynamic>? seenParams;
+      final repo = OrdersRepository.forTest(
+        clock: () => clock,
+        rpc: (fn, params) async {
+          seenFn = fn;
+          seenParams = params;
+          return {'order_id': 'o1', 'order_code': 'AMW-2026-0007'};
+        },
+      );
+
+      final result = await repo.createPickup(
+        order(id: 'o1'),
+        customer(id: 'c1'),
+        actorStaffId: 's1',
+      );
+
+      expect(seenFn, 'create_pickup');
+      expect(seenParams!['p_customer'], isA<Map<String, dynamic>>());
+      expect((seenParams!['p_customer'] as Map)['id'], 'c1');
+      expect((seenParams!['p_order'] as Map)['id'], 'o1');
+      // The RPC owns the code/attribution; the client passes the descriptive +
+      // pricing fields.
+      expect((seenParams!['p_order'] as Map)['service_type'], 'Wash & Iron');
+      expect(result.orderId, 'o1');
+      expect(result.orderCode, 'AMW-2026-0007');
+    });
+
+    test('throws when the RPC returns a result without order_id/order_code',
+        () async {
+      final repo = OrdersRepository.forTest(
+        clock: () => clock,
+        rpc: (_, __) async => {'order_id': 'o1'}, // missing order_code
+      );
+      expect(
+        () => repo.createPickup(order(), customer(), actorStaffId: 's'),
+        throwsStateError,
+      );
+    });
+
+    test('a createPickup without an rpc override trips a descriptive assert',
+        () async {
+      final repo = OrdersRepository.forTest(clock: () => clock);
+      expect(
+        () => repo.createPickup(order(), customer(), actorStaffId: 's'),
+        throwsA(isA<AssertionError>()
+            .having((e) => e.message, 'message', contains('rpc'))),
       );
     });
   });

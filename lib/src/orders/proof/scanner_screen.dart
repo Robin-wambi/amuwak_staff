@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/order_code.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'barcode_reader.dart';
 import 'barcode_scanner_scaffold.dart';
 

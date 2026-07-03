@@ -56,11 +56,10 @@ void main() {
     customersRepo = _MockCustomersRepository();
     ordersRepo = _MockOrdersRepository();
     when(() => customersRepo.getAll()).thenAnswer((_) async => <Customer>[]);
-    when(() => customersRepo.upsertCustomer(any())).thenAnswer((_) async {});
-    when(() => ordersRepo.reserveOrderCode())
-        .thenAnswer((_) async => 'AMW-2026-0001');
-    when(() => ordersRepo.upsertOrder(any(),
-        actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+    when(() => ordersRepo.createPickup(any(), any(),
+            actorStaffId: any(named: 'actorStaffId')))
+        .thenAnswer((_) async =>
+            (orderId: 'uuid-order-1', orderCode: 'AMW-2026-0001'));
     // initState loads address suggestions from customers + orders.
     when(() => ordersRepo.getAll())
         .thenAnswer((_) async => const <LaundryOrder>[]);
@@ -177,31 +176,19 @@ void main() {
 
   testWidgets('rate label live-updates as a custom rate is typed',
       (tester) async {
+    // A tall viewport so the whole form (and the optional custom-rate field) is
+    // visible without scroll gymnastics — matches the sibling tests and is
+    // robust to the form's height changing as validation errors appear/clear.
+    useTallViewport(tester);
     await tester.pumpWidget(buildScreen(defaultRatePerKgUgx: 5000));
     expect(find.text('Rate: USh 5,000/kg'), findsOneWidget);
 
     // Expand optional details and enter a custom rate.
-    await tester.dragUntilVisible(
-      find.text('Add optional details'),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     await tester.tap(find.text('Add optional details'));
     await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_custom_rate')),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
     await tester.enterText(find.byKey(const Key('np_custom_rate')), '4500');
     await tester.pump();
 
-    // Scroll the label back into view and confirm it reflects the typed rate.
-    await tester.dragUntilVisible(
-      find.byKey(const Key('np_rate')),
-      find.byType(ListView),
-      const Offset(0, 200),
-    );
     expect(find.text('Rate: USh 4,500/kg'), findsOneWidget);
     expect(find.text('Rate: USh 5,000/kg'), findsNothing);
   });
@@ -225,8 +212,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final captured = verify(() => ordersRepo.upsertOrder(
+    final captured = verify(() => ordersRepo.createPickup(
           captureAny(),
+          any(),
           actorStaffId: any(named: 'actorStaffId'),
         )).captured.single as LaundryOrder;
     expect(captured.ratePerKgSnapshotUgx, 5000.0);
@@ -263,8 +251,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create pickup'));
     await tester.pumpAndSettle();
 
-    final captured = verify(() => ordersRepo.upsertOrder(
+    final captured = verify(() => ordersRepo.createPickup(
           captureAny(),
+          any(),
           actorStaffId: any(named: 'actorStaffId'),
         )).captured.single as LaundryOrder;
     expect(captured.ratePerKgSnapshotUgx, 4000.0);

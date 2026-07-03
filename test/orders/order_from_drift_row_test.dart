@@ -95,6 +95,18 @@ void main() {
       });
     });
 
+    test('every OrderStatus round-trips through toDbString → fromDriftRow', () {
+      // The Drift row stores the Postgres canonical string; mapping it back must
+      // recover the same enum for every status (guards the toDbString/mapper
+      // pair against drift). Lives here, not in amuwak_core, because it depends
+      // on the app-level LaundryOrder + Drift row.
+      for (final s in OrderStatus.values) {
+        final row = _orderRow(status: s.toDbString());
+        final mapped = LaundryOrder.fromDriftRow(row, const []);
+        expect(mapped.status, s, reason: 'for ${s.name} (db: ${s.toDbString()})');
+      }
+    });
+
     test('unknown status falls back to pendingPickup instead of throwing', () {
       // A status string added server-side before an app update must NOT crash
       // the orders stream — it degrades to pendingPickup.

@@ -1,53 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/data/app_database.dart' as drift;
-import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_status.dart';
-
-drift.Order _orderRow({
-  String id = 'AMW-1024',
-  String status = 'in_progress',
-  DateTime? scheduledFor,
-  DateTime? createdAt,
-  String customerName = 'Sarah N.',
-  String serviceType = 'Wash & Iron',
-  int itemCount = 8,
-  String phone = '+256 700 123 456',
-  String address = 'Kikoni',
-  String notes = '',
-}) {
-  final created = createdAt ?? DateTime.utc(2026, 5, 19, 10, 0);
-  return drift.Order(
-    id: id,
-    orderCode: id,
-    customerId: null,
-    customerName: customerName,
-    phone: phone,
-    address: address,
-    serviceType: serviceType,
-    status: status,
-    intakeMethod: 'driver_pickup',
-    fulfillmentMethod: 'delivery',
-    itemCount: itemCount,
-    notes: notes,
-    scheduledFor: scheduledFor,
-    assignedDriver: null,
-    intakeRecordedBy: 's-1',
-    createdBy: 's-1',
-    createdAt: created,
-    updatedAt: created,
-    deletedAt: null,
-    ratePerKgSnapshotUgx: 0,
-    lineItems: '[]',
-    manualAdjustmentUgx: 0,
-    totalUgx: 0,
-    deliveryFeeSnapshotUgx: 0,
-    isExpress: false,
-    expressFlatSnapshotUgx: 0,
-    expressPctSnapshot: 0,
-    paymentAmountUgx: 0,
-  );
-}
 
 void main() {
   group('OrderStatus', () {
@@ -98,14 +51,6 @@ void main() {
       for (final s in OrderStatus.values) {
         expect(OrderStatus.fromDbString(s.toDbString()), s,
             reason: 'for ${s.name}');
-      }
-    });
-
-    test('toDbString round-trips through LaundryOrder.fromDriftRow', () {
-      for (final s in OrderStatus.values) {
-        final row = _orderRow(status: s.toDbString());
-        final mapped = LaundryOrder.fromDriftRow(row, const []);
-        expect(mapped.status, s, reason: 'for ${s.name} (db: ${s.toDbString()})');
       }
     });
   });

@@ -39,7 +39,7 @@ import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../pricing/pricing_catalog_screen.dart';
-import '../shared/uuid.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';

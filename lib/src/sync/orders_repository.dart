@@ -2,11 +2,12 @@ import 'dart:developer' as developer;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/app_database.dart' show Customer;
 import '../orders/order.dart';
-import '../orders/order_status.dart';
 import '../orders/pricing/pricing_calculator.dart';
 import '../orders/pricing/pricing_inputs.dart';
-import '../shared/order_code.dart';
+import 'package:amuwak_core/amuwak_core.dart';
+import '../orders/order_status.dart';
 import 'supabase_mappers.dart';
 import 'supabase_payloads.dart';
 
@@ -22,6 +23,12 @@ typedef OrderUpdateById = Future<List<Map<String, dynamic>>> Function(
 /// [upsertOrder]'s payload + missing-write [StateError] without a live client.
 typedef OrderUpsert =
     Future<List<Map<String, dynamic>>> Function(Map<String, dynamic> values);
+
+/// Test seam for an RPC call: given the function name and params, returns its
+/// result. Lets unit tests exercise [createPickup]'s param shape + result
+/// parsing without a live SupabaseClient.
+typedef OrderRpc =
+    Future<dynamic> Function(String fn, Map<String, dynamic> params);
 
 /// Read/write repository for orders — ONLINE-ONLY mode.
 ///
@@ -43,7 +50,8 @@ class OrdersRepository {
   })  : _supabase = supabase,
         _clock = clock ?? DateTime.now,
         _updateOverride = null,
-        _upsertOverride = null;
+        _upsertOverride = null,
+        _rpcOverride = null;
 
   /// Test seam: inject the raw `update(...).eq('id', …).select('id')` and
   /// `upsert(...).select('id')` so unit tests can drive the write methods
@@ -54,15 +62,18 @@ class OrdersRepository {
     required DateTime Function() clock,
     OrderUpdateById? updateRow,
     OrderUpsert? upsertRow,
+    OrderRpc? rpc,
   })  : _supabase = null,
         _clock = clock,
         _updateOverride = updateRow,
-        _upsertOverride = upsertRow;
+        _upsertOverride = upsertRow,
+        _rpcOverride = rpc;
 
   final SupabaseClient? _supabase;
   final DateTime Function() _clock;
   final OrderUpdateById? _updateOverride;
   final OrderUpsert? _upsertOverride;
+  final OrderRpc? _rpcOverride;
 
   /// Dispatches an id-scoped column update and returns the selected rows so the
   /// caller can detect a no-op (empty ⇒ no row matched). Routes through the
@@ -92,6 +103,18 @@ class OrdersRepository {
         'forTest instance has no upsertRow — '
         'pass one to OrdersRepository.forTest(upsertRow: ...)');
     return _supabase!.from('orders').upsert(values).select('id');
+  }
+
+  /// Dispatches an RPC and returns its raw result. Routes through the test
+  /// override when constructed via [OrdersRepository.forTest], else the live
+  /// Supabase client.
+  Future<dynamic> _rpc(String fn, Map<String, dynamic> params) async {
+    final override = _rpcOverride;
+    if (override != null) return override(fn, params);
+    assert(_supabase != null,
+        'forTest instance has no rpc — '
+        'pass one to OrdersRepository.forTest(rpc: ...)');
+    return _supabase!.rpc(fn, params: params);
   }
 
   // ----- READ -----
@@ -251,6 +274,38 @@ class OrdersRepository {
       throw StateError(
           'upsertOrder: write did not persist order "${priced.orderId}"');
     }
+  }
+
+  /// Creates a pickup: upserts [customer] and inserts [order] atomically via the
+  /// `create_pickup` SECURITY DEFINER RPC (migration 0040), which owns the order
+  /// code and the audit/assignment columns server-side. This is the only
+  /// order-creation path that works for the rider (driver) role — a driver can't
+  /// write `customers` or self-attribute `orders` directly under RLS — and it
+  /// can't leave an orphan customer if the order fails. Returns the persisted
+  /// order id and the minted order code; idempotent on the (client-generated)
+  /// order id, so a retry with the same order reuses the first code.
+  Future<({String orderId, String orderCode})> createPickup(
+    LaundryOrder order,
+    Customer customer, {
+    required String actorStaffId,
+  }) async {
+    final now = _clock();
+    final priced = recomputeOrderTotal(order);
+    final result = await _rpc('create_pickup', {
+      'p_customer': customerUpsertPayload(customer, now: now),
+      'p_order':
+          orderUpsertPayload(priced, actorStaffId: actorStaffId, now: now),
+    });
+    if (result is! Map) {
+      throw StateError('create_pickup: unexpected result "$result"');
+    }
+    final map = Map<String, dynamic>.from(result);
+    final orderId = map['order_id'] as String?;
+    final orderCode = map['order_code'] as String?;
+    if (orderId == null || orderCode == null) {
+      throw StateError('create_pickup: missing order_id/order_code in $map');
+    }
+    return (orderId: orderId, orderCode: orderCode);
   }
 
   /// Updates only the pricing columns (+ updated_at), recomputing total_ugx.

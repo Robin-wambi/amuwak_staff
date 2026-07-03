@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../shared/uuid.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_radii.dart';
 import '../../shared/theme/app_spacing.dart';
