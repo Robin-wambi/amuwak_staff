@@ -76,6 +76,8 @@ class OutboxWorker {
           await client.from(forTable).delete().eq('id', rowId);
           break;
         case 'rpc':
+          // For rpc ops [forTable] holds the Postgres function name (e.g.
+          // 'create_pickup'), not a table, and [payload] is the params map.
           await client.rpc(forTable, params: payload);
           break;
         default:

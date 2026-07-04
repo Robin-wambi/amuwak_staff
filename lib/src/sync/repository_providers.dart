@@ -16,14 +16,14 @@ import 'sync_status.dart';
 
 /// Riverpod providers for the repositories.
 ///
-/// ONLINE-ONLY mode: the read/write repos talk directly to Supabase via
-/// [supabaseClientProvider]. The offline write infrastructure
-/// ([outboxRepositoryProvider], [pullDeadLetterRepositoryProvider]) is kept
-/// defined but is no longer watched by the live app — the SyncOrchestrator is
-/// disabled, the banner removed, and the SyncErrorsScreen unreachable, so the
-/// local Drift database (lazily opened on first query) is never opened.
-/// Re-point the five repo providers back at [appDatabaseProvider] +
-/// [outboxRepositoryProvider] to restore offline mode.
+/// OFFLINE-FIRST for orders + proof: [ordersRepositoryProvider] and
+/// [proofEventsRepositoryProvider] read from the local Drift DB and queue writes
+/// on [outboxRepositoryProvider]. The [SyncOrchestrator] (started from main.dart
+/// via `syncLifecycleProvider`) drains the outbox and pulls server changes in
+/// the background, so the local Drift database is opened (lazily, on first use)
+/// once a session is active. Customers/staff/status repos still read directly
+/// from Supabase via [supabaseClientProvider] — flipping those to local reads is
+/// a follow-up.
 
 /// Singleton Supabase client. Tests override this with a mock/fake client.
 ///
@@ -67,9 +67,9 @@ final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
   (ref) => StatusEventsRepository(ref.watch(supabaseClientProvider)),
 );
 
-// OFFLINE write infra — preserved, unused in online-only mode. Still depends on
-// [appDatabaseProvider]; only ever constructed if something watches them
-// (nothing in the live app does), so the local DB stays closed.
+// Outbox + pull-dead-letter repos backing the offline write path. Watched by
+// the orders/proof providers above and the SyncOrchestrator, so the local Drift
+// DB is opened (lazily, on first use) once a session is active.
 final outboxRepositoryProvider = Provider<OutboxRepository>(
   (ref) => OutboxRepository(ref.watch(appDatabaseProvider)),
 );

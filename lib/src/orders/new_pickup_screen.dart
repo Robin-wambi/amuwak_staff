@@ -7,7 +7,6 @@ import 'package:amuwak_core/amuwak_core.dart';
 import '../data/app_database.dart' show Customer;
 import '../sync/customers_repository.dart';
 import '../sync/orders_repository.dart';
-import '../sync/sync_failure_policy.dart';
 import 'geo_services.dart';
 import 'new_pickup_result.dart';
 import 'order.dart';
@@ -32,17 +31,6 @@ bool scheduledTimeIsInPast(DateTime chosen, DateTime now) {
   return chosen.isBefore(nowMinute);
 }
 
-String _friendlyCreatePickupFailure(Object error, {required String fallback}) {
-  final friendly = friendlySyncError(error.toString());
-  if (friendly.startsWith('Connection problem')) {
-    return 'Connection problem. Check your connection and try again.';
-  }
-  if (friendly == 'Could not be saved.' ||
-      friendly == 'Could not be saved (server rejected it).') {
-    return fallback;
-  }
-  return friendly;
-}
 
 class NewPickupScreen extends StatefulWidget {
   const NewPickupScreen({
@@ -476,7 +464,8 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
     final orderId = _pendingOrderId ??= widget.orderIdGenerator();
     final scheduled = _scheduledFor;
     // orderCode is minted server-side by create_pickup; the local order carries
-    // the default (orderId) until the realtime stream re-delivers the coded row.
+    // the default (orderId) as a placeholder until the SyncPuller pulls the
+    // synced server row back with the real code (reconciliation via local DB).
     final order = LaundryOrder(
       orderId: orderId,
       customerId: customer.id,
@@ -513,24 +502,26 @@ class _NewPickupScreenState extends State<NewPickupScreen> {
         actorStaffId: widget.actorStaffId,
       );
     } catch (e, st) {
+      // Offline-first: createPickup writes to the local Drift DB and enqueues the
+      // create_pickup RPC on the outbox, so it throws only for a genuine on-device
+      // write failure — not for network/RLS/server-rejection, which now happen
+      // asynchronously in OutboxWorker. A server rejection of the queued RPC
+      // surfaces via the sync-status UX (SyncErrorsScreen), not here.
+      // TODO(sync-status-ux): loop async create_pickup rejections back to the
+      // rider so a rejected pickup isn't silently left pending on this device.
       developer.log(
-        'create_pickup failed during pickup creation.',
+        'create_pickup local save failed.',
         name: 'NewPickupScreen',
         error: e,
         stackTrace: st,
       );
       if (!mounted) return;
       setState(() => _saving = false);
-      final reason = _friendlyCreatePickupFailure(
-        e,
-        fallback: 'The server did not accept the pickup.',
-      );
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 8),
+        const SnackBar(
+          duration: Duration(seconds: 8),
           content: Text(
-            'Could not save the pickup. $reason\n'
-            'Tap Create pickup again to retry.',
+            'Could not save the pickup on this device. Please try again.',
           ),
         ),
       );
