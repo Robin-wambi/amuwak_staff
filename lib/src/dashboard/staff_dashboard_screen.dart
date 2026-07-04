@@ -36,14 +36,12 @@ import 'package:amuwak_core/amuwak_core.dart';
 import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
-// ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
-// orchestrator, local DB) are disabled. Re-add these imports with the
-// commented code below to restore offline:
+import '../sync/sync_orchestrator_provider.dart';
+import '../sync/sync_status.dart';
+// Phase 5 (offline UX): re-add these to surface pending/dead-letter state.
 // import '../shared/widgets/sync_status_banner.dart';
 // import '../sync/sync_errors_provider.dart';
 // import '../sync/sync_errors_screen.dart';
-// import '../sync/sync_orchestrator_provider.dart';
-// import '../sync/sync_status.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
@@ -184,11 +182,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // No navigation here — AuthGate routes to LoginScreen once the session clears.
   }
 
-  /// Production wiring: resolves the auth service from Riverpod and hands it to
-  /// [signOutAndReset]. ONLINE-ONLY: the offline teardown (orchestrator.stop +
-  /// local-DB truncate) is disabled, so only the auth sign-out is wired here.
+  /// Production wiring: resolves the auth service, sync orchestrator, and local
+  /// database from Riverpod and hands them to [signOutAndReset], which stops the
+  /// sync engine and truncates the local cache before revoking the session.
   Future<void> _defaultSignOut(WidgetRef ref) {
-    return signOutAndReset(auth: ref.read(authServiceProvider));
+    return signOutAndReset(
+      auth: ref.read(authServiceProvider),
+      orchestrator: ref.read(syncOrchestratorProvider),
+      db: ref.read(appDatabaseProvider),
+    );
   }
 
   Future<void> _handleNewPickup() async {

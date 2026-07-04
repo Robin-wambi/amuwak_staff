@@ -1,11 +1,3 @@
-@Skip('Online-only mode: signOutAndReset no longer stops the sync orchestrator '
-    'or truncates the local Drift DB (those are offline-only concerns). This '
-    'test asserts that removed teardown behaviour. Original preserved in git '
-    'history; restore alongside the OFFLINE teardown block in '
-    'lib/src/auth/sign_out.dart when re-enabling offline. Online sign-out '
-    '(auth.signOut only) is exercised via the dashboard sign-out widget test.')
-library;
-
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';

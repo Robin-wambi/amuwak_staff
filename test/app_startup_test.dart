@@ -1,11 +1,3 @@
-@Skip('Online-only mode: main.dart no longer mounts syncLifecycleProvider, so '
-    'the SyncOrchestrator is not started/stopped on auth changes. This test '
-    'asserts that removed startup wiring. Original preserved in git history; '
-    'restore alongside the syncLifecycleProvider watch in lib/main.dart when '
-    're-enabling offline. The login-renders-at-startup case is covered by '
-    'test/widget_test.dart.')
-library;
-
 import 'dart:async';
 
 import 'package:drift/native.dart';
@@ -53,6 +45,13 @@ void main() {
           appDatabaseProvider.overrideWithValue(db),
           syncOrchestratorProvider.overrideWithValue(orchestrator),
           authStateProvider.overrideWith((ref) => authController.stream),
+          // AuthGate reads these; pin them to "signed out" so it renders
+          // LoginScreen without touching the uninitialised Supabase.instance
+          // (currentUserIdProvider otherwise falls back to
+          // authServiceProvider.currentUser). The orchestrator start/stop
+          // assertions below drive off authStateProvider, not these.
+          currentUserIdProvider.overrideWithValue(null),
+          currentAuthEventProvider.overrideWithValue(null),
         ],
         child: const AmuwakStaffApp(),
       ),
