@@ -21,17 +21,11 @@ class AppBootstrap {
       anonKey: config.supabaseAnonKey,
       httpClient: TimeoutHttpClient(http.Client()),
     );
-    // ONLINE-ONLY: the local Drift database is no longer used at runtime, so we
-    // skip opening/seeding it here. Data comes straight from Supabase. Restore
-    // the block below (and re-enable the sync orchestrator) to bring offline
-    // back:
-    //
-    //   final db = AppDatabase();
-    //   try {
-    //     await runSeed(db, OrdersSeeder());
-    //   } finally {
-    //     await db.close();
-    //   }
+    // The local Drift DB is opened lazily by the SyncOrchestrator (via
+    // appDatabaseProvider) once a session is active — see main.dart's
+    // syncLifecycleProvider — and the SyncPuller fills it from Supabase on
+    // sign-in. We intentionally don't eagerly open/seed it here. [runSeed] below
+    // stays for tests that want a pre-populated DB without spinning up Supabase.
   }
 
   /// Test-visible seed entry — accepts an injected DB + seeder so tests
