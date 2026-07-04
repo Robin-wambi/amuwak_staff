@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'src/auth/auth_gate.dart';
 import 'src/bootstrap/app_bootstrap.dart';
 import 'src/printing/printing_providers.dart';
-import 'src/shared/widgets/app_theme.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 // ONLINE-ONLY: the sync orchestrator (offline engine) is disabled. Re-add this
 // import and the `ref.watch(syncLifecycleProvider)` below to restore offline.
 // import 'src/sync/sync_orchestrator_provider.dart';

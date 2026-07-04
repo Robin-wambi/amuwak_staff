@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/shared/motion/reveal_on_mount.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   testWidgets('child is fully opaque after the reveal settles',

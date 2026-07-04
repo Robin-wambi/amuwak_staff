@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../pricing/catalog_item.dart';
 import 'package:amuwak_core/amuwak_core.dart';
-import '../../shared/theme/app_card.dart';
-import '../../shared/theme/app_colors.dart';
-import '../../shared/theme/app_spacing.dart';
 import 'line_item.dart';
 
 /// Editable list of free-form line items, with an "Add item" button. Stateless:

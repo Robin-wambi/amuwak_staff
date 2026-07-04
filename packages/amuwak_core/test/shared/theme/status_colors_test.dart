@@ -1,7 +1,6 @@
 import 'dart:ui';
 
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/shared/theme/status_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

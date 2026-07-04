@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:amuwak_staff/src/shared/theme/app_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

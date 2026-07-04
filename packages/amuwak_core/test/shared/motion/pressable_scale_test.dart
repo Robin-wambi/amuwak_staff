@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/shared/motion/pressable_scale.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   testWidgets('forwards tap to onTap', (tester) async {

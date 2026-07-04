@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/app_database.dart';
-import '../shared/theme/app_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'repository_providers.dart';
 import 'sync_errors_provider.dart';
 import 'sync_failure_policy.dart';
