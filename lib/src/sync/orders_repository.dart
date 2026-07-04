@@ -6,7 +6,7 @@ import '../data/app_database.dart';
 import '../orders/order.dart';
 import '../orders/pricing/pricing_calculator.dart';
 import '../orders/pricing/pricing_inputs.dart';
-import 'package:amuwak_core/amuwak_core.dart';
+import '../orders/order_status.dart';
 import 'outbox_repository.dart';
 import 'supabase_payloads.dart';
 
@@ -318,6 +318,38 @@ class OrdersRepository {
         op: 'update',
         rowId: orderId,
         payload: orderSoftDeletePayload(actorStaffId: actorStaffId, now: now),
+      );
+    });
+  }
+
+  /// Updates only the payment amount (+ updated_at), so the finance report can
+  /// net collected payments. Local Drift write + outbox enqueue.
+  Future<void> updatePayment(String orderId, int amountUgx,
+      {required String actorStaffId}) async {
+    final outbox = _requireOutbox();
+    final now = _clock();
+    await _db.transaction(() async {
+      final affected = await (_db.update(_db.orders)
+            ..where((t) => t.id.equals(orderId)))
+          .write(OrdersCompanion(
+            paymentAmountUgx: Value(amountUgx),
+            updatedBy: Value(actorStaffId),
+            updatedAt: Value(now),
+          ));
+      if (affected == 0) {
+        throw StateError('updatePayment: no order with id "$orderId"');
+      }
+      await outbox.enqueue(
+        id: OutboxRepository.dedupKeyFor(
+            forTable: 'orders',
+            op: 'update',
+            rowId: orderId,
+            extra: 'payment:${now.toUtc().toIso8601String()}'),
+        forTable: 'orders',
+        op: 'update',
+        rowId: orderId,
+        payload: orderPaymentUpdatePayload(amountUgx,
+            actorStaffId: actorStaffId, now: now),
       );
     });
   }
