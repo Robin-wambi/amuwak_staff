@@ -42,7 +42,10 @@ final supabaseClientProvider =
     Provider<SupabaseClient>((_) => Supabase.instance.client);
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(
-  (ref) => OrdersRepository(ref.watch(supabaseClientProvider)),
+  (ref) => OrdersRepository(
+    ref.watch(appDatabaseProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+  ),
 );
 
 final customersRepositoryProvider = Provider<CustomersRepository>(
@@ -54,7 +57,10 @@ final staffRepositoryProvider = Provider<StaffRepository>(
 );
 
 final proofEventsRepositoryProvider = Provider<ProofEventsRepository>(
-  (ref) => ProofEventsRepository(ref.watch(supabaseClientProvider)),
+  (ref) => ProofEventsRepository(
+    ref.watch(appDatabaseProvider),
+    outbox: ref.watch(outboxRepositoryProvider),
+  ),
 );
 
 final statusEventsRepositoryProvider = Provider<StatusEventsRepository>(
