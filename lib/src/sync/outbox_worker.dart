@@ -56,18 +56,27 @@ class OutboxWorker {
   Future<void>? _inFlightDrain;
 
   /// Default dispatcher backed by the real Supabase client.
+  ///
+  /// The `rpc` op calls a Postgres function ([forTable] is the function name,
+  /// [payload] the params) instead of a table write — used for `create_pickup`,
+  /// which a rider cannot do as a direct `orders`/`customers` insert under RLS.
+  /// The RPC is idempotent server-side and the real minted `order_code` is
+  /// reconciled onto the local placeholder row by the puller (it pulls the now-
+  /// synced server row), so the dispatcher does not need the RPC's return value.
   static OutboxDispatch supabaseDispatcher(SupabaseClient client) {
     return (forTable, op, rowId, payload) async {
-      final table = client.from(forTable);
       switch (op) {
         case 'insert':
-          await table.insert(payload);
+          await client.from(forTable).insert(payload);
           break;
         case 'update':
-          await table.update(payload).eq('id', rowId);
+          await client.from(forTable).update(payload).eq('id', rowId);
           break;
         case 'delete':
-          await table.delete().eq('id', rowId);
+          await client.from(forTable).delete().eq('id', rowId);
+          break;
+        case 'rpc':
+          await client.rpc(forTable, params: payload);
           break;
         default:
           throw StateError('OutboxWorker: unknown op "$op"');
