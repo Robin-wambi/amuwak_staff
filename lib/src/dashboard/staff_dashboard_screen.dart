@@ -252,13 +252,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     }
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
-    // The order was just written to Supabase; the realtime stream re-emits
-    // asynchronously once the insert round-trips back over the WebSocket. Poll
-    // the snapshot before giving up — without this the new pickup lands on the
-    // dashboard instead of PickupCaptureScreen because the stream hadn't
-    // delivered the order yet. The window (20 × 100ms = 2s) allows for mobile
-    // realtime latency (~100-500ms, more on a slow link); beyond it we fall
+    // createPickup commits the order to the local Drift DB synchronously before
+    // returning, and ordersStreamProvider watches Drift — so the new order is
+    // normally in the snapshot on the first iteration. Poll defensively anyway:
+    // the Drift watch → Riverpod rebuild hop is async, so the freshly-written
+    // row may not have propagated into ordersStreamProvider's value on the very
+    // first read. Without this, the new pickup would land on the dashboard
+    // instead of PickupCaptureScreen if the rebuild hadn't fired yet. The window
+    // (20 × 100ms = 2s) is generous slack for that local hop; beyond it we fall
     // back to the "open from the list" hint below.
+    // TODO(phase-5): local reads make this synchronous — read the order directly
+    // after createPickup returns instead of polling. See the plan doc.
     LaundryOrder? newOrder;
     for (var attempt = 0; attempt < 20; attempt++) {
       final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];

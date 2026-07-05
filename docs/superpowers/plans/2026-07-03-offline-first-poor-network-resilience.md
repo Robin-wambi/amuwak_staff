@@ -34,10 +34,12 @@ rider **cannot** do. Solution:
   `payloadJson={ p_customer:{…}, p_order:{…} }` (both in one row → mirrors the RPC's atomicity, one
   outbox row per pickup, dedup anchor = `create_pickup:rpc:<orderId>`).
 - **Extend `OutboxWorker.supabaseDispatcher`** with an `rpc` branch that calls
-  `client.rpc('create_pickup', params: payload)`. The dispatch closure runs *before* `markSent`
-  (`outbox_worker.dart:96`), so give the factory a `reconcile(orderId, orderCode)` callback that
-  writes the server-returned `order_code` into the local Drift row on success — wired at
-  `sync_orchestrator_provider.dart:27`.
+  `client.rpc('create_pickup', params: payload)`. The dispatcher does **not** need the RPC's return
+  value: reconciliation of the real minted `order_code` onto the local placeholder row happens via the
+  **puller** pulling the now-synced server row back (its `insertOrReplace` on the same `id` overwrites
+  the placeholder — see Problem 2). This is simpler than a `reconcile(orderId, orderCode)` callback
+  wired into the dispatcher, and it's what shipped. (An earlier draft of this plan proposed the
+  callback; the puller pull-back subsumes it.)
 - **Placeholder code:** create the local order with a blank `order_code`. `LaundryOrder.orderCode`
   already falls back to `orderId` when blank, so the placeholder mechanism is half-built. The UI shows
   a friendly "New order (pending sync)" instead of the raw UUID (Gap B below).
@@ -85,8 +87,9 @@ Files: `lib/src/sync/repository_providers.dart`, `lib/src/bootstrap/app_bootstra
 
 **Phase 3 — Order/status/proof writes through the outbox.** This is the heart of the fix.
 - Restore the OFFLINE write bodies (Drift insert + `outbox.enqueue`) for orders/customers/proof/status.
-- Implement **Problem 1**: add the `rpc` op + dispatcher branch + `reconcileCreatePickup`; offline
-  `createPickup` writes local placeholder + enqueues the `create_pickup` rpc row.
+- Implement **Problem 1**: add the `rpc` op + dispatcher branch (reconciliation is handled by the
+  puller pulling the synced row back, not a dispatcher callback); offline `createPickup` writes local
+  placeholder + enqueues the `create_pickup` rpc row.
 - Add the offline methods missing from the preserved block: `updateOrderDetails`, `updatePricing`,
   `softDelete` (all as `orders:update`).
 - Restore sign-out teardown (`orchestrator.stop()` + local truncate) in `lib/src/auth/sign_out.dart`
@@ -125,9 +128,9 @@ photo cleanup (delete the JPEG only after **both** the Storage upload **and** th
 confirmed sent), cap per-order photos (already `_maxPhotos=3`).
 
 ## Critical files
-- `lib/src/sync/orders_repository.dart` — offline body + `createPickup`/`reconcileCreatePickup`/updates/softDelete
-- `lib/src/sync/outbox_worker.dart` — new `rpc` op branch + reconcile hook in `supabaseDispatcher`
-- `lib/src/sync/sync_orchestrator_provider.dart` — pass reconcile callback into the dispatcher
+- `lib/src/sync/orders_repository.dart` — offline body + `createPickup`/updates/softDelete
+- `lib/src/sync/outbox_worker.dart` — new `rpc` op branch in `supabaseDispatcher` (puller reconciles `order_code`)
+- `lib/src/sync/sync_orchestrator_provider.dart` — wire the dispatcher (no reconcile callback needed)
 - `lib/src/sync/repository_providers.dart` — rewire 5 repos from `SupabaseClient` → Drift + outbox
 - `lib/src/bootstrap/app_bootstrap.dart` + `lib/main.dart` — open DB/seed, timeouts, `ref.watch(syncLifecycleProvider)`
 - `lib/src/sync/photo_upload_worker.dart` (new) + `lib/src/orders/proof/proof_photos_repository.dart` (new)
@@ -150,9 +153,10 @@ confirmed sent), cap per-order photos (already `_maxPhotos=3`).
 ## Verification
 - **Unit (TDD, one test file at a time — multi-path `flutter test` hangs on this Windows host):**
   `flutter test test/outbox_worker_test.dart` (new `rpc`-op case), `.../orders_repository_mutations_test.dart`
-  (offline create/update + dedup + reconcile), `.../photo_upload_worker_test.dart`,
+  (offline create/update + dedup), `.../photo_upload_worker_test.dart`,
   `.../proof_photos_repository_test.dart`, un-skipped `test/end_to_end_sync_test.dart` +
-  `test/sync_puller_test.dart`, and the UX widget tests (`order_card`, dashboard banner/badge).
+  `test/sync_puller_test.dart` (placeholder → real `order_code` reconciliation via the puller), and
+  the UX widget tests (`order_card`, dashboard banner/badge).
 - **Coverage:** `flutter test --coverage && bash coverage/summary.sh` back to ~98% after Phase 6.
 - **Manual acceptance (the real fix):** turn connectivity **off** → Create pickup → order appears
   instantly with a "pending sync" chip and friendly code → turn connectivity **on** → within one worker
