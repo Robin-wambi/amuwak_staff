@@ -64,7 +64,18 @@ class OutboxRepository {
   Future<List<OutboxData>> peekPending({required int limit}) {
     final query = _db.select(_db.outbox)
       ..where((t) => t.status.isIn(<String>['pending', 'failed']))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+      // Drain in strict enqueue order. `created_at` alone is NOT enough: it is
+      // second-granularity (Drift's `currentDateAndTime`), so two mutations
+      // enqueued in the same second share a timestamp and would drain in an
+      // undefined order. That matters because a `create_pickup` RPC and a
+      // follow-up `orders:update` for the SAME order can tie — dispatch the
+      // update first and it hits 0 server rows (a silent no-op that "succeeds"
+      // and is deleted), losing the change. SQLite's implicit `rowid` is a
+      // monotonic insertion counter, so ordering by it guarantees the create
+      // drains before any later write to the same row. (`rowid`, spelled
+      // without an underscore, is the implicit rowid — distinct from this
+      // table's `row_id` TEXT column, which holds the mutation's target id.)
+      ..orderBy([(_) => OrderingTerm.asc(const CustomExpression<int>('rowid'))])
       ..limit(limit);
     return query.get();
   }

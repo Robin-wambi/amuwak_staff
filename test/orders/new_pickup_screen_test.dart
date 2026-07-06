@@ -560,9 +560,12 @@ void main() {
       await tester.pump();
 
       // The rider sees actionable copy, while raw Postgres/Supabase details
-      // stay in developer logs.
+      // stay in developer logs. (Offline-first: createPickup throws only on a
+      // local write failure; a server-side RLS/validation rejection of the
+      // queued create_pickup RPC surfaces asynchronously via the sync-status UX,
+      // not on this screen.)
       expect(
-        find.textContaining('Not allowed on the server (permissions).'),
+        find.textContaining('Could not save the pickup on this device.'),
         findsOneWidget,
       );
       expect(find.textContaining('PostgrestException'), findsNothing);

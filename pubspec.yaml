@@ -50,6 +50,9 @@ dependencies:
 
   # Backend + offline sync
   supabase_flutter: ^2.5.0
+  # Direct dep so we can pass a timeout-wrapping Client to Supabase.initialize
+  # (timeout_http_client.dart). Already resolved transitively via supabase.
+  http: ^1.2.0
   drift: ^2.18.0
   drift_flutter: ^0.2.0
   sqlite3: ^2.4.0

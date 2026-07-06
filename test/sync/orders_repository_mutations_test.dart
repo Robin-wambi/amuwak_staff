@@ -1,21 +1,39 @@
-import 'package:amuwak_staff/src/data/app_database.dart' show Customer;
-import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
-import 'package:amuwak_staff/src/sync/orders_repository.dart';
+import 'dart:convert';
+
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Unit-tests the id-scoped write methods through the [OrdersRepository.forTest]
-/// seam: the dispatched column map (payload shape + audit pointers) and the
-/// no-op [StateError] guard, without a live SupabaseClient. The pure payload
-/// shapes are pinned separately in supabase_payloads_test.dart; here we verify
-/// the repository wires the right id + payload and reacts to an empty result.
+import 'package:amuwak_staff/src/data/app_database.dart';
+import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_staff/src/orders/order.dart';
+import 'package:amuwak_staff/src/sync/orders_repository.dart';
+import 'package:amuwak_staff/src/sync/outbox_repository.dart';
+
+/// Offline-first mutation wiring for [OrdersRepository]: each write lands in the
+/// local Drift `orders` table AND enqueues the right outbox row (forTable/op/
+/// rowId/payload). Complements orders_repository_write_test.dart (upsertOrder +
+/// updateStatus) with the createPickup RPC path and the pricing/details/
+/// soft-delete updates. Pure payload shapes are pinned in
+/// supabase_payloads_test.dart; here we verify the repo writes locally and
+/// queues the matching mutation.
 void main() {
   final clock = DateTime.utc(2026, 6, 24, 10, 30);
+  late AppDatabase db;
+  late OutboxRepository outbox;
+  late OrdersRepository repo;
 
-  LaundryOrder order({String id = 'o1'}) => LaundryOrder(
+  setUp(() {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    outbox = OutboxRepository(db);
+    repo = OrdersRepository(db, outbox: outbox, clock: () => clock);
+  });
+
+  tearDown(() async => db.close());
+
+  LaundryOrder order({String id = 'o1', String code = 'AMW-1'}) => LaundryOrder(
         orderId: id,
-        orderCode: 'AMW-1',
+        orderCode: code,
         customerName: 'Ada',
         serviceType: ServiceType.washAndIron,
         status: OrderStatus.inProgress,
@@ -30,138 +48,121 @@ void main() {
         totalUgx: 19500,
       );
 
-  /// A repo whose update dispatch records the (id, values) and reports
-  /// [matched] rows (empty ⇒ no row found ⇒ StateError).
-  OrdersRepository repoThat({
-    required void Function(String id, Map<String, dynamic> values) record,
-    bool matched = true,
-  }) =>
-      OrdersRepository.forTest(
-        clock: () => clock,
-        updateRow: (id, values) async {
-          record(id, values);
-          return matched ? [<String, dynamic>{'id': id}] : const [];
-        },
+  Customer customer({String id = 'c1'}) => Customer(
+        id: id,
+        name: 'Ada',
+        phone: '0700',
+        address: 'Kira',
+        notes: null,
+        createdAt: clock,
+        updatedAt: clock,
+        deletedAt: null,
+        customRatePerKgUgx: null,
       );
 
-  group('forTest misuse', () {
-    test('a write without updateRow trips a descriptive assert, not a bare '
-        'null-check crash', () async {
-      // forTest with no updateRow leaves both the override and _supabase null;
-      // the guard in _updateById must name the omission rather than crashing
-      // opaquely on _supabase!.
-      final repo = OrdersRepository.forTest(clock: () => clock);
-      expect(
-        () => repo.softDelete('o1', actorStaffId: 's'),
-        throwsA(isA<AssertionError>().having(
-            (e) => e.message, 'message', contains('updateRow'))),
-      );
-    });
-  });
+  /// Inserts a base order row so update/soft-delete tests have something to hit.
+  Future<void> seed(String id) =>
+      db.into(db.orders).insert(OrdersCompanion.insert(
+            id: id,
+            orderCode: id,
+            customerName: 'Ada',
+            phone: '0700',
+            address: 'Kira',
+            serviceType: ServiceType.washAndIron.toDbString(),
+            status: 'in_progress',
+            intakeMethod: 'driver_pickup',
+            fulfillmentMethod: 'delivery',
+            itemCount: 5,
+            intakeRecordedBy: 's-1',
+            createdBy: 's-1',
+          ));
 
-  group('upsertOrder', () {
-    /// A repo whose upsert dispatch records the column map and reports whether
-    /// the write persisted (empty rows ⇒ nothing written ⇒ StateError).
-    OrdersRepository repoThatUpserts({
-      required void Function(Map<String, dynamic> values) record,
-      bool persisted = true,
-    }) =>
-        OrdersRepository.forTest(
-          clock: () => clock,
-          upsertRow: (values) async {
-            record(values);
-            return persisted
-                ? [<String, dynamic>{'id': values['id']}]
-                : const [];
-          },
-        );
+  Future<Map<String, dynamic>> singlePendingPayload() async {
+    final pending = await outbox.peekPending(limit: 10);
+    expect(pending, hasLength(1));
+    return jsonDecode(pending.single.payloadJson) as Map<String, dynamic>;
+  }
 
-    test('dispatches the recomputed upsert payload + creation audit pointers',
+  group('createPickup', () {
+    test('writes local customer + order and enqueues a create_pickup rpc row',
         () async {
-      late Map<String, dynamic> values;
-      final repo = repoThatUpserts(record: (v) => values = v);
+      final result = await repo.createPickup(
+          order(id: 'o1'), customer(id: 'c1'), actorStaffId: 's1');
 
-      final o = order();
-      await repo.upsertOrder(o, actorStaffId: 'staff-7');
+      expect(result.orderId, 'o1');
 
-      expect(values['id'], 'o1');
-      expect(values['order_code'], 'AMW-1');
-      expect(values['customer_name'], 'Ada');
-      expect(values['created_by'], 'staff-7');
-      expect(values['intake_recorded_by'], 'staff-7');
-      expect(values['created_at'], '2026-06-24T10:30:00.000Z');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
-      // total_ugx is the recomputed total, not the stored snapshot.
-      expect(values['total_ugx'],
-          OrdersRepository.recomputeOrderTotal(o).totalUgx);
+      expect((await db.select(db.orders).get()).single.id, 'o1');
+      expect((await db.select(db.customers).get()).single.id, 'c1');
+
+      final pending = await outbox.peekPending(limit: 10);
+      expect(pending, hasLength(1));
+      expect(pending.single.forTable, 'create_pickup');
+      expect(pending.single.op, 'rpc');
+      expect(pending.single.rowId, 'o1');
+      final payload =
+          jsonDecode(pending.single.payloadJson) as Map<String, dynamic>;
+      expect((payload['p_customer'] as Map)['id'], 'c1');
+      expect((payload['p_order'] as Map)['id'], 'o1');
+      // The RPC owns the code/attribution; the client passes descriptive +
+      // pricing fields.
+      expect((payload['p_order'] as Map)['service_type'], 'Wash & Iron');
     });
 
-    test('throws StateError when the write did not persist', () async {
-      final repo = repoThatUpserts(record: (_) {}, persisted: false);
+    test('is idempotent: a retry with the same order id does not duplicate',
+        () async {
+      await repo.createPickup(order(id: 'o1'), customer(id: 'c1'),
+          actorStaffId: 's1');
+      await repo.createPickup(order(id: 'o1'), customer(id: 'c1'),
+          actorStaffId: 's1');
+
+      expect(await db.select(db.orders).get(), hasLength(1));
+      expect(await outbox.peekPending(limit: 10), hasLength(1),
+          reason: 'the create_pickup:rpc:<id> dedup key absorbs the retry');
+    });
+
+    test('without an outbox throws StateError', () async {
+      final noOutbox = OrdersRepository(db, clock: () => clock);
       expect(
-        () => repo.upsertOrder(order(), actorStaffId: 's'),
+        () => noOutbox.createPickup(order(), customer(), actorStaffId: 's'),
         throwsStateError,
-      );
-    });
-
-    test('a forTest instance without upsertRow trips a descriptive assert',
-        () async {
-      final repo = OrdersRepository.forTest(clock: () => clock);
-      expect(
-        () => repo.upsertOrder(order(), actorStaffId: 's'),
-        throwsA(isA<AssertionError>()
-            .having((e) => e.message, 'message', contains('upsertRow'))),
       );
     });
   });
 
   group('updatePricing', () {
-    // A priced order whose stored total_ugx (19500) is deliberately stale vs
-    // its inputs, so the test can prove updatePricing dispatches the RECOMPUTED
-    // total rather than echoing the stored one.
     LaundryOrder pricedOrder() => order().copyWith(
           finalWeightKg: 4,
           manualAdjustmentUgx: 500,
           deliveryFeeSnapshotUgx: 2000,
         );
 
-    test('dispatches recomputed pricing columns + updated_at for the order id',
+    test('writes recomputed pricing locally and enqueues an update row',
         () async {
-      late String gotId;
-      late Map<String, dynamic> values;
-      final repo = repoThat(record: (id, v) {
-        gotId = id;
-        values = v;
-      });
-
+      await seed('o1');
       final o = pricedOrder();
+      final recomputed = OrdersRepository.recomputeOrderTotal(o).totalUgx;
+
       await repo.updatePricing(o, actorStaffId: 'staff-7');
 
-      expect(gotId, 'o1');
-      // Pricing inputs are dispatched verbatim from the order.
-      expect(values['estimated_weight_kg'], o.estimatedWeightKg);
-      expect(values['final_weight_kg'], 4);
-      expect(values['line_items'], const []);
-      expect(values['manual_adjustment_ugx'], 500);
-      expect(values['delivery_fee_snapshot_ugx'], 2000);
-      expect(values['is_express'], false);
-      expect(values['express_flat_snapshot_ugx'], 0);
-      expect(values['express_pct_snapshot'], 0);
-      // total_ugx is the RECOMPUTED total, not the stale stored 19500.
-      final recomputed = OrdersRepository.recomputeOrderTotal(o).totalUgx;
-      expect(values['total_ugx'], recomputed);
-      expect(values['total_ugx'], isNot(19500));
-      expect(values['updated_by'], 'staff-7');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
-      // Descriptive, status, and creation columns must never leak into a
-      // pricing-only update.
-      expect(values.containsKey('customer_name'), isFalse);
-      expect(values.containsKey('status'), isFalse);
-      expect(values.containsKey('created_by'), isFalse);
+      final row =
+          await (db.select(db.orders)..where((t) => t.id.equals('o1')))
+              .getSingle();
+      expect(row.finalWeightKg, 4);
+      expect(row.manualAdjustmentUgx, 500);
+      expect(row.totalUgx, recomputed);
+      expect(row.totalUgx, isNot(19500), reason: 'recomputed, not the stale total');
+      expect(row.updatedBy, 'staff-7');
+
+      final payload = await singlePendingPayload();
+      expect(payload['total_ugx'], recomputed);
+      expect(payload['updated_by'], 'staff-7');
+      // Descriptive/status/creation columns must never leak into a pricing edit.
+      expect(payload.containsKey('customer_name'), isFalse);
+      expect(payload.containsKey('status'), isFalse);
+      expect(payload.containsKey('created_by'), isFalse);
     });
 
-    test('throws StateError when no row matched', () async {
-      final repo = repoThat(record: (_, __) {}, matched: false);
+    test('throws StateError when no local row matches', () async {
       expect(
         () => repo.updatePricing(pricedOrder(), actorStaffId: 's'),
         throwsStateError,
@@ -170,189 +171,62 @@ void main() {
   });
 
   group('updateOrderDetails', () {
-    test('dispatches the descriptive payload + updated_by for the order id',
+    test('writes descriptive columns locally and enqueues an update row',
         () async {
-      late String gotId;
-      late Map<String, dynamic> values;
-      final repo = repoThat(record: (id, v) {
-        gotId = id;
-        values = v;
-      });
+      await seed('o1');
 
       await repo.updateOrderDetails(order(), actorStaffId: 'staff-7');
 
-      expect(gotId, 'o1');
-      expect(values['customer_name'], 'Ada');
-      expect(values['phone'], '0700');
-      expect(values['address'], 'Kira');
-      expect(values['service_type'], ServiceType.washAndIron.toDbString());
-      expect(values['item_count'], 5);
-      expect(values['notes'], 'gate 4');
-      expect(values['scheduled_for'], '2026-06-25T09:00:00.000Z');
-      expect(values['updated_by'], 'staff-7');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
+      final row =
+          await (db.select(db.orders)..where((t) => t.id.equals('o1')))
+              .getSingle();
+      expect(row.customerName, 'Ada');
+      expect(row.itemCount, 5);
+      expect(row.notes, 'gate 4');
+      expect(row.updatedBy, 'staff-7');
+
+      final payload = await singlePendingPayload();
+      expect(payload['customer_name'], 'Ada');
+      expect(payload['updated_by'], 'staff-7');
       // Creation metadata, status, and pricing snapshots must never leak.
-      expect(values.containsKey('created_by'), isFalse);
-      expect(values.containsKey('status'), isFalse);
-      expect(values.containsKey('total_ugx'), isFalse);
+      expect(payload.containsKey('created_by'), isFalse);
+      expect(payload.containsKey('status'), isFalse);
+      expect(payload.containsKey('total_ugx'), isFalse);
     });
 
-    test('throws StateError when no row matched', () async {
-      final repo = repoThat(record: (_, __) {}, matched: false);
+    test('throws StateError when no local row matches', () async {
       expect(
-        () => repo.updateOrderDetails(order(), actorStaffId: 's'),
+        () => repo.updateOrderDetails(order(id: 'missing'), actorStaffId: 's'),
         throwsStateError,
       );
     });
   });
 
   group('softDelete', () {
-    test('dispatches the tombstone payload + deleted_by for the order id',
+    test('sets deleted_at/deleted_by locally and enqueues an update row',
         () async {
-      late String gotId;
-      late Map<String, dynamic> values;
-      final repo = repoThat(record: (id, v) {
-        gotId = id;
-        values = v;
-      });
+      await seed('o9');
 
       await repo.softDelete('o9', actorStaffId: 'staff-7');
 
-      expect(gotId, 'o9');
-      expect(values['deleted_at'], '2026-06-24T10:30:00.000Z');
-      expect(values['deleted_by'], 'staff-7');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
+      final row =
+          await (db.select(db.orders)..where((t) => t.id.equals('o9')))
+              .getSingle();
+      expect(row.deletedAt, clock);
+      expect(row.deletedBy, 'staff-7');
+
+      final pending = await outbox.peekPending(limit: 10);
+      expect(pending.single.op, 'update');
+      final payload =
+          jsonDecode(pending.single.payloadJson) as Map<String, dynamic>;
+      expect(payload['deleted_at'], '2026-06-24T10:30:00.000Z');
+      expect(payload['deleted_by'], 'staff-7');
     });
 
-    test('throws StateError when no row matched', () async {
-      final repo = repoThat(record: (_, __) {}, matched: false);
+    test('throws StateError when no local row matches', () async {
       expect(
         () => repo.softDelete('missing', actorStaffId: 's'),
         throwsStateError,
-      );
-    });
-  });
-
-  group('updatePayment', () {
-    test('dispatches the absolute collected amount + updated_by for the id',
-        () async {
-      late String gotId;
-      late Map<String, dynamic> values;
-      final repo = repoThat(record: (id, v) {
-        gotId = id;
-        values = v;
-      });
-
-      await repo.updatePayment('o1', 6000, actorStaffId: 'staff-7');
-
-      expect(gotId, 'o1');
-      expect(values['payment_amount_ugx'], 6000);
-      expect(values['updated_by'], 'staff-7');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
-      // A payment update must never touch status, pricing, or creation columns.
-      expect(values.containsKey('status'), isFalse);
-      expect(values.containsKey('total_ugx'), isFalse);
-      expect(values.containsKey('created_by'), isFalse);
-    });
-
-    test('throws StateError when no row matched', () async {
-      final repo = repoThat(record: (_, __) {}, matched: false);
-      expect(
-        () => repo.updatePayment('x', 6000, actorStaffId: 's'),
-        throwsStateError,
-      );
-    });
-  });
-
-  group('updateStatus', () {
-    test('dispatches the folded status + updated_by for the order id', () async {
-      late String gotId;
-      late Map<String, dynamic> values;
-      final repo = repoThat(record: (id, v) {
-        gotId = id;
-        values = v;
-      });
-
-      await repo.updateStatus('o1', OrderStatus.readyForDelivery,
-          actorStaffId: 'staff-7');
-
-      expect(gotId, 'o1');
-      expect(values['status'], OrderStatus.readyForDelivery.toDbString());
-      expect(values['updated_by'], 'staff-7');
-      expect(values['updated_at'], '2026-06-24T10:30:00.000Z');
-    });
-
-    test('throws StateError when no row matched', () async {
-      final repo = repoThat(record: (_, __) {}, matched: false);
-      expect(
-        () => repo.updateStatus('x', OrderStatus.completed, actorStaffId: 's'),
-        throwsStateError,
-      );
-    });
-  });
-
-  group('createPickup', () {
-    Customer customer({String id = 'c1'}) => Customer(
-          id: id,
-          name: 'Ada',
-          phone: '0700',
-          address: 'Kira',
-          notes: null,
-          createdAt: clock,
-          updatedAt: clock,
-          deletedAt: null,
-          customRatePerKgUgx: null,
-        );
-
-    test('calls the create_pickup RPC with p_customer + p_order and returns '
-        'the server order id + minted code', () async {
-      String? seenFn;
-      Map<String, dynamic>? seenParams;
-      final repo = OrdersRepository.forTest(
-        clock: () => clock,
-        rpc: (fn, params) async {
-          seenFn = fn;
-          seenParams = params;
-          return {'order_id': 'o1', 'order_code': 'AMW-2026-0007'};
-        },
-      );
-
-      final result = await repo.createPickup(
-        order(id: 'o1'),
-        customer(id: 'c1'),
-        actorStaffId: 's1',
-      );
-
-      expect(seenFn, 'create_pickup');
-      expect(seenParams!['p_customer'], isA<Map<String, dynamic>>());
-      expect((seenParams!['p_customer'] as Map)['id'], 'c1');
-      expect((seenParams!['p_order'] as Map)['id'], 'o1');
-      // The RPC owns the code/attribution; the client passes the descriptive +
-      // pricing fields.
-      expect((seenParams!['p_order'] as Map)['service_type'], 'Wash & Iron');
-      expect(result.orderId, 'o1');
-      expect(result.orderCode, 'AMW-2026-0007');
-    });
-
-    test('throws when the RPC returns a result without order_id/order_code',
-        () async {
-      final repo = OrdersRepository.forTest(
-        clock: () => clock,
-        rpc: (_, __) async => {'order_id': 'o1'}, // missing order_code
-      );
-      expect(
-        () => repo.createPickup(order(), customer(), actorStaffId: 's'),
-        throwsStateError,
-      );
-    });
-
-    test('a createPickup without an rpc override trips a descriptive assert',
-        () async {
-      final repo = OrdersRepository.forTest(clock: () => clock);
-      expect(
-        () => repo.createPickup(order(), customer(), actorStaffId: 's'),
-        throwsA(isA<AssertionError>()
-            .having((e) => e.message, 'message', contains('rpc'))),
       );
     });
   });

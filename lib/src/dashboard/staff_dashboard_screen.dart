@@ -43,14 +43,12 @@ import 'package:amuwak_core/amuwak_core.dart';
 import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';
-// ONLINE-ONLY: offline sync surfaces (status banner, sync-errors screen,
-// orchestrator, local DB) are disabled. Re-add these imports with the
-// commented code below to restore offline:
+import '../sync/sync_orchestrator_provider.dart';
+import '../sync/sync_status.dart';
+// Phase 5 (offline UX): re-add these to surface pending/dead-letter state.
 // import '../shared/widgets/sync_status_banner.dart';
 // import '../sync/sync_errors_provider.dart';
 // import '../sync/sync_errors_screen.dart';
-// import '../sync/sync_orchestrator_provider.dart';
-// import '../sync/sync_status.dart';
 
 typedef RetrieveLostPhotoFn = Future<bool> Function();
 
@@ -191,11 +189,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     // No navigation here — AuthGate routes to LoginScreen once the session clears.
   }
 
-  /// Production wiring: resolves the auth service from Riverpod and hands it to
-  /// [signOutAndReset]. ONLINE-ONLY: the offline teardown (orchestrator.stop +
-  /// local-DB truncate) is disabled, so only the auth sign-out is wired here.
+  /// Production wiring: resolves the auth service, sync orchestrator, and local
+  /// database from Riverpod and hands them to [signOutAndReset], which stops the
+  /// sync engine and truncates the local cache before revoking the session.
   Future<void> _defaultSignOut(WidgetRef ref) {
-    return signOutAndReset(auth: ref.read(authServiceProvider));
+    return signOutAndReset(
+      auth: ref.read(authServiceProvider),
+      orchestrator: ref.read(syncOrchestratorProvider),
+      db: ref.read(appDatabaseProvider),
+    );
   }
 
   Future<void> _handleNewPickup() async {
@@ -250,13 +252,17 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
     }
     if (result == null || !mounted) return;
     if (!result.startPickupNow) return;
-    // The order was just written to Supabase; the realtime stream re-emits
-    // asynchronously once the insert round-trips back over the WebSocket. Poll
-    // the snapshot before giving up — without this the new pickup lands on the
-    // dashboard instead of PickupCaptureScreen because the stream hadn't
-    // delivered the order yet. The window (20 × 100ms = 2s) allows for mobile
-    // realtime latency (~100-500ms, more on a slow link); beyond it we fall
+    // createPickup commits the order to the local Drift DB synchronously before
+    // returning, and ordersStreamProvider watches Drift — so the new order is
+    // normally in the snapshot on the first iteration. Poll defensively anyway:
+    // the Drift watch → Riverpod rebuild hop is async, so the freshly-written
+    // row may not have propagated into ordersStreamProvider's value on the very
+    // first read. Without this, the new pickup would land on the dashboard
+    // instead of PickupCaptureScreen if the rebuild hadn't fired yet. The window
+    // (20 × 100ms = 2s) is generous slack for that local hop; beyond it we fall
     // back to the "open from the list" hint below.
+    // TODO(phase-5): local reads make this synchronous — read the order directly
+    // after createPickup returns instead of polling. See the plan doc.
     LaundryOrder? newOrder;
     for (var attempt = 0; attempt < 20; attempt++) {
       final orders = ref.read(ordersStreamProvider).valueOrNull ?? const [];
