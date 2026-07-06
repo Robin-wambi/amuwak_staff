@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
@@ -27,6 +28,50 @@ void main() {
     expect(pending.first.id, 'mut-1');
     expect(pending.first.forTable, 'orders');
     expect(pending.first.status, 'pending');
+  });
+
+  test(
+      'peekPending orders by enqueue sequence, not created_at, so a create '
+      'dispatches before a later same-order write when timestamps tie/invert',
+      () async {
+    // Real hazard: createPickup enqueues a `create_pickup` RPC row, then a
+    // follow-up (status/payment) enqueues an `orders:update` for the SAME
+    // order. The create MUST dispatch first — the server row has to exist
+    // before the update targets it by id, or PostgREST matches 0 rows, the
+    // update silently "succeeds", and the change is lost. `created_at` is only
+    // second-granularity (Drift's `currentDateAndTime`), so two enqueues in the
+    // same second share a timestamp and `ORDER BY created_at` alone has no
+    // deterministic tiebreak. Ordering must fall back to the monotonic enqueue
+    // sequence. Here we invert the timestamps to pin the contract determinis-
+    // tically: the create is enqueued FIRST but carries the LATER created_at.
+    await db.into(db.outbox).insert(
+          OutboxCompanion.insert(
+            id: 'create_pickup:rpc:order-1',
+            forTable: 'create_pickup',
+            op: 'rpc',
+            rowId: 'order-1',
+            payloadJson: '{}',
+            createdAt: Value(DateTime.utc(2026, 1, 1, 0, 0, 2)),
+          ),
+        );
+    await db.into(db.outbox).insert(
+          OutboxCompanion.insert(
+            id: 'orders:update:order-1',
+            forTable: 'orders',
+            op: 'update',
+            rowId: 'order-1',
+            payloadJson: '{}',
+            createdAt: Value(DateTime.utc(2026, 1, 1, 0, 0, 1)),
+          ),
+        );
+
+    final pending = await repo.peekPending(limit: 10);
+    expect(
+      pending.map((r) => r.id).toList(),
+      ['create_pickup:rpc:order-1', 'orders:update:order-1'],
+      reason: 'the first-enqueued row must drain first regardless of its '
+          'coarse created_at timestamp',
+    );
   });
 
   test('markSent removes the row', () async {
