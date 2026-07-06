@@ -193,8 +193,8 @@ class _NotificationRow extends StatelessWidget {
         isPickup ? colorScheme.primary : _deliveredColor(context);
 
     final title = isPickup
-        ? 'New pickup · ${order.orderCode}'
-        : 'Delivered · ${order.orderCode}';
+        ? 'New pickup · ${order.referenceLabel}'
+        : 'Delivered · ${order.referenceLabel}';
     final subtitle = isPickup
         ? '${order.customerName} · ${order.timeLabel}'
         : '${order.customerName} · '

@@ -434,6 +434,55 @@ void main() {
     );
 
     testWidgets(
+      'deleting a placeholder order names the customer in the SnackBar, not '
+      'the UUID',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        // Offline order: orderCode unset so it falls back to the UUID orderId.
+        const placeholder = LaundryOrder(
+          orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+          customerName: 'Zola',
+          serviceType: ServiceType.washAndIron,
+          status: OrderStatus.inProgress,
+          timeLabel: 'Today',
+          itemCount: 1,
+          phone: '0700',
+          address: 'Kira',
+          notes: '',
+        );
+
+        final repo = _StubOrdersRepository();
+        when(() => repo.getAll()).thenAnswer((_) async => <LaundryOrder>[]);
+        when(() => repo.softDelete(any(),
+            actorStaffId: any(named: 'actorStaffId'))).thenAnswer((_) async {});
+
+        await pumpDashboardWithDb(tester, extraOverrides: [
+          ordersStreamProvider.overrideWith(
+            (ref) => Stream<List<LaundryOrder>>.value([placeholder]),
+          ),
+          ordersRepositoryProvider.overrideWithValue(repo),
+          currentUserIdProvider.overrideWith((ref) => 'staff-1'),
+        ]);
+
+        await tester.tap(find.text('Orders').last);
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('Zola'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete')); // actions-sheet entry
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, 'Delete')); // confirm
+        await tester.pumpAndSettle();
+
+        expect(find.text('Order for Zola deleted.'), findsOneWidget);
+        expect(find.textContaining('019e9147'), findsNothing);
+      },
+    );
+
+    testWidgets(
       'long-press → Delete → confirm shows a retry SnackBar when softDelete '
       'fails',
       (tester) async {

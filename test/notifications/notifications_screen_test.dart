@@ -86,6 +86,28 @@ void main() {
     expect(find.textContaining('5 min ago'), findsOneWidget);
   });
 
+  testWidgets(
+      'a placeholder pickup shows "Pending sync", never the raw UUID',
+      (tester) async {
+    // Offline order: orderCode unset so it falls back to the UUID orderId.
+    const placeholder = LaundryOrder(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      customerName: 'Cust',
+      serviceType: ServiceType.washAndIron,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 'Today',
+      itemCount: 1,
+      phone: '0700000000',
+      address: 'Somewhere',
+      notes: '',
+    );
+    await tester.pumpWidget(_harness([placeholder]));
+    await tester.pump();
+
+    expect(find.text('New pickup · Pending sync'), findsOneWidget);
+    expect(find.textContaining('019e9147'), findsNothing);
+  });
+
   testWidgets('tapping a row invokes onOrderTap with that order', (tester) async {
     LaundryOrder? tapped;
     await tester.pumpWidget(_harness(
