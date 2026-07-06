@@ -139,6 +139,34 @@ void main() {
   });
 
   testWidgets(
+      'a placeholder order (no server code yet) shows "Pending sync", not the '
+      'raw UUID', (tester) async {
+    final storage = InMemoryProofPhotoStorage();
+    // Offline order: orderCode is left unset so it falls back to the UUID
+    // orderId (hasServerCode false). The header + "Order code" row must not
+    // leak that UUID.
+    const placeholder = LaundryOrder(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      customerName: 'Jane',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 't',
+      itemCount: 12,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+    );
+
+    await tester.pumpWidget(_wrap(placeholder, storage: storage));
+
+    expect(find.textContaining('Pending sync'), findsWidgets);
+    expect(
+      find.textContaining('019e9147-608b-72b7-9e2c-0baa04e85094'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
       'Deliver verification matches the human order code, not the UUID order id',
       (tester) async {
     final storage = InMemoryProofPhotoStorage();

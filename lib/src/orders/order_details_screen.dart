@@ -446,7 +446,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           _DetailRow(
                             icon: Icons.receipt_long_outlined,
                             label: 'Order code',
-                            value: _order.orderCode,
+                            // "Pending sync" until the server-minted AMW code
+                            // backfills — never the raw UUID placeholder.
+                            value: _order.referenceLabel,
                           ),
                           _DetailRow(
                             icon: Icons.checkroom_outlined,
@@ -669,7 +671,7 @@ class _OrderHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  order.orderCode,
+                  order.referenceLabel,
                   style: TextStyle(
                     color: colorScheme.onPrimaryContainer,
                     fontSize: 14,
