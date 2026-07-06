@@ -144,6 +144,41 @@ void main() {
       expect(o.orderId, 'uuid-1');
     });
 
+    test('hasServerCode is false while the code is still the placeholder', () {
+      // A freshly-created offline order carries its UUID id as the placeholder
+      // order_code (orderCode ?? orderId), so the real AMW code isn't assigned.
+      const placeholder = LaundryOrder(
+        orderId: 'a1b2c3d4-uuid',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(placeholder.hasServerCode, isFalse);
+      expect(placeholder.referenceLabel, 'Pending sync');
+    });
+
+    test('hasServerCode is true once the real AMW code has backfilled', () {
+      const coded = LaundryOrder(
+        orderId: 'a1b2c3d4-uuid',
+        orderCode: 'AMW-2026-0042',
+        customerName: 'X',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 't',
+        itemCount: 1,
+        phone: 'p',
+        address: 'a',
+        notes: '',
+      );
+      expect(coded.hasServerCode, isTrue);
+      expect(coded.referenceLabel, 'AMW-2026-0042');
+    });
+
     test('intakeMethod defaults to driver_pickup', () {
       const o = LaundryOrder(
         orderId: 'X',

@@ -83,6 +83,19 @@ class LaundryOrder {
   /// zero-total order is never "paid" (there's nothing to pay).
   bool get isFullyPaid => totalUgx > 0 && paymentAmountUgx >= totalUgx;
 
+  /// Whether the human `AMW-YYYY-NNNN` code has been assigned by the server yet.
+  ///
+  /// An order created offline carries its UUID [orderId] as a placeholder
+  /// [orderCode] (see the `orderCode ?? orderId` default) until the SyncPuller
+  /// pulls the synced server row back with the real minted code. While the two
+  /// are equal the code is a placeholder — never surface it as an order number
+  /// or print it on a bag tag (it isn't a valid, scannable `AMW` code).
+  bool get hasServerCode => orderCode != orderId;
+
+  /// The reference to show a human: the real `AMW` code once assigned, or a
+  /// clear "Pending sync" placeholder while an offline order awaits its code.
+  String get referenceLabel => hasServerCode ? orderCode : 'Pending sync';
+
   ProofEvent? get pickupProof => _firstOfType(ProofEventType.pickup);
   ProofEvent? get deliveryProof => _firstOfType(ProofEventType.delivery);
   bool get hasPickupProof => pickupProof != null;
