@@ -133,7 +133,10 @@ class OrderCard extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete order?'),
         content: Text(
-          'Delete order ${order.orderCode}? This hides it from the rider.',
+          order.hasServerCode
+              ? 'Delete order ${order.orderCode}? This hides it from the rider.'
+              : 'Delete this pending order for ${order.customerName}? '
+                  'This hides it from the rider.',
         ),
         actions: [
           TextButton(
@@ -241,7 +244,12 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs / 2),
                     Text(
-                      '${order.orderCode} - ${order.serviceType.label}',
+                      // Offline orders have no server-minted AMW code yet, so
+                      // show only the service (the "Pending sync" chip below
+                      // signals the missing code) rather than a raw UUID.
+                      order.hasServerCode
+                          ? '${order.orderCode} - ${order.serviceType.label}'
+                          : order.serviceType.label,
                       style: textTheme.bodySmall,
                     ),
                   ],
@@ -253,6 +261,15 @@ class OrderCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg - 2),
           Row(
             children: [
+              // Surfaces an offline order still awaiting its server-minted AMW
+              // code — the rider should identify it by customer name until sync.
+              if (!order.hasServerCode) ...[
+                _OrderInfoChip(
+                  icon: Icons.sync_rounded,
+                  label: order.referenceLabel,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               _OrderInfoChip(
                 icon: Icons.access_time_rounded,
                 label: order.timeLabel,
