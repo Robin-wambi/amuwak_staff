@@ -27,9 +27,64 @@ LaundryOrder _order({
       notes: '',
     );
 
+/// A freshly-created offline order: no server code yet, so orderCode falls back
+/// to the UUID id (hasServerCode == false).
+LaundryOrder _placeholder({OrderStatus status = OrderStatus.pendingPickup}) =>
+    LaundryOrder(
+      orderId: 'a1b2c3d4-e5f6-7890-uuid',
+      customerName: 'Ada',
+      serviceType: ServiceType.washAndIron,
+      status: status,
+      timeLabel: 'Today',
+      itemCount: 3,
+      phone: '0700',
+      address: 'Kira',
+      notes: '',
+    );
+
 Widget _host(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  group('pending-sync placeholder (offline order with no AMW code yet)', () {
+    testWidgets('never shows the raw UUID as the order reference',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _placeholder(), onTap: () {}),
+      ));
+
+      expect(find.textContaining('a1b2c3d4'), findsNothing);
+      expect(find.textContaining('Pending sync'), findsWidgets);
+    });
+
+    testWidgets('a coded order shows its AMW code and no pending indicator',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _order(), onTap: () {}),
+      ));
+
+      expect(find.textContaining('AMW-1'), findsOneWidget);
+      expect(find.textContaining('Pending sync'), findsNothing);
+    });
+
+    testWidgets('the delete confirm names the customer, not the UUID',
+        (tester) async {
+      await tester.pumpWidget(_host(
+        OrderCard(order: _placeholder(), onTap: () {}, onDelete: () {}),
+      ));
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      final dialog = tester.widget<AlertDialog>(find.byType(AlertDialog));
+      final content = (dialog.content as Text).data!;
+      expect(content, contains('Ada'));
+      expect(content, isNot(contains('a1b2c3d4')));
+    });
+  });
+
   group('OrderCard without action callbacks', () {
     testWidgets('renders tap-only and has no Dismissible', (tester) async {
       var tapped = false;

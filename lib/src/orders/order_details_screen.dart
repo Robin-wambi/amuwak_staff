@@ -241,15 +241,25 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _confirmDelivery() async {
-    final scanOk = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => ScannerScreen(
-          expectedOrderCode: _order.orderCode,
-          cameraViewBuilder: widget.cameraViewBuilder,
+    // A never-synced order still carries its UUID placeholder as order_code, so
+    // no tag was ever printed and the code is never shown to the rider — there
+    // is nothing to scan. Fall back to a customer-name confirmation (mirrors the
+    // offline pickup-capture gating). A coded order keeps the tag scan.
+    final bool proceed;
+    if (_order.hasServerCode) {
+      final scanOk = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ScannerScreen(
+            expectedOrderCode: _order.orderCode,
+            cameraViewBuilder: widget.cameraViewBuilder,
+          ),
         ),
-      ),
-    );
-    if (scanOk != true || !mounted) return;
+      );
+      proceed = scanOk == true;
+    } else {
+      proceed = await _confirmUncodedDelivery();
+    }
+    if (!proceed || !mounted) return;
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => DeliveryCaptureScreen(
@@ -271,6 +281,33 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         _order = _order.copyWith(status: OrderStatus.completed);
       });
     }
+  }
+
+  /// Delivery confirmation for an order whose code hasn't synced yet: there is
+  /// no printed tag to scan, so the rider verifies the handover by customer
+  /// name instead. Returns true when they confirm.
+  Future<bool> _confirmUncodedDelivery() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm delivery'),
+        content: Text(
+          "This order's code hasn't synced yet, so there's no tag to scan. "
+          'Confirm you are handing over ${_order.customerName}\'s order.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Confirm delivery'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   /// The bag is tagged once it's cleaned, then scanned at delivery. Offer a
@@ -446,7 +483,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                           _DetailRow(
                             icon: Icons.receipt_long_outlined,
                             label: 'Order code',
-                            value: _order.orderCode,
+                            // "Pending sync" until the server-minted AMW code
+                            // backfills — never the raw UUID placeholder.
+                            value: _order.referenceLabel,
                           ),
                           _DetailRow(
                             icon: Icons.checkroom_outlined,
@@ -669,7 +708,7 @@ class _OrderHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  order.orderCode,
+                  order.referenceLabel,
                   style: TextStyle(
                     color: colorScheme.onPrimaryContainer,
                     fontSize: 14,

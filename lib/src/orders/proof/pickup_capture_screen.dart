@@ -477,6 +477,11 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
 
   Widget _buildQrStage() {
     final canPrint = widget.labelPrinter != null;
+    // An order created offline has no server-minted AMW code yet (its orderCode
+    // is still the UUID placeholder). Printing/writing that UUID would produce
+    // an unscannable tag that never matches the real code assigned at delivery,
+    // so gate the whole tag/QR/print workflow until the code backfills.
+    final hasCode = widget.order.hasServerCode;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -490,24 +495,34 @@ class _PickupCaptureScreenState extends State<PickupCaptureScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    canPrint
-                        ? 'Print the tag and tie it to the bag, or write order '
-                            '#${widget.order.orderCode} on it.'
-                        : 'Write order #${widget.order.orderCode} on the bag, '
-                            'or scan this QR.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.secondaryText),
-                  ),
-                  const SizedBox(height: 24),
-                  TagPrintView(
-                    orderCode: widget.order.orderCode,
-                    customerName: widget.order.customerName,
-                    labelPrinter: widget.labelPrinter,
-                    printerStore: widget.printerStore,
-                    captureTag: widget.captureTag,
-                    buttonKey: const Key('pickup_print_tag'),
-                  ),
+                  if (hasCode) ...[
+                    Text(
+                      canPrint
+                          ? 'Print the tag and tie it to the bag, or write order '
+                              '#${widget.order.orderCode} on it.'
+                          : 'Write order #${widget.order.orderCode} on the bag, '
+                              'or scan this QR.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.secondaryText),
+                    ),
+                    const SizedBox(height: 24),
+                    TagPrintView(
+                      orderCode: widget.order.orderCode,
+                      customerName: widget.order.customerName,
+                      labelPrinter: widget.labelPrinter,
+                      printerStore: widget.printerStore,
+                      captureTag: widget.captureTag,
+                      buttonKey: const Key('pickup_print_tag'),
+                    ),
+                  ] else
+                    Text(
+                      "This order's code is assigned once it syncs. For now, tie "
+                      'a blank tag and identify the bag by the customer name '
+                      '(${widget.order.customerName}). Print or write the code '
+                      'after it syncs.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.secondaryText),
+                    ),
                 ],
               ),
             ),

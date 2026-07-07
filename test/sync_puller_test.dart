@@ -132,6 +132,53 @@ void main() {
         '2026-05-19T12:00:00.000Z');
   });
 
+  test(
+      'a placeholder order_code is backfilled by the real AMW code on the next '
+      'pull (offline-create reconciliation)', () async {
+    const orderId = '019e9147-608b-72b7-9e2c-0baa04e85094';
+    Map<String, dynamic> orderRow(String code, String updatedAt) => {
+          'id': orderId,
+          'order_code': code,
+          'customer_name': 'Jane',
+          'phone': '+256',
+          'address': 'addr',
+          'service_type': 'wash',
+          'status': 'pending_pickup',
+          'intake_method': 'driver_pickup',
+          'fulfillment_method': 'delivery',
+          'item_count': 1,
+          'intake_recorded_by': 's-1',
+          'created_by': 's-1',
+          'created_at': '2026-05-23T10:00:00Z',
+          'updated_at': updatedAt,
+        };
+
+    final fake = _FakeFetch();
+    fake.queued['orders'] = [
+      // Mirrors the local row right after an offline create: order_code is the
+      // UUID placeholder (== id) because create_pickup hasn't minted a code yet.
+      [orderRow(orderId, '2026-05-23T10:00:00Z')],
+      // The synced server row now carries the real minted AMW code.
+      [orderRow('AMW-2026-0042', '2026-05-23T10:05:00Z')],
+    ];
+
+    const orders = SyncTable(name: 'orders', watermarkColumn: 'updated_at');
+    final puller = SyncPuller(db: db, fetch: fake.call);
+
+    await puller.pullTable(orders);
+    final before = await (db.select(db.orders)
+          ..where((t) => t.id.equals(orderId)))
+        .getSingle();
+    expect(before.orderCode, orderId, reason: 'placeholder present before sync');
+
+    await puller.pullTable(orders);
+    final after = await (db.select(db.orders)
+          ..where((t) => t.id.equals(orderId)))
+        .getSingle();
+    expect(after.orderCode, 'AMW-2026-0042',
+        reason: 'the id-keyed insertOrReplace overwrote the placeholder code');
+  });
+
   group('Plan 3a Task 7 mappers — additional tables', () {
     test('pullTable upserts order_status_events rows '
         '(including null from_status and null device_event_id)', () async {

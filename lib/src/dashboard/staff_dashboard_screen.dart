@@ -384,7 +384,15 @@ class _StaffDashboardScreenState extends ConsumerState<StaffDashboardScreen> {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
-          SnackBar(content: Text('Order ${order.orderCode} deleted.')),
+          SnackBar(
+            content: Text(
+              // A placeholder order has no server code yet — name the customer
+              // rather than echo the raw UUID.
+              order.hasServerCode
+                  ? 'Order ${order.orderCode} deleted.'
+                  : 'Order for ${order.customerName} deleted.',
+            ),
+          ),
         );
     } catch (e, st) {
       developer.log('softDelete failed for order ${order.orderId}.',

@@ -334,6 +334,54 @@ void main() {
   );
 
   testWidgets(
+    'a placeholder order (no server code yet) hides the tag/QR and shows '
+    'pending guidance, never a UUID to write on the bag',
+    (tester) async {
+      // Offline order: orderCode unset so it falls back to the UUID orderId
+      // (hasServerCode false). Printing/writing this UUID on a bag would yield
+      // an unscannable tag that never matches the real AMW code at delivery.
+      const placeholder = LaundryOrder(
+        orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+        customerName: 'Jane Doe',
+        serviceType: ServiceType.washAndIron,
+        status: OrderStatus.pendingPickup,
+        timeLabel: 'Today, 09:00',
+        itemCount: 12,
+        phone: '+234000',
+        address: '5 Yaba',
+        notes: '',
+      );
+
+      await _pumpAndPushPickup(
+        tester,
+        storage: InMemoryProofPhotoStorage(),
+        order: placeholder,
+        pickPhoto: () async => const [10, 20, 30],
+      );
+
+      await tester.tap(find.byKey(const Key('count_increment')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_photo')));
+      await tester.pumpAndSettle();
+      await _scrollToConfirm(tester);
+      await tester.tap(
+        find.widgetWithText(ElevatedButton, 'Confirm with customer'),
+      );
+      await tester.pumpAndSettle();
+
+      // Still on the tag stage, but no printable/scannable code exists yet.
+      expect(find.text('Tie tag to the bag'), findsOneWidget);
+      expect(find.byType(QrDisplayWidget), findsNothing);
+      expect(find.byKey(const Key('pickup_print_tag')), findsNothing);
+      // The rider is guided to the customer name, never handed the UUID.
+      expect(find.textContaining('019e9147'), findsNothing);
+      expect(find.textContaining('once it syncs'), findsOneWidget);
+      // They can still finish the pickup.
+      expect(find.widgetWithText(ElevatedButton, 'Done'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'Done re-enables itself, surfaces an error, and performs NO repo writes '
     'when photo save fails',
     (tester) async {

@@ -90,7 +90,11 @@ void main() {
       'readyForDelivery shows "Deliver" and routes through scanner to delivery',
       (tester) async {
     final storage = InMemoryProofPhotoStorage();
+    // A synced (coded) order — orderCode differs from the UUID orderId — so it
+    // routes through the scan path (the uncoded fallback is covered below).
     final readyOrder = _pendingPickup.copyWith(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      orderCode: 'AMW-2026-0042',
       status: OrderStatus.readyForDelivery,
       proofEvents: [
         ProofEvent(
@@ -98,12 +102,12 @@ void main() {
           type: ProofEventType.pickup,
           capturedAt: DateTime(2026, 5, 12, 9, 42),
           count: 12,
-          photoPaths: const ['memory://AMW-0421/pickup_0'],
+          photoPaths: const ['memory://AMW-2026-0042/pickup_0'],
         ),
       ],
     );
 
-    await tester.pumpWidget(_wrap(readyOrder, storage: storage));
+    await tester.pumpWidget(_wrap(readyOrder, storage: storage, scannedValue: 'AMW-2026-0042'));
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Deliver'));
     await tester.pumpAndSettle();
@@ -111,6 +115,51 @@ void main() {
     expect(find.text('Scan order tag'), findsOneWidget);
 
     await tester.tap(find.text('Simulate scan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hand over'), findsOneWidget);
+  });
+
+  testWidgets(
+      'a still-uncoded order confirms delivery by customer name instead of '
+      'scanning a tag that was never printed', (tester) async {
+    final storage = InMemoryProofPhotoStorage();
+    // Placeholder: orderCode falls back to the UUID orderId (hasServerCode
+    // false). No tag was ever printed (pickup gated that) and the UUID is never
+    // shown, so there is nothing to scan — fall back to a name confirmation.
+    final uncoded = LaundryOrder(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      customerName: 'Jane',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.readyForDelivery,
+      timeLabel: 't',
+      itemCount: 12,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+      proofEvents: [
+        ProofEvent(
+          id: 'pe-test-1',
+          type: ProofEventType.pickup,
+          capturedAt: DateTime(2026, 5, 12, 9, 42),
+          count: 12,
+          photoPaths: const ['memory://placeholder/pickup_0'],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_wrap(uncoded, storage: storage));
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Deliver'));
+    await tester.pumpAndSettle();
+
+    // No scan step — a customer-name confirmation dialog instead.
+    expect(find.text('Scan order tag'), findsNothing);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.textContaining('Jane'), findsWidgets);
+    expect(find.textContaining('019e9147'), findsNothing);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Confirm delivery'));
     await tester.pumpAndSettle();
 
     expect(find.text('Hand over'), findsOneWidget);
@@ -132,6 +181,34 @@ void main() {
     // The short code is shown (header + the "Order code" detail row)...
     expect(find.textContaining('AMW-2026-0042'), findsWidgets);
     // ...and the long UUID is never put in front of the rider.
+    expect(
+      find.textContaining('019e9147-608b-72b7-9e2c-0baa04e85094'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+      'a placeholder order (no server code yet) shows "Pending sync", not the '
+      'raw UUID', (tester) async {
+    final storage = InMemoryProofPhotoStorage();
+    // Offline order: orderCode is left unset so it falls back to the UUID
+    // orderId (hasServerCode false). The header + "Order code" row must not
+    // leak that UUID.
+    const placeholder = LaundryOrder(
+      orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
+      customerName: 'Jane',
+      serviceType: ServiceType.washOnly,
+      status: OrderStatus.pendingPickup,
+      timeLabel: 't',
+      itemCount: 12,
+      phone: 'p',
+      address: 'a',
+      notes: '',
+    );
+
+    await tester.pumpWidget(_wrap(placeholder, storage: storage));
+
+    expect(find.textContaining('Pending sync'), findsWidgets);
     expect(
       find.textContaining('019e9147-608b-72b7-9e2c-0baa04e85094'),
       findsNothing,
