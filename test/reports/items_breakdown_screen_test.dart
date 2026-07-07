@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/widgets/order_card.dart';
 import 'package:amuwak_staff/src/reports/items_breakdown_screen.dart';
 import 'package:amuwak_staff/src/sync/repository_providers.dart';

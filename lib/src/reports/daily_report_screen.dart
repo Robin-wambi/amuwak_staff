@@ -7,13 +7,7 @@ import '../expenses/expense_list_extensions.dart';
 import '../orders/order.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
-import '../orders/order_status.dart';
 import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/theme/app_card.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
-import '../shared/theme/app_spacing.dart';
-import '../shared/theme/status_colors.dart';
 import 'report_period.dart';
 
 class DailyReportScreen extends StatelessWidget {

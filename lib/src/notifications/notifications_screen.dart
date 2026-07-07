@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../orders/order.dart';
-import '../shared/theme/app_card.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
-import '../shared/theme/app_spacing.dart';
-import '../shared/theme/status_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../shared/widgets/empty_state.dart';
 import '../sync/repository_providers.dart';
 import 'notification_summary.dart';

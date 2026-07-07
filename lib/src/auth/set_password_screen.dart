@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../dashboard/current_staff_provider.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../sync/repository_providers.dart';
 import 'auth_service.dart';
 import 'session.dart';

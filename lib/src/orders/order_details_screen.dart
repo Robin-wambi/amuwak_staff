@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/theme/app_card.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
-import '../shared/theme/app_spacing.dart';
-import '../shared/theme/status_colors.dart';
 import '../pricing/catalog_item.dart';
 import '../printing/label_printer.dart';
 import '../printing/printer_store.dart';
 import '../sync/orders_repository.dart';
 import '../sync/proof_events_repository.dart';
 import 'order.dart';
-import 'order_status.dart';
 import 'payment/record_payment_sheet.dart';
 import 'pricing/line_item.dart';
 import 'pricing/pricing_calculator.dart';

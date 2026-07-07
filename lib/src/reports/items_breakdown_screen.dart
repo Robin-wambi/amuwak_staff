@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../orders/order.dart';
 import '../orders/order_list_extensions.dart';
 import '../orders/widgets/order_card.dart';
-import '../shared/theme/app_spacing.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../shared/widgets/empty_state.dart';
 import '../sync/repository_providers.dart';
 

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-import '../theme/app_motion.dart';
-import '../theme/app_radii.dart';
-import '../theme/app_spacing.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 /// A brand-coloured header surface with a slow, very subtle gradient sheen that
 /// travels diagonally — making the surface feel "alive" without drawing the eye

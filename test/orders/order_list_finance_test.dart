@@ -2,9 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_list_extensions.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 
 // Order A: completed, final weight 2kg @ 5000 (= 10000 weight charge),
 // one 8000 line item, express (flat 1000 + 20% of 18000 = 4600), delivery 3000,

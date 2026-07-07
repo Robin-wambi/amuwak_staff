@@ -1,7 +1,4 @@
-import 'package:amuwak_staff/src/shared/motion/pressable_scale.dart';
-import 'package:amuwak_staff/src/shared/theme/app_card.dart';
-import 'package:amuwak_staff/src/shared/theme/app_elevation.dart';
-import 'package:amuwak_staff/src/shared/theme/app_radii.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

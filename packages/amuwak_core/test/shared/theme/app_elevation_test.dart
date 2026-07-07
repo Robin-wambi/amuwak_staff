@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/shared/theme/app_elevation.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   test('resting and raised both define shadows', () {

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-import '../theme/app_radii.dart';
-import '../theme/app_typography.dart';
-import '../theme/status_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 ThemeData buildAmuwakTheme() {
   final colorScheme = ColorScheme.fromSeed(
