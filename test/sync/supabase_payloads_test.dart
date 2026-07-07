@@ -1,7 +1,6 @@
 import 'package:amuwak_staff/src/data/app_database.dart' show Customer;
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_core/amuwak_core.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
 import 'package:amuwak_staff/src/sync/supabase_payloads.dart';
 import 'package:flutter_test/flutter_test.dart';

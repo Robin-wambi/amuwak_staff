@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
-import 'package:amuwak_staff/src/orders/pricing/pricing_inputs.dart';
-import 'package:amuwak_staff/src/orders/pricing/pricing_calculator.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   group('recomputeTotal', () {

@@ -1,7 +1,5 @@
 import 'package:amuwak_core/amuwak_core.dart';
 import 'order.dart';
-import 'pricing/pricing_calculator.dart';
-import 'pricing/pricing_inputs.dart';
 
 extension OrderListStats on List<LaundryOrder> {
   int countByStatus(OrderStatus status) =>
