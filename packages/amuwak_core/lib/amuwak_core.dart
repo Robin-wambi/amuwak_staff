@@ -22,3 +22,9 @@ export 'src/shared/theme/status_colors.dart';
 export 'src/shared/theme/app_card.dart';
 
 export 'src/shared/motion/pressable_scale.dart';
+export 'src/shared/motion/count_up_text.dart';
+export 'src/shared/motion/reveal_on_mount.dart';
+export 'src/shared/motion/animated_gradient_header.dart';
+
+export 'src/shared/widgets/empty_state.dart';
+export 'src/shared/widgets/app_theme.dart';

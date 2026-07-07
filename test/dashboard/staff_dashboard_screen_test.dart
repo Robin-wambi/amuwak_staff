@@ -10,7 +10,6 @@ import 'package:amuwak_staff/src/auth/login_screen.dart';
 import 'package:amuwak_staff/src/auth/session.dart';
 import 'package:amuwak_staff/src/dashboard/current_staff_provider.dart';
 import 'package:amuwak_staff/src/dashboard/staff_dashboard_screen.dart';
-import 'package:amuwak_staff/src/shared/motion/animated_gradient_header.dart';
 import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/expenses/expense_entry_screen.dart';
 import 'package:amuwak_staff/src/expenses/expenses_repository.dart';

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../orders/order.dart';
 import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/widgets/empty_state.dart';
 import '../sync/repository_providers.dart';
 import 'notification_summary.dart';
 import 'relative_time.dart';

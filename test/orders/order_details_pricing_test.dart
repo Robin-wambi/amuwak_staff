@@ -7,7 +7,6 @@ import 'package:amuwak_staff/src/orders/order_details_screen.dart';
 import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/pricing/catalog_item.dart';
-import 'package:amuwak_staff/src/shared/widgets/app_theme.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';
 

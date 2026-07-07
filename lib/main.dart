@@ -4,8 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'src/auth/auth_gate.dart';
 import 'src/bootstrap/app_bootstrap.dart';
 import 'src/printing/printing_providers.dart';
-import 'src/shared/widgets/app_theme.dart';
 import 'src/sync/sync_orchestrator_provider.dart';
+
+import 'package:amuwak_core/amuwak_core.dart';
 
 Future<void> main() async {
   await AppBootstrap.initialize();

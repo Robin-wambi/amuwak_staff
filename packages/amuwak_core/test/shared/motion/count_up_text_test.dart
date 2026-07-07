@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:amuwak_staff/src/shared/motion/count_up_text.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   testWidgets('counts up to the target value after settle', (tester) async {
