@@ -1079,6 +1079,7 @@ class _MonthlyRevenueTrackerCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1091,19 +1092,29 @@ class _MonthlyRevenueTrackerCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatUgx(series.totalUgx),
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Scale a large monthly total down to fit its column rather
+                      // than overflowing the row at narrow widths (e.g. 360px).
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatUgx(series.totalUgx),
+                          maxLines: 1,
+                          style: textTheme.headlineSmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs / 2),
-                    Text(completedLabel, style: textTheme.bodySmall),
-                  ],
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Text(completedLabel, style: textTheme.bodySmall),
+                    ],
+                  ),
                 ),
               ],
             ),
