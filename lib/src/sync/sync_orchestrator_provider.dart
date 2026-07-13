@@ -25,11 +25,11 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
     worker: OutboxWorker(
       repo: OutboxRepository(db),
       dispatch: OutboxWorker.supabaseDispatcher(supabase),
-      // Lets the worker tell an offline blip (skip, no penalty) apart from an
-      // online row-specific transient failure (count toward dead-letter so a
-      // poison head row can't block the queue). onlineProvider is driven by
-      // ConnectivityWatcher via SyncOrchestrator.
-      isOnline: () => ref.read(onlineProvider),
+      // Sourced from confirmed pull round-trips (see serverReachableProvider),
+      // NOT connectivity_plus — so a poor-network interface-up device never
+      // dead-letters a good write, while a server that hangs on one payload
+      // still parks that row instead of blocking the queue.
+      serverReachable: () => ref.read(serverReachableProvider),
     ),
     puller: SyncPuller(
       db: db,
@@ -43,6 +43,8 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
     ),
     setOnline: (online) =>
         ref.read(onlineProvider.notifier).state = online,
+    setReachable: (reachable) =>
+        ref.read(serverReachableProvider.notifier).state = reachable,
   );
 });
 

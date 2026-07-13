@@ -17,7 +17,7 @@ class OutboxWorker {
   OutboxWorker({
     required this.repo,
     required this.dispatch,
-    required this.isOnline,
+    this.serverReachable = _assumeUnreachable,
     this.batchSize = 25,
     this.deadLetterAfter = 5,
   });
@@ -25,18 +25,27 @@ class OutboxWorker {
   final OutboxRepository repo;
   final OutboxDispatch dispatch;
 
-  /// Reports whether the device currently has connectivity. Used to tell an
-  /// offline blip (skip without penalty) apart from an online, row-specific
-  /// transient failure (must count toward the dead-letter budget so a poison
-  /// head row can't block the queue forever).
+  /// Reports whether the Supabase server is currently *reachable* — and this
+  /// must be sourced from a CONFIRMED server round-trip (a successful
+  /// [SyncPuller.pullAll]), NOT from `connectivity_plus`. That distinction is
+  /// the whole point: an attached Wi-Fi/cellular interface reports "online"
+  /// long before (or without ever) the server being reachable, so trusting it
+  /// would dead-letter a rider's good write on a poor network — the very bug
+  /// this class was fixed for.
   ///
-  /// Required so the offline-vs-online decision is always an explicit caller
-  /// choice. A caller with no real signal should pass `() => false` ("assume
-  /// offline") — the fail-safe that never turns a flaky-signal rider's good
-  /// writes into false errors — but must opt into it deliberately rather than
-  /// inherit it from a forgotten parameter, which would silently reintroduce
-  /// unbounded head-of-line blocking for transient errors.
-  final bool Function() isOnline;
+  /// It disambiguates the two ways a transient transport error can arise:
+  ///   - server unreachable (a pull would also be failing) → device-wide blip,
+  ///     retry the row forever, never penalise it;
+  ///   - server reachable (a pull just succeeded) yet THIS row still times out
+  ///     → the failure is row-specific (e.g. an RPC that hangs on this
+  ///     payload), so count it toward the dead-letter budget where it can no
+  ///     longer head-of-line block the queue.
+  ///
+  /// Defaults to [_assumeUnreachable] (`() => false`) — the fail-safe: with no
+  /// wired signal we never turn a transient failure into a dead-letter.
+  final bool Function() serverReachable;
+
+  static bool _assumeUnreachable() => false;
 
   final int batchSize;
 
@@ -86,6 +95,13 @@ class OutboxWorker {
     };
   }
 
+  /// Revives every dead-lettered row so the next drain retries it, returning
+  /// how many were revived. The orchestrator calls this on sign-in and on
+  /// reconnect — with no manual retry UI, this is the only recovery path for a
+  /// parked write. The running drain timer picks the revived rows up on its
+  /// next tick.
+  Future<int> recoverDeadLettered() => repo.requeueAllDeadLettered();
+
   /// Pump one batch of pending mutations. Returns the count successfully sent.
   /// Stops on the first failure to avoid hammering a flaky backend.
   Future<int> drainOnce() {
@@ -122,17 +138,21 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        if (isTransientSyncError(e) && !isOnline()) {
-          // Offline (or connectivity unknown): a whole-device transport blip,
-          // not this row's fault. Leave it pending and stop this drain; the
-          // next cycle retries WITHOUT burning the dead-letter budget. Keeps a
-          // flaky-signal rider from accumulating false sync errors.
+        if (isTransientSyncError(e) && !serverReachable()) {
+          // Transport-layer failure (timeout, dropped socket, DNS) AND no
+          // confirmed server contact: a device-wide blip, not this row's fault.
+          // Leave it pending and stop this drain; the next cycle retries
+          // WITHOUT burning the dead-letter budget. This is what keeps a
+          // poor-network rider's good write from being permanently parked.
           return sent;
         }
-        // Either a permanent error, or a transient-looking error while the
-        // device IS online — which makes it row-specific. Count it toward the
-        // dead-letter budget so one persistently-failing head row can't
-        // head-of-line block the rest of the queue indefinitely.
+        // Either a permanent, row-specific error (e.g. a StateError from an
+        // unknown op), OR a transient failure while the server is confirmed
+        // reachable (a pull just succeeded) — which makes the failure
+        // row-specific (e.g. an RPC that hangs on this payload). Count it
+        // toward the dead-letter budget so one persistently-failing head row
+        // can't head-of-line block the rest of the queue; auto-requeue on the
+        // next reconnect gives it fresh attempts.
         await repo.markFailed(row.id, e.toString(),
             deadLetterAfter: deadLetterAfter);
         return sent;

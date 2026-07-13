@@ -41,8 +41,19 @@ final lastSyncedAtProvider = StreamProvider<DateTime?>((ref) {
   return query.watchSingle().map((row) => row.read(maxExpr));
 });
 
-/// Set by ConnectivityWatcher via SyncOrchestrator at app bootstrap.
+/// Set by ConnectivityWatcher via SyncOrchestrator at app bootstrap. Reflects
+/// network-interface presence — good enough for the (optional) banner, but NOT
+/// a reliable "can we reach the server" signal.
 final onlineProvider = StateProvider<bool>((_) => true);
+
+/// Whether the server is actually *reachable*, published by SyncOrchestrator
+/// from whether the last `pullAll` completed (a confirmed round-trip) — unlike
+/// [onlineProvider], which only tracks interface presence. The OutboxWorker
+/// reads this to tell a device-wide transport blip (retry forever) apart from a
+/// row-specific hang (dead-letter). Defaults to `false` (fail-safe: assume
+/// unreachable until a pull proves otherwise, so a transient failure is never
+/// dead-lettered on a hunch).
+final serverReachableProvider = StateProvider<bool>((_) => false);
 
 /// Combined sync-status snapshot for the banner widget to consume.
 final syncStatusProvider = Provider<SyncStatus>((ref) {

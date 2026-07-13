@@ -113,6 +113,33 @@ class OutboxRepository {
     );
   }
 
+  /// Requeues EVERY dead-lettered row back to `'pending'` (retry counter and
+  /// last-error cleared), returning how many rows were revived.
+  ///
+  /// This app ships no manual retry UI, so a dead-lettered write would
+  /// otherwise be stranded forever. The SyncOrchestrator calls this on sign-in
+  /// and on every reconnect so a parked mutation gets fresh drain attempts
+  /// automatically. Now that transport errors never dead-letter (they retry in
+  /// place), a revived row is either a legacy transient failure — which now
+  /// succeeds — or a genuine permanent rejection, which simply re-parks after
+  /// its budget: bounded per reconnect, never an infinite tight loop.
+  ///
+  /// Guarded to `dead_letter` status (like [requeue]) so it can never reset the
+  /// retry counter on a still-`pending`/`failed` row out from under an
+  /// in-flight drain.
+  Future<int> requeueAllDeadLettered() {
+    return (_db.update(_db.outbox)
+          ..where((t) => t.status.equals('dead_letter')))
+        .write(
+      const OutboxCompanion(
+        status: Value('pending'),
+        retryCount: Value(0),
+        lastError: Value(null),
+        lastAttemptedAt: Value(null),
+      ),
+    );
+  }
+
   /// Permanently drops a dead-lettered mutation the rider has chosen to give
   /// up on. Unlike [requeue], this does NOT retry — the local change is
   /// discarded for good. Intended only for `dead_letter` rows surfaced in the

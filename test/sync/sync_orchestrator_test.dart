@@ -27,6 +27,7 @@ void main() {
   late _MockWatcher watcher;
   late _MockTransitions transitions;
   late List<bool> onlineStates;
+  late List<bool> reachableStates;
   late SyncOrchestrator orchestrator;
   late void Function()? capturedOnOnline;
   late void Function()? capturedOnOffline;
@@ -37,11 +38,13 @@ void main() {
     watcher = _MockWatcher();
     transitions = _MockTransitions();
     onlineStates = [];
+    reachableStates = [];
     capturedOnOnline = null;
     capturedOnOffline = null;
 
     when(() => worker.start(interval: any(named: 'interval'))).thenReturn(null);
     when(() => worker.stop()).thenAnswer((_) async {});
+    when(() => worker.recoverDeadLettered()).thenAnswer((_) async => 0);
     when(() => puller.pullAll()).thenAnswer((_) async => 0);
     when(() => transitions.loadOnce()).thenAnswer((_) async {});
     when(() => watcher.isOnline()).thenAnswer((_) async => true);
@@ -62,6 +65,7 @@ void main() {
       watcher: watcher,
       transitions: transitions,
       setOnline: (b) => onlineStates.add(b),
+      setReachable: (b) => reachableStates.add(b),
       workerInterval: const Duration(milliseconds: 50),
       pullerInterval: const Duration(milliseconds: 50),
     );
@@ -88,6 +92,13 @@ void main() {
       // Allow microtasks to drain.
       await Future<void>.delayed(Duration.zero);
       verify(() => puller.pullAll()).called(1);
+    });
+
+    test('recovers dead-lettered rows on startup (no manual retry UI)',
+        () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      verify(() => worker.recoverDeadLettered()).called(1);
     });
 
     test('seeds the setOnline callback from watcher.isOnline()', () async {
@@ -118,6 +129,111 @@ void main() {
 
       verify(() => puller.pullAll()).called(1);
       expect(onlineStates.last, isTrue);
+    });
+
+    test('a completed pull publishes reachable=true', () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(reachableStates.last, isTrue);
+    });
+
+    test('a failed pull publishes reachable=false', () async {
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => throw Exception('server unreachable'));
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(reachableStates.last, isFalse);
+    });
+
+    test('the offline edge publishes reachable=false', () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      capturedOnOffline!();
+      expect(reachableStates.last, isFalse);
+    });
+
+    test(
+        'recovers dead-lettered rows on the unreachable→reachable edge, even '
+        'with no connectivity edge (interface stayed up)', () async {
+      // First pull FAILS (server unreachable behind an up interface) → nothing
+      // recovered. A later pull SUCCEEDS → the reachability edge revives parked
+      // writes exactly once. This is the recovery path a connectivity edge
+      // can't provide when the interface never dropped.
+      var pulls = 0;
+      when(() => puller.pullAll()).thenAnswer((_) async {
+        pulls++;
+        if (pulls == 1) throw Exception('server unreachable');
+        return 0;
+      });
+
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => worker.recoverDeadLettered());
+      expect(reachableStates.last, isFalse);
+
+      // A subsequent pull now reaches the server.
+      await orchestrator.syncNow();
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => worker.recoverDeadLettered()).called(1);
+      expect(reachableStates.last, isTrue);
+    });
+
+    test(
+        'a periodic sweep keeps re-requeueing dead-lettered rows while the '
+        'server stays reachable (no further edge)', () async {
+      // The asymmetric case: reads keep succeeding (reachable stays true, so no
+      // false→true edge) while a write stays dead-lettered. The sweep alone
+      // must keep giving it fresh attempts so it self-heals without a
+      // disconnect/reconnect cycle.
+      final swept = SyncOrchestrator(
+        worker: worker,
+        puller: puller,
+        watcher: watcher,
+        transitions: transitions,
+        setOnline: (b) => onlineStates.add(b),
+        setReachable: (b) => reachableStates.add(b),
+        workerInterval: const Duration(milliseconds: 50),
+        // Keep periodic pulls out of the way so only the sweep drives recovery.
+        pullerInterval: const Duration(seconds: 30),
+        recoverSweepInterval: const Duration(milliseconds: 40),
+      );
+      addTearDown(swept.stop);
+
+      await swept.start();
+      // Startup pull succeeds → reachable=true and the edge fires one recover.
+      await Future<void>.delayed(Duration.zero);
+      clearInteractions(worker);
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      verify(() => worker.recoverDeadLettered())
+          .called(greaterThanOrEqualTo(2));
+    });
+
+    test('the periodic sweep does NOT requeue while the server is unreachable',
+        () async {
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => throw Exception('server unreachable'));
+      final swept = SyncOrchestrator(
+        worker: worker,
+        puller: puller,
+        watcher: watcher,
+        transitions: transitions,
+        setOnline: (b) => onlineStates.add(b),
+        setReachable: (b) => reachableStates.add(b),
+        workerInterval: const Duration(milliseconds: 50),
+        pullerInterval: const Duration(seconds: 30),
+        recoverSweepInterval: const Duration(milliseconds: 40),
+      );
+      addTearDown(swept.stop);
+
+      await swept.start();
+      // Startup pull fails → reachable=false, so no edge recover.
+      await Future<void>.delayed(Duration.zero);
+      clearInteractions(worker);
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      verifyNever(() => worker.recoverDeadLettered());
     });
 
     test('an offline edge reports online=false and does NOT trigger pullAll',
@@ -215,6 +331,35 @@ void main() {
       await expectLater(orchestrator.stop(), completes);
       verifyNever(() => worker.stop());
       verifyNever(() => watcher.dispose());
+    });
+
+    test('awaits any in-flight recoverDeadLettered before returning', () async {
+      // recoverDeadLettered() issues a DB write (UPDATE outbox ... WHERE
+      // status='dead_letter'). signOutAndReset calls stop() then truncates the
+      // outbox, so — exactly like the in-flight pullAll it already tracks —
+      // stop() must await this write first, or a stale requeue can land after
+      // the truncate and (on a shared device) revive a dead_letter row into the
+      // next rider's outbox.
+      final inflight = Completer<int>();
+      when(() => worker.recoverDeadLettered())
+          .thenAnswer((_) async => inflight.future);
+
+      await orchestrator.start();
+      // The startup pull confirms reachability; its unreachable→reachable edge
+      // kicks off recoverDeadLettered. Let that settle so it's in flight.
+      await Future<void>.delayed(Duration.zero);
+
+      final stopFuture = orchestrator.stop();
+      var stopCompleted = false;
+      unawaited(stopFuture.then((_) => stopCompleted = true));
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(stopCompleted, isFalse,
+          reason: 'stop should be waiting on the in-flight recover');
+
+      inflight.complete(0);
+      await stopFuture;
+      expect(stopCompleted, isTrue);
     });
 
     test('awaits any in-flight pullAll before returning', () async {
