@@ -24,6 +24,7 @@ class SyncOrchestrator {
     required this.watcher,
     required this.transitions,
     required this.setOnline,
+    required this.setReachable,
     this.workerInterval = const Duration(seconds: 5),
     this.pullerInterval = const Duration(seconds: 15),
   });
@@ -33,11 +34,24 @@ class SyncOrchestrator {
   final ConnectivityWatcher watcher;
   final ValidTransitionsLoader transitions;
   final void Function(bool isOnline) setOnline;
+
+  /// Publishes whether the server is *reachable*, derived from whether the last
+  /// [SyncPuller.pullAll] actually completed (a confirmed round-trip) rather
+  /// than from `connectivity_plus` interface state. The OutboxWorker consumes
+  /// this to decide whether a transient failure is a device-wide blip (retry
+  /// forever) or a row-specific hang (dead-letter). Kept distinct from
+  /// [setOnline] precisely so interface-presence can never drive that decision.
+  final void Function(bool reachable) setReachable;
   final Duration workerInterval;
   final Duration pullerInterval;
 
   bool _started = false;
   Timer? _pullTimer;
+
+  /// Last reachability we published, so [_reportReachable] can fire the
+  /// unreachable→reachable recovery exactly on the edge (a pull succeeding
+  /// after failures) instead of on every successful pull.
+  bool _reachable = false;
 
   /// Tracks the currently-running pullAll (immediate, periodic, or
   /// connectivity-triggered) so [stop] can wait for it to settle before
@@ -81,11 +95,10 @@ class SyncOrchestrator {
     }
 
     _started = true;
-    // Revive any write parked in dead_letter (e.g. from a build that dead-
-    // lettered flaky-network timeouts) so it drains itself — the app has no
-    // manual retry UI. The worker's drain timer, already armed above, picks up
-    // the requeued rows on its next tick.
-    _kickoffRecover();
+    // Kick the first pull. When it completes it publishes reachability, and the
+    // unreachable→reachable edge (see [_reportReachable]) is what revives any
+    // write parked in dead_letter — the app has no manual retry UI, and there
+    // is no point requeueing until a round-trip proves the server is back.
     _kickoffPull();
     _pullTimer = Timer.periodic(pullerInterval, (_) => _kickoffPull());
   }
@@ -118,14 +131,30 @@ class SyncOrchestrator {
 
   void _handleOnline() {
     setOnline(true);
-    // Reconnect edge: give any dead-lettered write a fresh set of drain
-    // attempts now that the transport is (probably) back.
-    _kickoffRecover();
+    // Interface came back. Kick a pull to confirm the server is actually
+    // reachable; its success edge (see [_reportReachable]) is what revives any
+    // parked write — we don't trust interface presence alone.
     _kickoffPull();
   }
 
   void _handleOffline() {
     setOnline(false);
+    // Interface down ⇒ definitively unreachable. Publish it immediately rather
+    // than waiting for the next pull to fail, so the worker stops penalising
+    // transient write failures right away.
+    _reportReachable(false);
+  }
+
+  /// Publishes a reachability change and, on the unreachable→reachable edge,
+  /// revives any write parked in dead_letter while the server was down. That
+  /// edge is the recovery trigger for the case a connectivity edge can't cover:
+  /// the interface stayed up the whole time and only the server was
+  /// unreachable, so [_handleOnline] never fired.
+  void _reportReachable(bool reachable) {
+    final was = _reachable;
+    _reachable = reachable;
+    setReachable(reachable);
+    if (reachable && !was) _kickoffRecover();
   }
 
   void _kickoffRecover() {
@@ -144,8 +173,19 @@ class SyncOrchestrator {
     if (_inFlightPull != null) return;
     final f = puller.pullAll();
     _inFlightPull = f.then(
-      (_) => _inFlightPull = null,
-      onError: (Object _) => _inFlightPull = null,
+      (_) {
+        _inFlightPull = null;
+        // A completed pull is a confirmed server round-trip — the server is
+        // reachable, so the worker may now treat a still-timing-out write as
+        // row-specific.
+        _reportReachable(true);
+      },
+      onError: (Object _) {
+        _inFlightPull = null;
+        // pullAll threw (fetch failed) — the server is unreachable, so the
+        // worker must keep retrying transient write failures without penalty.
+        _reportReachable(false);
+      },
     );
   }
 }

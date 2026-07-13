@@ -260,4 +260,48 @@ void main() {
         reason: 'transport errors must not burn the retry budget');
     expect(await repo.watchDeadLettered().first, isEmpty);
   });
+
+  test(
+      'a transient error DOES dead-letter when the server is reachable, so a '
+      'row that hangs the server cannot head-of-line block the queue', () async {
+    // The remaining edge the reachability gate closes. A successful pull has
+    // confirmed the server IS reachable, yet this create_pickup RPC keeps
+    // timing out — the hang is specific to this row's payload, not the network.
+    // It must dead-letter (bounded) so the healthy row queued behind it can
+    // sync, rather than retrying forever and blocking the queue.
+    final dispatched = <String>[];
+    final worker = OutboxWorker(
+      repo: repo,
+      dispatch: (forTable, op, rowId, payload) async {
+        dispatched.add(rowId);
+        if (rowId == 'poison') throw TimeoutException('server hang');
+      },
+      serverReachable: () => true,
+    );
+
+    await repo.enqueue(
+      id: 'poison', forTable: 'create_pickup', op: 'rpc',
+      rowId: 'poison', payload: const {},
+    );
+    // Enqueued after ⇒ sits behind the poison head row in FIFO order.
+    await repo.enqueue(
+      id: 'healthy', forTable: 'orders', op: 'update',
+      rowId: 'healthy', payload: const {},
+    );
+
+    // Budget is 5, so the 6th attempt dead-letters the poison head row.
+    for (var i = 0; i < 6; i++) {
+      await worker.drainOnce();
+    }
+    expect((await repo.watchDeadLettered().first).map((r) => r.id).toList(),
+        ['poison'],
+        reason: 'a row-specific transient hang must dead-letter when the '
+            'server is confirmed reachable');
+
+    // Head row gone from peekPending; the row behind it now syncs.
+    await worker.drainOnce();
+    expect(dispatched, contains('healthy'),
+        reason: 'the row behind the poison head must sync once it is parked');
+    expect(await repo.peekPending(limit: 10), isEmpty);
+  });
 }

@@ -27,6 +27,7 @@ void main() {
   late _MockWatcher watcher;
   late _MockTransitions transitions;
   late List<bool> onlineStates;
+  late List<bool> reachableStates;
   late SyncOrchestrator orchestrator;
   late void Function()? capturedOnOnline;
   late void Function()? capturedOnOffline;
@@ -37,6 +38,7 @@ void main() {
     watcher = _MockWatcher();
     transitions = _MockTransitions();
     onlineStates = [];
+    reachableStates = [];
     capturedOnOnline = null;
     capturedOnOffline = null;
 
@@ -63,6 +65,7 @@ void main() {
       watcher: watcher,
       transitions: transitions,
       setOnline: (b) => onlineStates.add(b),
+      setReachable: (b) => reachableStates.add(b),
       workerInterval: const Duration(milliseconds: 50),
       pullerInterval: const Duration(milliseconds: 50),
     );
@@ -128,16 +131,52 @@ void main() {
       expect(onlineStates.last, isTrue);
     });
 
-    test('a reconnect edge recovers dead-lettered rows', () async {
+    test('a completed pull publishes reachable=true', () async {
       await orchestrator.start();
       await Future<void>.delayed(Duration.zero);
-      // 1 from startup.
-      verify(() => worker.recoverDeadLettered()).called(1);
+      expect(reachableStates.last, isTrue);
+    });
 
-      capturedOnOnline!();
+    test('a failed pull publishes reachable=false', () async {
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => throw Exception('server unreachable'));
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(reachableStates.last, isFalse);
+    });
+
+    test('the offline edge publishes reachable=false', () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      capturedOnOffline!();
+      expect(reachableStates.last, isFalse);
+    });
+
+    test(
+        'recovers dead-lettered rows on the unreachable→reachable edge, even '
+        'with no connectivity edge (interface stayed up)', () async {
+      // First pull FAILS (server unreachable behind an up interface) → nothing
+      // recovered. A later pull SUCCEEDS → the reachability edge revives parked
+      // writes exactly once. This is the recovery path a connectivity edge
+      // can't provide when the interface never dropped.
+      var pulls = 0;
+      when(() => puller.pullAll()).thenAnswer((_) async {
+        pulls++;
+        if (pulls == 1) throw Exception('server unreachable');
+        return 0;
+      });
+
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => worker.recoverDeadLettered());
+      expect(reachableStates.last, isFalse);
+
+      // A subsequent pull now reaches the server.
+      await orchestrator.syncNow();
       await Future<void>.delayed(Duration.zero);
 
       verify(() => worker.recoverDeadLettered()).called(1);
+      expect(reachableStates.last, isTrue);
     });
 
     test('an offline edge reports online=false and does NOT trigger pullAll',
@@ -249,7 +288,9 @@ void main() {
           .thenAnswer((_) async => inflight.future);
 
       await orchestrator.start();
-      // start() kicks off recoverDeadLettered without awaiting; it's in flight.
+      // The startup pull confirms reachability; its unreachable→reachable edge
+      // kicks off recoverDeadLettered. Let that settle so it's in flight.
+      await Future<void>.delayed(Duration.zero);
 
       final stopFuture = orchestrator.stop();
       var stopCompleted = false;

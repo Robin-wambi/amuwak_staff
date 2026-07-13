@@ -17,12 +17,35 @@ class OutboxWorker {
   OutboxWorker({
     required this.repo,
     required this.dispatch,
+    this.serverReachable = _assumeUnreachable,
     this.batchSize = 25,
     this.deadLetterAfter = 5,
   });
 
   final OutboxRepository repo;
   final OutboxDispatch dispatch;
+
+  /// Reports whether the Supabase server is currently *reachable* — and this
+  /// must be sourced from a CONFIRMED server round-trip (a successful
+  /// [SyncPuller.pullAll]), NOT from `connectivity_plus`. That distinction is
+  /// the whole point: an attached Wi-Fi/cellular interface reports "online"
+  /// long before (or without ever) the server being reachable, so trusting it
+  /// would dead-letter a rider's good write on a poor network — the very bug
+  /// this class was fixed for.
+  ///
+  /// It disambiguates the two ways a transient transport error can arise:
+  ///   - server unreachable (a pull would also be failing) → device-wide blip,
+  ///     retry the row forever, never penalise it;
+  ///   - server reachable (a pull just succeeded) yet THIS row still times out
+  ///     → the failure is row-specific (e.g. an RPC that hangs on this
+  ///     payload), so count it toward the dead-letter budget where it can no
+  ///     longer head-of-line block the queue.
+  ///
+  /// Defaults to [_assumeUnreachable] (`() => false`) — the fail-safe: with no
+  /// wired signal we never turn a transient failure into a dead-letter.
+  final bool Function() serverReachable;
+
+  static bool _assumeUnreachable() => false;
 
   final int batchSize;
 
@@ -115,24 +138,21 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        if (isTransientSyncError(e)) {
-          // A transport-layer failure (timeout, dropped socket, DNS): the
-          // server was unreachable for this attempt. It is device-wide, never
-          // caused by this row's payload — so leave the row pending and stop
-          // this drain; the next cycle retries WITHOUT burning the dead-letter
-          // budget. This is what keeps a poor-network rider's good write from
-          // being permanently parked: `connectivity_plus` reports "online" the
-          // moment an interface attaches, long before the server is actually
-          // reachable, so we must NOT rely on that signal to decide a timed-out
-          // write is row-specific. A genuinely row-specific rejection reaches
-          // the server and comes back as a PostgrestException (handled above)
-          // or a logic StateError — those still dead-letter, so a real poison
-          // row can't head-of-line block the queue forever.
+        if (isTransientSyncError(e) && !serverReachable()) {
+          // Transport-layer failure (timeout, dropped socket, DNS) AND no
+          // confirmed server contact: a device-wide blip, not this row's fault.
+          // Leave it pending and stop this drain; the next cycle retries
+          // WITHOUT burning the dead-letter budget. This is what keeps a
+          // poor-network rider's good write from being permanently parked.
           return sent;
         }
-        // A permanent, row-specific error (e.g. a StateError from an unknown
-        // op). Count it toward the dead-letter budget so one persistently-
-        // failing head row can't head-of-line block the rest of the queue.
+        // Either a permanent, row-specific error (e.g. a StateError from an
+        // unknown op), OR a transient failure while the server is confirmed
+        // reachable (a pull just succeeded) — which makes the failure
+        // row-specific (e.g. an RPC that hangs on this payload). Count it
+        // toward the dead-letter budget so one persistently-failing head row
+        // can't head-of-line block the rest of the queue; auto-requeue on the
+        // next reconnect gives it fresh attempts.
         await repo.markFailed(row.id, e.toString(),
             deadLetterAfter: deadLetterAfter);
         return sent;

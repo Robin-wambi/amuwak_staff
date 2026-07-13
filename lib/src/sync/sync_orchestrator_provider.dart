@@ -25,6 +25,11 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
     worker: OutboxWorker(
       repo: OutboxRepository(db),
       dispatch: OutboxWorker.supabaseDispatcher(supabase),
+      // Sourced from confirmed pull round-trips (see serverReachableProvider),
+      // NOT connectivity_plus — so a poor-network interface-up device never
+      // dead-letters a good write, while a server that hangs on one payload
+      // still parks that row instead of blocking the queue.
+      serverReachable: () => ref.read(serverReachableProvider),
     ),
     puller: SyncPuller(
       db: db,
@@ -38,6 +43,8 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
     ),
     setOnline: (online) =>
         ref.read(onlineProvider.notifier).state = online,
+    setReachable: (reachable) =>
+        ref.read(serverReachableProvider.notifier).state = reachable,
   );
 });
 
