@@ -179,6 +179,63 @@ void main() {
       expect(reachableStates.last, isTrue);
     });
 
+    test(
+        'a periodic sweep keeps re-requeueing dead-lettered rows while the '
+        'server stays reachable (no further edge)', () async {
+      // The asymmetric case: reads keep succeeding (reachable stays true, so no
+      // false→true edge) while a write stays dead-lettered. The sweep alone
+      // must keep giving it fresh attempts so it self-heals without a
+      // disconnect/reconnect cycle.
+      final swept = SyncOrchestrator(
+        worker: worker,
+        puller: puller,
+        watcher: watcher,
+        transitions: transitions,
+        setOnline: (b) => onlineStates.add(b),
+        setReachable: (b) => reachableStates.add(b),
+        workerInterval: const Duration(milliseconds: 50),
+        // Keep periodic pulls out of the way so only the sweep drives recovery.
+        pullerInterval: const Duration(seconds: 30),
+        recoverSweepInterval: const Duration(milliseconds: 40),
+      );
+      addTearDown(swept.stop);
+
+      await swept.start();
+      // Startup pull succeeds → reachable=true and the edge fires one recover.
+      await Future<void>.delayed(Duration.zero);
+      clearInteractions(worker);
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      verify(() => worker.recoverDeadLettered())
+          .called(greaterThanOrEqualTo(2));
+    });
+
+    test('the periodic sweep does NOT requeue while the server is unreachable',
+        () async {
+      when(() => puller.pullAll())
+          .thenAnswer((_) async => throw Exception('server unreachable'));
+      final swept = SyncOrchestrator(
+        worker: worker,
+        puller: puller,
+        watcher: watcher,
+        transitions: transitions,
+        setOnline: (b) => onlineStates.add(b),
+        setReachable: (b) => reachableStates.add(b),
+        workerInterval: const Duration(milliseconds: 50),
+        pullerInterval: const Duration(seconds: 30),
+        recoverSweepInterval: const Duration(milliseconds: 40),
+      );
+      addTearDown(swept.stop);
+
+      await swept.start();
+      // Startup pull fails → reachable=false, so no edge recover.
+      await Future<void>.delayed(Duration.zero);
+      clearInteractions(worker);
+
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      verifyNever(() => worker.recoverDeadLettered());
+    });
+
     test('an offline edge reports online=false and does NOT trigger pullAll',
         () async {
       await orchestrator.start();

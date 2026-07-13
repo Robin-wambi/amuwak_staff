@@ -27,6 +27,7 @@ class SyncOrchestrator {
     required this.setReachable,
     this.workerInterval = const Duration(seconds: 5),
     this.pullerInterval = const Duration(seconds: 15),
+    this.recoverSweepInterval = const Duration(minutes: 5),
   });
 
   final OutboxWorker worker;
@@ -45,8 +46,18 @@ class SyncOrchestrator {
   final Duration workerInterval;
   final Duration pullerInterval;
 
+  /// How often to re-requeue dead-lettered rows while the server is reachable.
+  /// Edge-triggered recovery ([_reportReachable]) only fires on the
+  /// unreachable→reachable transition, so it misses a row dead-lettered while
+  /// the server stayed reachable throughout (e.g. an asymmetric connection
+  /// where reads succeed but this write keeps timing out). This low-frequency
+  /// sweep gives such a row periodic fresh attempts so it self-heals without
+  /// waiting for a disconnect/reconnect cycle or an app restart.
+  final Duration recoverSweepInterval;
+
   bool _started = false;
   Timer? _pullTimer;
+  Timer? _recoverTimer;
 
   /// Last reachability we published, so [_reportReachable] can fire the
   /// unreachable→reachable recovery exactly on the edge (a pull succeeding
@@ -101,6 +112,13 @@ class SyncOrchestrator {
     // is no point requeueing until a round-trip proves the server is back.
     _kickoffPull();
     _pullTimer = Timer.periodic(pullerInterval, (_) => _kickoffPull());
+    _recoverTimer = Timer.periodic(recoverSweepInterval, (_) {
+      // Only sweep while the server is reachable: requeueing a row when the
+      // server is unreachable just churns it back to pending where it skips
+      // anyway. When reachable, this revives any write parked without a
+      // reachability edge (the asymmetric reads-ok/writes-fail case).
+      if (_reachable) _kickoffRecover();
+    });
   }
 
   Future<void> stop() async {
@@ -109,6 +127,8 @@ class SyncOrchestrator {
 
     _pullTimer?.cancel();
     _pullTimer = null;
+    _recoverTimer?.cancel();
+    _recoverTimer = null;
     await worker.stop();
     watcher.dispose();
 
