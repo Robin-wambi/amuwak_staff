@@ -237,6 +237,33 @@ void main() {
       verifyNever(() => watcher.dispose());
     });
 
+    test('awaits any in-flight recoverDeadLettered before returning', () async {
+      // recoverDeadLettered() issues a DB write (UPDATE outbox ... WHERE
+      // status='dead_letter'). signOutAndReset calls stop() then truncates the
+      // outbox, so — exactly like the in-flight pullAll it already tracks —
+      // stop() must await this write first, or a stale requeue can land after
+      // the truncate and (on a shared device) revive a dead_letter row into the
+      // next rider's outbox.
+      final inflight = Completer<int>();
+      when(() => worker.recoverDeadLettered())
+          .thenAnswer((_) async => inflight.future);
+
+      await orchestrator.start();
+      // start() kicks off recoverDeadLettered without awaiting; it's in flight.
+
+      final stopFuture = orchestrator.stop();
+      var stopCompleted = false;
+      unawaited(stopFuture.then((_) => stopCompleted = true));
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(stopCompleted, isFalse,
+          reason: 'stop should be waiting on the in-flight recover');
+
+      inflight.complete(0);
+      await stopFuture;
+      expect(stopCompleted, isTrue);
+    });
+
     test('awaits any in-flight pullAll before returning', () async {
       // Make pullAll resolve on a controllable completer so we can verify
       // the orchestrator's stop() awaits it.

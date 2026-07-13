@@ -48,6 +48,13 @@ class SyncOrchestrator {
   /// with `_truncateAllTables` on sign-out (Task 15).
   Future<void>? _inFlightPull;
 
+  /// Tracks the currently-running [OutboxWorker.recoverDeadLettered] write so
+  /// [stop] can await it before `signOutAndReset` truncates the outbox — the
+  /// same orphan-vs-truncate race [_inFlightPull] guards. A concurrent
+  /// [_kickoffRecover] (start() plus a near-simultaneous reconnect edge) skips
+  /// re-entry rather than orphaning the earlier write.
+  Future<void>? _inFlightRecover;
+
   Future<void> start() async {
     if (_started) return;
 
@@ -76,9 +83,9 @@ class SyncOrchestrator {
     _started = true;
     // Revive any write parked in dead_letter (e.g. from a build that dead-
     // lettered flaky-network timeouts) so it drains itself — the app has no
-    // manual retry UI. Fire-and-forget: the worker's drain timer, already
-    // armed above, picks up the requeued rows on its next tick.
-    unawaited(worker.recoverDeadLettered());
+    // manual retry UI. The worker's drain timer, already armed above, picks up
+    // the requeued rows on its next tick.
+    _kickoffRecover();
     _kickoffPull();
     _pullTimer = Timer.periodic(pullerInterval, (_) => _kickoffPull());
   }
@@ -92,8 +99,10 @@ class SyncOrchestrator {
     await worker.stop();
     watcher.dispose();
 
-    final inflight = _inFlightPull;
-    if (inflight != null) await inflight;
+    final inflightPull = _inFlightPull;
+    if (inflightPull != null) await inflightPull;
+    final inflightRecover = _inFlightRecover;
+    if (inflightRecover != null) await inflightRecover;
   }
 
   /// Manual refresh — pull every registered table now. Used by a "swipe
@@ -111,12 +120,24 @@ class SyncOrchestrator {
     setOnline(true);
     // Reconnect edge: give any dead-lettered write a fresh set of drain
     // attempts now that the transport is (probably) back.
-    unawaited(worker.recoverDeadLettered());
+    _kickoffRecover();
     _kickoffPull();
   }
 
   void _handleOffline() {
     setOnline(false);
+  }
+
+  void _kickoffRecover() {
+    if (_inFlightRecover != null) return;
+    final f = worker.recoverDeadLettered();
+    // Mirror [_kickoffPull]: track the write so [stop] can await it, and
+    // swallow any error here so a failed requeue can't escape as an unhandled
+    // async exception (the drain timer retries the underlying work anyway).
+    _inFlightRecover = f.then(
+      (_) => _inFlightRecover = null,
+      onError: (Object _) => _inFlightRecover = null,
+    );
   }
 
   void _kickoffPull() {
