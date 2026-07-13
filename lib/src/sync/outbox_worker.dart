@@ -17,26 +17,12 @@ class OutboxWorker {
   OutboxWorker({
     required this.repo,
     required this.dispatch,
-    required this.isOnline,
     this.batchSize = 25,
     this.deadLetterAfter = 5,
   });
 
   final OutboxRepository repo;
   final OutboxDispatch dispatch;
-
-  /// Reports whether the device currently has connectivity. Used to tell an
-  /// offline blip (skip without penalty) apart from an online, row-specific
-  /// transient failure (must count toward the dead-letter budget so a poison
-  /// head row can't block the queue forever).
-  ///
-  /// Required so the offline-vs-online decision is always an explicit caller
-  /// choice. A caller with no real signal should pass `() => false` ("assume
-  /// offline") — the fail-safe that never turns a flaky-signal rider's good
-  /// writes into false errors — but must opt into it deliberately rather than
-  /// inherit it from a forgotten parameter, which would silently reintroduce
-  /// unbounded head-of-line blocking for transient errors.
-  final bool Function() isOnline;
 
   final int batchSize;
 
@@ -86,6 +72,13 @@ class OutboxWorker {
     };
   }
 
+  /// Revives every dead-lettered row so the next drain retries it, returning
+  /// how many were revived. The orchestrator calls this on sign-in and on
+  /// reconnect — with no manual retry UI, this is the only recovery path for a
+  /// parked write. The running drain timer picks the revived rows up on its
+  /// next tick.
+  Future<int> recoverDeadLettered() => repo.requeueAllDeadLettered();
+
   /// Pump one batch of pending mutations. Returns the count successfully sent.
   /// Stops on the first failure to avoid hammering a flaky backend.
   Future<int> drainOnce() {
@@ -122,17 +115,24 @@ class OutboxWorker {
             deadLetterAfter: deadLetterAfter);
         return sent;
       } catch (e) {
-        if (isTransientSyncError(e) && !isOnline()) {
-          // Offline (or connectivity unknown): a whole-device transport blip,
-          // not this row's fault. Leave it pending and stop this drain; the
-          // next cycle retries WITHOUT burning the dead-letter budget. Keeps a
-          // flaky-signal rider from accumulating false sync errors.
+        if (isTransientSyncError(e)) {
+          // A transport-layer failure (timeout, dropped socket, DNS): the
+          // server was unreachable for this attempt. It is device-wide, never
+          // caused by this row's payload — so leave the row pending and stop
+          // this drain; the next cycle retries WITHOUT burning the dead-letter
+          // budget. This is what keeps a poor-network rider's good write from
+          // being permanently parked: `connectivity_plus` reports "online" the
+          // moment an interface attaches, long before the server is actually
+          // reachable, so we must NOT rely on that signal to decide a timed-out
+          // write is row-specific. A genuinely row-specific rejection reaches
+          // the server and comes back as a PostgrestException (handled above)
+          // or a logic StateError — those still dead-letter, so a real poison
+          // row can't head-of-line block the queue forever.
           return sent;
         }
-        // Either a permanent error, or a transient-looking error while the
-        // device IS online — which makes it row-specific. Count it toward the
-        // dead-letter budget so one persistently-failing head row can't
-        // head-of-line block the rest of the queue indefinitely.
+        // A permanent, row-specific error (e.g. a StateError from an unknown
+        // op). Count it toward the dead-letter budget so one persistently-
+        // failing head row can't head-of-line block the rest of the queue.
         await repo.markFailed(row.id, e.toString(),
             deadLetterAfter: deadLetterAfter);
         return sent;

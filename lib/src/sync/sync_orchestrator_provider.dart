@@ -25,11 +25,6 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
     worker: OutboxWorker(
       repo: OutboxRepository(db),
       dispatch: OutboxWorker.supabaseDispatcher(supabase),
-      // Lets the worker tell an offline blip (skip, no penalty) apart from an
-      // online row-specific transient failure (count toward dead-letter so a
-      // poison head row can't block the queue). onlineProvider is driven by
-      // ConnectivityWatcher via SyncOrchestrator.
-      isOnline: () => ref.read(onlineProvider),
     ),
     puller: SyncPuller(
       db: db,

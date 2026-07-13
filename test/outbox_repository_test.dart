@@ -158,6 +158,57 @@ void main() {
       expect(pending.map((r) => r.id), contains('k-stuck'));
     });
 
+    test(
+        'requeueAllDeadLettered revives every dead-lettered row and leaves '
+        'pending/failed rows untouched', () async {
+      // The app has no manual retry UI, so the orchestrator calls this on
+      // sign-in and on reconnect to auto-recover any parked write. It must
+      // touch ONLY dead_letter rows — a still-pending or merely-failed row's
+      // retry budget must survive.
+      await repo.enqueue(
+        id: 'dead-1', forTable: 'create_pickup', op: 'rpc', rowId: 'A',
+        payload: const {},
+      );
+      await repo.enqueue(
+        id: 'dead-2', forTable: 'orders', op: 'update', rowId: 'B',
+        payload: const {},
+      );
+      await repo.enqueue(
+        id: 'pending-1', forTable: 'orders', op: 'update', rowId: 'C',
+        payload: const {},
+      );
+      await repo.enqueue(
+        id: 'failed-1', forTable: 'orders', op: 'update', rowId: 'D',
+        payload: const {},
+      );
+      // Dead-letter the first two (budget is 5, so 6 failures parks them).
+      for (var i = 0; i < 6; i++) {
+        await repo.markFailed('dead-1', 'boom');
+        await repo.markFailed('dead-2', 'boom');
+      }
+      // failed-1: a single failure → status 'failed', retryCount 1, NOT dead.
+      await repo.markFailed('failed-1', 'boom');
+
+      final revived = await repo.requeueAllDeadLettered();
+
+      expect(revived, 2, reason: 'only the two dead-lettered rows are revived');
+      expect(await repo.watchDeadLettered().first, isEmpty);
+
+      final all = await db.select(db.outbox).get();
+      final byId = {for (final r in all) r.id: r};
+      expect(byId['dead-1']!.status, 'pending');
+      expect(byId['dead-1']!.retryCount, 0);
+      expect(byId['dead-1']!.lastError, isNull);
+      expect(byId['dead-2']!.status, 'pending');
+      expect(byId['dead-2']!.retryCount, 0);
+
+      // Untouched: the merely-failed row keeps its status and budget.
+      expect(byId['failed-1']!.status, 'failed',
+          reason: 'requeueAllDeadLettered must only act on dead_letter rows');
+      expect(byId['failed-1']!.retryCount, 1);
+      expect(byId['pending-1']!.status, 'pending');
+    });
+
     test('requeue leaves a still-failed (not dead-lettered) row untouched',
         () async {
       await repo.enqueue(

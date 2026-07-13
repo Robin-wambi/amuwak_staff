@@ -74,6 +74,11 @@ class SyncOrchestrator {
     }
 
     _started = true;
+    // Revive any write parked in dead_letter (e.g. from a build that dead-
+    // lettered flaky-network timeouts) so it drains itself — the app has no
+    // manual retry UI. Fire-and-forget: the worker's drain timer, already
+    // armed above, picks up the requeued rows on its next tick.
+    unawaited(worker.recoverDeadLettered());
     _kickoffPull();
     _pullTimer = Timer.periodic(pullerInterval, (_) => _kickoffPull());
   }
@@ -104,6 +109,9 @@ class SyncOrchestrator {
 
   void _handleOnline() {
     setOnline(true);
+    // Reconnect edge: give any dead-lettered write a fresh set of drain
+    // attempts now that the transport is (probably) back.
+    unawaited(worker.recoverDeadLettered());
     _kickoffPull();
   }
 

@@ -35,12 +35,9 @@ void main() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     repo = OutboxRepository(db);
     recorder = _DispatchRecorder();
-    // Default to "assume offline" so the transient-skip path is exercised;
-    // tests that need the online path build their own worker with () => true.
     worker = OutboxWorker(
       repo: repo,
       dispatch: recorder.dispatch,
-      isOnline: () => false,
     );
   });
 
@@ -103,12 +100,7 @@ void main() {
     await repo.enqueue(id: 'm2', forTable: 'orders', op: 'insert',
                        rowId: 'r2', payload: const {});
 
-    final onlineWorker = OutboxWorker(
-      repo: repo,
-      dispatch: recorder.dispatch,
-      isOnline: () => true,
-    );
-    final drained = await onlineWorker.drainOnce();
+    final drained = await worker.drainOnce();
 
     expect(drained, 2, reason: 'both already-present rows count as sent');
     expect(await repo.peekPending(limit: 10), isEmpty,
@@ -234,46 +226,38 @@ void main() {
   });
 
   test(
-      'an online, persistently-transient head row dead-letters so it cannot '
-      'block the queue forever', () async {
-    // Bug-1 regression guard. While the device is ONLINE, the head row keeps
-    // throwing a transient-looking transport error. If we skipped it the way
-    // we skip genuine offline blips, the drain would `return` on it every
-    // cycle and the healthy row behind it would never sync — a permanently
-    // stuck pending count. Online ⇒ the failure is row-specific ⇒ it must
-    // count toward the dead-letter budget and eventually dead-letter.
-    final onlineWorker = OutboxWorker(
-      repo: repo,
-      dispatch: recorder.dispatch,
-      isOnline: () => true,
-    );
-    recorder.throwThis = SocketException('connection reset');
+      'transport errors never dead-letter: a good write on a flaky network '
+      'retries forever instead of being permanently parked', () async {
+    // The reported bug. connectivity_plus reports "online" the moment a Wi-Fi/
+    // cellular interface is attached — NOT when the server is actually
+    // reachable. On a poor network the interface is up but every dispatch times
+    // out. A transport failure (timeout/dropped socket/DNS) is device-wide, not
+    // caused by this row's payload, so it must NEVER burn the dead-letter
+    // budget — otherwise a rider's saved create_pickup is permanently parked
+    // and its real order code never syncs, even after the network recovers.
+    //
+    // A genuinely row-specific rejection reaches the server and comes back as a
+    // PostgrestException (or a logic StateError) — those still dead-letter (see
+    // the tests above), so a real poison row can't head-of-line block the queue.
+    recorder.throwThis = TimeoutException('deadline exceeded');
 
     await repo.enqueue(
-      id: 'poison', forTable: 'orders', op: 'insert',
-      rowId: 'r1', payload: const {},
-    );
-    // Enqueued second ⇒ sorts after 'poison' by createdAt, so it sits behind
-    // the poison head row in the FIFO queue.
-    await repo.enqueue(
-      id: 'healthy', forTable: 'orders', op: 'insert',
-      rowId: 'r2', payload: const {},
+      id: 'create_pickup:rpc:o1', forTable: 'create_pickup', op: 'rpc',
+      rowId: 'o1', payload: const {},
     );
 
-    // Budget is 5, so the 6th attempt dead-letters the poison head row.
-    for (var i = 0; i < 6; i++) {
-      await onlineWorker.drainOnce();
+    // Far more drains than deadLetterAfter (5) — a sustained flaky-network spell.
+    for (var i = 0; i < 10; i++) {
+      expect(await worker.drainOnce(), 0);
     }
-    expect((await repo.watchDeadLettered().first).map((r) => r.id).toList(),
-        ['poison'],
-        reason: 'online transient failures must still dead-letter');
 
-    // Head row is gone from peekPending; the row behind it can now sync.
-    recorder.throwThis = null;
-    await onlineWorker.drainOnce();
-
-    expect(recorder.calls.any((c) => c[2] == 'r2'), isTrue,
-        reason: 'the row behind the poison head must eventually sync');
-    expect(await repo.peekPending(limit: 10), isEmpty);
+    final pending = await repo.peekPending(limit: 10);
+    expect(pending, hasLength(1),
+        reason: 'the row must remain queued, not dead-lettered');
+    expect(pending.first.status, 'pending',
+        reason: 'a flaky-network timeout must not flip status to dead_letter');
+    expect(pending.first.retryCount, 0,
+        reason: 'transport errors must not burn the retry budget');
+    expect(await repo.watchDeadLettered().first, isEmpty);
   });
 }

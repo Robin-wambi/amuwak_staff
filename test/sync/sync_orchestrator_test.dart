@@ -42,6 +42,7 @@ void main() {
 
     when(() => worker.start(interval: any(named: 'interval'))).thenReturn(null);
     when(() => worker.stop()).thenAnswer((_) async {});
+    when(() => worker.recoverDeadLettered()).thenAnswer((_) async => 0);
     when(() => puller.pullAll()).thenAnswer((_) async => 0);
     when(() => transitions.loadOnce()).thenAnswer((_) async {});
     when(() => watcher.isOnline()).thenAnswer((_) async => true);
@@ -90,6 +91,13 @@ void main() {
       verify(() => puller.pullAll()).called(1);
     });
 
+    test('recovers dead-lettered rows on startup (no manual retry UI)',
+        () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      verify(() => worker.recoverDeadLettered()).called(1);
+    });
+
     test('seeds the setOnline callback from watcher.isOnline()', () async {
       when(() => watcher.isOnline()).thenAnswer((_) async => true);
       await orchestrator.start();
@@ -118,6 +126,18 @@ void main() {
 
       verify(() => puller.pullAll()).called(1);
       expect(onlineStates.last, isTrue);
+    });
+
+    test('a reconnect edge recovers dead-lettered rows', () async {
+      await orchestrator.start();
+      await Future<void>.delayed(Duration.zero);
+      // 1 from startup.
+      verify(() => worker.recoverDeadLettered()).called(1);
+
+      capturedOnOnline!();
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => worker.recoverDeadLettered()).called(1);
     });
 
     test('an offline edge reports online=false and does NOT trigger pullAll',
