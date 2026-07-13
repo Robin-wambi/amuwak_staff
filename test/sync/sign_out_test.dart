@@ -3,7 +3,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:amuwak_staff/src/auth/auth_service.dart';
 import 'package:amuwak_staff/src/auth/sign_out.dart';
 import 'package:amuwak_staff/src/data/app_database.dart';
 import 'package:amuwak_core/amuwak_core.dart';

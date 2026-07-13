@@ -6,8 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:amuwak_staff/src/auth/auth_service.dart';
-import 'package:amuwak_staff/src/auth/session.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
 
