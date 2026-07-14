@@ -23,8 +23,9 @@ SELECT has_table('public', 'valid_transitions', 'valid_transitions table exists'
 --   driver_pickup/customer_collect = 5
 --   driver_pickup/delivery        = 6
 --   phone_order (copy of driver_pickup variants) = 5 + 6 = 11
---   Total = 31
-SELECT is((SELECT count(*) FROM public.valid_transitions)::int, 31,
+--   customer_app (copy of driver_pickup variants, added in 0044) = 5 + 6 = 11
+--   Total = 42
+SELECT is((SELECT count(*) FROM public.valid_transitions)::int, 42,
   'valid_transitions seeded with all intake/fulfillment/status combinations');
 
 SELECT is(
