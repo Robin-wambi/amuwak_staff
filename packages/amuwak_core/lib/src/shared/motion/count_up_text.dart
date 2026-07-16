@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:amuwak_core/amuwak_core.dart';
+import '../theme/app_motion.dart';
 
 /// Renders an integer [value] that animates up to its target. When [value]
 /// changes the tween re-runs from the currently displayed number to the new

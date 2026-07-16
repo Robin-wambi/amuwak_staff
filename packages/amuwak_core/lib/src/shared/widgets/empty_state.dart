@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:amuwak_core/amuwak_core.dart';
+import '../theme/app_colors.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({

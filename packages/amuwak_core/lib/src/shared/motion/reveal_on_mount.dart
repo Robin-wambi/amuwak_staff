@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:amuwak_core/amuwak_core.dart';
+import '../theme/app_motion.dart';
 
 /// Fades a [child] in (0→1) and slides it up ([AppMotion.revealOffset]→0) once,
 /// when it first mounts. Pass [delay] to stagger siblings:
