@@ -1,9 +1,9 @@
 import 'dart:developer' as developer;
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:amuwak_core/amuwak_core.dart';
 import 'connectivity_watcher.dart';
 import 'outbox_repository.dart';
 import 'outbox_worker.dart';

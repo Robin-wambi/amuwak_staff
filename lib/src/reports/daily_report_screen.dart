@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 
 import '../expenses/expense.dart';
@@ -7,7 +8,6 @@ import '../expenses/expense_list_extensions.dart';
 import '../orders/order.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 import 'report_period.dart';
 
 class DailyReportScreen extends StatelessWidget {

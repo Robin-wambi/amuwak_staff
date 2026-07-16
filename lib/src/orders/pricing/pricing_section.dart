@@ -1,7 +1,7 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../pricing/catalog_item.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 
 /// Editable list of free-form line items, with an "Add item" button. Stateless:
 /// the parent owns the list and re-renders on change.

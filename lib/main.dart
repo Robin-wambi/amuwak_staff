@@ -1,12 +1,12 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'src/auth/auth_gate.dart';
 import 'src/bootstrap/app_bootstrap.dart';
 import 'src/printing/printing_providers.dart';
 import 'src/sync/sync_orchestrator_provider.dart';
-
-import 'package:amuwak_core/amuwak_core.dart';
 
 Future<void> main() async {
   await AppBootstrap.initialize();

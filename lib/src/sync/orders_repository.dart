@@ -1,10 +1,10 @@
 import 'dart:convert';
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:drift/drift.dart' show Value;
 
 import '../data/app_database.dart';
 import '../orders/order.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 import 'outbox_repository.dart';
 import 'supabase_payloads.dart';
 

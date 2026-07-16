@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,7 +32,6 @@ import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../pricing/pricing_catalog_screen.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';

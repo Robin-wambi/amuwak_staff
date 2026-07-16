@@ -1,6 +1,7 @@
+import 'package:amuwak_core/amuwak_core.dart';
+
 import '../data/app_database.dart';
 import '../sync/sync_orchestrator.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 
 /// Cleanly tears down the per-user sync state and signs the user out.
 ///

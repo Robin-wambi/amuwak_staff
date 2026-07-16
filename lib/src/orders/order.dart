@@ -1,7 +1,8 @@
 import 'dart:convert';
 
-import '../data/app_database.dart' as drift;
 import 'package:amuwak_core/amuwak_core.dart';
+
+import '../data/app_database.dart' as drift;
 import 'proof_event.dart';
 
 class LaundryOrder {

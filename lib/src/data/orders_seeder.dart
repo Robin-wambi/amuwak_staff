@@ -1,6 +1,7 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show kReleaseMode;
-import 'package:amuwak_core/amuwak_core.dart';
+
 import 'app_database.dart';
 
 class OrdersSeeder {

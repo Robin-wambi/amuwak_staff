@@ -1,7 +1,8 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../dashboard/current_staff_provider.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 import '../sync/repository_providers.dart';
 
 /// Lets a signed-in user choose a name and password. Reached two ways, both of

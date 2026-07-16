@@ -1,5 +1,6 @@
-import 'order.dart';
 import 'package:amuwak_core/amuwak_core.dart';
+
+import 'order.dart';
 
 /// The set of order subsets a dashboard summary card can drill into.
 ///
