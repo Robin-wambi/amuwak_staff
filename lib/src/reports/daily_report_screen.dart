@@ -1085,19 +1085,29 @@ class _MonthlyRevenueTrackerCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatUgx(series.totalUgx),
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w800,
+                // Flexible so a large month-to-date total cannot claim more than
+                // its share of the row and shove the title to zero width; the
+                // number then scales down to fit rather than overflowing.
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatUgx(series.totalUgx),
+                          maxLines: 1,
+                          style: textTheme.headlineSmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs / 2),
-                    Text(completedLabel, style: textTheme.bodySmall),
-                  ],
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Text(completedLabel, style: textTheme.bodySmall),
+                    ],
+                  ),
                 ),
               ],
             ),
