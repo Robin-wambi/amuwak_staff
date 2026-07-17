@@ -85,6 +85,10 @@ void main() {
         home: OrderDetailsScreen(
           order: const LaundryOrder(
             orderId: 'AMW-0421',
+            // Server-minted code, distinct from orderId, so hasServerCode is
+            // true and the flow can reach the tag/QR stage. Without this the
+            // code defaults to orderId and the order reads as unsynced.
+            orderCode: 'AMW-2026-0421',
             customerName: 'Jane',
             serviceType: ServiceType.washOnly,
             status: OrderStatus.pendingPickup,
@@ -98,7 +102,9 @@ void main() {
           pickPhoto: () async => const [1, 2, 3],
           cameraViewBuilder: (ctx, onDetected) {
             return FakeCameraView(
-              scannedValue: 'AMW-0421',
+              // The rider scans the tag, which carries the server-minted
+              // orderCode — not the internal orderId.
+              scannedValue: 'AMW-2026-0421',
               onDetected: onDetected,
             );
           },

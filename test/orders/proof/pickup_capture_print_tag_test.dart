@@ -33,8 +33,11 @@ class _StubPhotoStorage implements ProofPhotoStorage {
       'path-$index';
 }
 
+// A synced order: the UUID orderId differs from the server-minted orderCode, so
+// hasServerCode is true and the tag/QR stage renders. Keep them distinct — when
+// they match, the order reads as an unsynced placeholder and the tag is hidden.
 const _order = LaundryOrder(
-  orderId: 'AMW-2026-0042',
+  orderId: '019e9147-608b-72b7-9e2c-0baa04e85094',
   orderCode: 'AMW-2026-0042',
   customerName: 'Jane Doe',
   serviceType: ServiceType.washAndIron,
