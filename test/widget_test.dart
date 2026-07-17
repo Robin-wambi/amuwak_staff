@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/main.dart';
-import 'package:amuwak_staff/src/auth/session.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/sync/sync_orchestrator_provider.dart';
 
 void main() {

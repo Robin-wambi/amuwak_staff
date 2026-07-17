@@ -1,9 +1,9 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../sync/sync_errors_provider.dart';
 import '../../sync/sync_status.dart';
-import '../theme/app_colors.dart';
 
 /// A thin banner shown above the staff dashboard. Priority order:
 ///   1. Sync errors (red, tappable → opens the sync-errors screen)

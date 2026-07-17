@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 LaundryOrder _base() => LaundryOrder(
       orderId: 'o1',

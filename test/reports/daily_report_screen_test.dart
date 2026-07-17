@@ -5,12 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_filter.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
-import 'package:amuwak_staff/src/shared/theme/app_card.dart';
 
 // Default spend date is local Wed 2026-06-17 — matches [_fixedNow] so the
 // daily window contains it. Pass [on] to place an expense on another day.
@@ -375,6 +372,40 @@ void main() {
       expect(
           find.descendant(
               of: tracker, matching: find.text('0 completed deliveries')),
+          findsOneWidget);
+    });
+
+    testWidgets('keeps the month-to-date total from overflowing the header '
+        'at 360px for large totals', (tester) async {
+      tester.view.physicalSize = const Size(360, 8000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DailyReportView(
+            now: _fixedNow,
+            orders: [
+              // A large month-to-date total (USh 24,691,356) makes the tracker's
+              // headline number wide. In the header row it must shrink to fit
+              // rather than shove the "This month revenue tracker" title to zero
+              // width and overflow the row.
+              _order('big', OrderStatus.completed, 24691356,
+                  paid: 24691356, deliveredAt: DateTime(2026, 6, 17, 9)),
+            ],
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
+
+      final tracker = find.ancestor(
+        of: find.text('This month revenue tracker'),
+        matching: find.byType(AppCard),
+      );
+      expect(
+          find.descendant(
+              of: tracker, matching: find.text('USh 24,691,356')),
           findsOneWidget);
     });
   });

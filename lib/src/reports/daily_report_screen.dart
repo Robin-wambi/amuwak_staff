@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 
 import '../expenses/expense.dart';
@@ -7,13 +8,6 @@ import '../expenses/expense_list_extensions.dart';
 import '../orders/order.dart';
 import '../orders/order_filter.dart';
 import '../orders/order_list_extensions.dart';
-import '../orders/order_status.dart';
-import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/theme/app_card.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_radii.dart';
-import '../shared/theme/app_spacing.dart';
-import '../shared/theme/status_colors.dart';
 import 'report_period.dart';
 
 class DailyReportScreen extends StatelessWidget {
@@ -1091,19 +1085,29 @@ class _MonthlyRevenueTrackerCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatUgx(series.totalUgx),
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w800,
+                // Flexible so a large month-to-date total cannot claim more than
+                // its share of the row and shove the title to zero width; the
+                // number then scales down to fit rather than overflowing.
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatUgx(series.totalUgx),
+                          maxLines: 1,
+                          style: textTheme.headlineSmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs / 2),
-                    Text(completedLabel, style: textTheme.bodySmall),
-                  ],
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Text(completedLabel, style: textTheme.bodySmall),
+                    ],
+                  ),
                 ),
               ],
             ),

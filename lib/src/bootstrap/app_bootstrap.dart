@@ -1,9 +1,10 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../data/app_database.dart';
 import '../data/orders_seeder.dart';
-import 'app_config.dart';
 import 'timeout_http_client.dart';
 
 class AppBootstrap {

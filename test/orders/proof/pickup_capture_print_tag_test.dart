@@ -5,12 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof/pickup_capture_screen.dart';
 import 'package:amuwak_staff/src/orders/proof/printable_tag.dart';
 import 'package:amuwak_staff/src/orders/proof/proof_photo_storage.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/printing/label_printer.dart';
 import 'package:amuwak_staff/src/sync/orders_repository.dart';
 import 'package:amuwak_staff/src/sync/proof_events_repository.dart';

@@ -1,10 +1,10 @@
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../dashboard/staff_dashboard_screen.dart';
 import 'login_screen.dart';
-import 'session.dart';
 import 'set_password_screen.dart';
 
 /// Root widget that picks the screen from the auth state:
