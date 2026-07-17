@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/theme/app_spacing.dart';
 import 'pricing_settings.dart';
 
 typedef LoadSettingsFn = Future<PricingSettings> Function();

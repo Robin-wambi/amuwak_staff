@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/theme/app_card.dart';
-import '../../shared/theme/app_colors.dart';
-import '../../shared/theme/app_radii.dart';
-import '../../shared/theme/app_spacing.dart';
-import '../../shared/theme/status_colors.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../order.dart';
-import '../order_status.dart';
 
 /// A single order summary card: customer name, order code + service type,
 /// time/item-count chips, and a status pill. Shared between the dashboard

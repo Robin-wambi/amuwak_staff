@@ -1,5 +1,6 @@
+import 'package:amuwak_core/amuwak_core.dart';
+
 import '../orders/order.dart';
-import '../orders/order_status.dart';
 
 /// How far back a delivered order stays in the summary feed.
 const Duration kDeliveredWindow = Duration(hours: 48);

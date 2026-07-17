@@ -3,9 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../shared/theme/app_spacing.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'order.dart';
-import 'service_type.dart';
 
 typedef SaveOrderFn = Future<void> Function(LaundryOrder updated);
 

@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:amuwak_core/amuwak_core.dart';
-import '../shared/theme/app_spacing.dart';
 import 'catalog_item.dart';
 
 typedef LoadCatalogFn = Future<List<CatalogItem>> Function();

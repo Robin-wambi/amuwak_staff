@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../auth/session.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import '../data/app_database.dart';
 import '../sync/repository_providers.dart';
 

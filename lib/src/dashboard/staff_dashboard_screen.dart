@@ -1,10 +1,10 @@
 import 'dart:developer' as developer;
 
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../auth/session.dart';
 import '../auth/sign_out.dart';
 import 'current_staff_provider.dart';
 import 'dashboard_header_content.dart';
@@ -27,19 +27,11 @@ import '../orders/proof/pickup_capture_screen.dart';
 import '../orders/proof/proof_photo_storage.dart';
 import '../reports/daily_report_screen.dart';
 import '../reports/items_breakdown_screen.dart';
-import '../shared/motion/animated_gradient_header.dart';
-import '../shared/motion/count_up_text.dart';
-import '../shared/motion/reveal_on_mount.dart';
-import '../shared/theme/app_card.dart';
-import '../shared/theme/app_colors.dart';
-import '../shared/theme/app_motion.dart';
-import '../shared/theme/app_spacing.dart';
 import '../pricing/catalog_item.dart';
 import '../pricing/pricing_providers.dart';
 import '../pricing/pricing_settings.dart';
 import '../pricing/pricing_settings_screen.dart';
 import '../pricing/pricing_catalog_screen.dart';
-import 'package:amuwak_core/amuwak_core.dart';
 import '../staff/invite_staff_screen.dart';
 import '../printing/printing_providers.dart';
 import '../sync/repository_providers.dart';

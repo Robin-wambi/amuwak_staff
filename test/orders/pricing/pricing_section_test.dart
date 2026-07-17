@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/pricing/pricing_section.dart';
 import 'package:amuwak_staff/src/pricing/catalog_item.dart';
 

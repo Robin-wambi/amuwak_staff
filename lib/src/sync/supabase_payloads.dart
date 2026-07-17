@@ -1,6 +1,7 @@
+import 'package:amuwak_core/amuwak_core.dart';
+
 import '../data/app_database.dart' show Customer;
 import '../orders/order.dart';
-import '../orders/order_status.dart';
 import '../orders/proof_event.dart';
 
 /// Pure builders for the ONLINE write path: domain model → snake_case Supabase

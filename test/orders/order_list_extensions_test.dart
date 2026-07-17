@@ -2,9 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_list_extensions.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 
 LaundryOrder _orderWith(OrderStatus status, {int items = 1, int totalUgx = 0}) {
   return LaundryOrder(

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 
 void main() {
   group('LineItem', () {

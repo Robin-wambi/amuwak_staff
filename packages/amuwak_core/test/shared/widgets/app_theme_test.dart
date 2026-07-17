@@ -1,8 +1,4 @@
-import 'package:amuwak_staff/src/shared/theme/app_colors.dart';
-import 'package:amuwak_staff/src/shared/theme/app_radii.dart';
-import 'package:amuwak_staff/src/shared/theme/app_typography.dart';
-import 'package:amuwak_staff/src/shared/theme/status_colors.dart';
-import 'package:amuwak_staff/src/shared/widgets/app_theme.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

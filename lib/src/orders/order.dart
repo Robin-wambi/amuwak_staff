@@ -1,10 +1,9 @@
 import 'dart:convert';
 
+import 'package:amuwak_core/amuwak_core.dart';
+
 import '../data/app_database.dart' as drift;
-import 'order_status.dart';
-import 'pricing/line_item.dart';
 import 'proof_event.dart';
-import 'service_type.dart';
 
 class LaundryOrder {
   const LaundryOrder({

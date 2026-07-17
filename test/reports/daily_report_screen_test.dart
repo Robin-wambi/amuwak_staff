@@ -5,12 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:amuwak_staff/src/expenses/expense.dart';
 import 'package:amuwak_staff/src/orders/order.dart';
 import 'package:amuwak_staff/src/orders/order_filter.dart';
-import 'package:amuwak_staff/src/orders/order_status.dart';
-import 'package:amuwak_staff/src/orders/pricing/line_item.dart';
+import 'package:amuwak_core/amuwak_core.dart';
 import 'package:amuwak_staff/src/orders/proof_event.dart';
-import 'package:amuwak_staff/src/orders/service_type.dart';
 import 'package:amuwak_staff/src/reports/daily_report_screen.dart';
-import 'package:amuwak_staff/src/shared/theme/app_card.dart';
 
 // Default spend date is local Wed 2026-06-17 — matches [_fixedNow] so the
 // daily window contains it. Pass [on] to place an expense on another day.
