@@ -5,14 +5,22 @@
 -- (packages/amuwak_core/lib/src/shared/phone.dart) — strip non-digits, drop a
 -- leading 256 country code, then a single leading 0 trunk prefix. Parity is
 -- asserted by a shared test-vector list (Dart side + the sibling pgTAP test).
+-- No SQL caller today (see link_or_create_customer below); kept as the pinned
+-- mirror of the Dart helper and for the deferred phone-claim flow.
 --
--- link_or_create_customer(): on first authenticated session, link the auth user
--- to an existing unowned customers row whose normalised phone matches (so a
--- walk-in/phone customer the shop already created sees their history), else
--- create a new linked customer. SECURITY DEFINER because the lookup must read
--- across ALL customers (a customer cannot SELECT others under RLS) and must run
--- atomically to avoid a double-link race; it only ever claims a row with
--- auth_user_id IS NULL. Idempotent: returns the existing link if already linked.
+-- link_or_create_customer(): on first authenticated session, create a customers
+-- row linked to the caller's auth user. Idempotent: returns the existing link if
+-- already linked. SECURITY DEFINER because a customer has no INSERT privilege on
+-- customers under RLS (customers_write is in_shop/manager only, see 0007).
+--
+-- DELIBERATELY does NOT claim an existing unowned customers row by phone match.
+-- Signup is email+password (0041), so p_phone is unverified caller input: a bare
+-- digit match is not proof of phone ownership, and auto-linking on it would let
+-- anyone who knows a walk-in customer's number inherit that customer's order
+-- history, address and chat. Letting a walk-in see their pre-app history needs
+-- proof of ownership first (phone OTP, or a staff-issued claim code) — deferred
+-- to a follow-up. Until then a returning walk-in starts a fresh customer row and
+-- staff merge it by hand.
 
 CREATE OR REPLACE FUNCTION uganda_national_digits(input text) RETURNS text
 LANGUAGE plpgsql IMMUTABLE
@@ -35,9 +43,8 @@ CREATE OR REPLACE FUNCTION link_or_create_customer(
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public AS $$
 DECLARE
-  v_uid  uuid := auth.uid();
-  v_norm text := uganda_national_digits(p_phone);
-  v_id   uuid;
+  v_uid uuid := auth.uid();
+  v_id  uuid;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'link_or_create_customer requires an authenticated caller';
@@ -51,28 +58,26 @@ BEGIN
     RETURN v_id;
   END IF;
 
-  -- Claim an unowned customer with a matching normalised phone.
-  SELECT id INTO v_id FROM customers
-   WHERE auth_user_id IS NULL
-     AND deleted_at IS NULL
-     AND uganda_national_digits(phone) = v_norm
-   ORDER BY created_at
-   LIMIT 1
-   FOR UPDATE;
-
-  IF v_id IS NOT NULL THEN
-    UPDATE customers
-       SET auth_user_id = v_uid,
-           email        = COALESCE(NULLIF(btrim(p_email), ''), email),
-           updated_at   = now()
-     WHERE id = v_id;
-    RETURN v_id;
-  END IF;
-
-  -- Otherwise create a fresh linked customer.
+  -- Create a fresh linked customer. ON CONFLICT keeps two concurrent
+  -- first-session calls idempotent instead of raising 23505 on
+  -- customers_auth_user_id_key (0041).
   INSERT INTO customers (name, phone, email, auth_user_id)
   VALUES (p_name, p_phone, NULLIF(btrim(p_email), ''), v_uid)
+  ON CONFLICT (auth_user_id) WHERE auth_user_id IS NOT NULL DO NOTHING
   RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    -- Lost the race above, or this auth user is linked to a soft-deleted row.
+    SELECT id INTO v_id FROM customers
+     WHERE auth_user_id = v_uid AND deleted_at IS NULL
+     LIMIT 1;
+  END IF;
+
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION
+      'link_or_create_customer: auth user % is linked to a deleted customer', v_uid;
+  END IF;
+
   RETURN v_id;
 END;
 $$;

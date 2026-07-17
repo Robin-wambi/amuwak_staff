@@ -2,7 +2,7 @@
 BEGIN;
 SET search_path TO extensions, public;
 
-SELECT plan(7);
+SELECT plan(11);
 
 -- Two customers, each linked to an auth user.
 INSERT INTO public.customers (id, name, phone, auth_user_id) VALUES
@@ -96,6 +96,41 @@ PREPARE msg_ok AS
   VALUES ('00000000-0000-0000-0000-00000000b101', 'customer',
           '00000000-0000-0000-0000-00000000c101', 'hello');
 SELECT lives_ok('msg_ok', 'Cust1 can message their own order');
+
+-- ---- A customer may mark a staff reply read, but never rewrite it ----
+-- order_messages_mark_read makes this row updatable by Cust1, but RLS is
+-- row-level only; the column grant in 0046 is what stops the tampering.
+RESET ROLE;
+INSERT INTO public.order_messages (id, order_id, sender_kind, sender_id, body)
+VALUES ('00000000-0000-0000-0000-00000000f101',
+        '00000000-0000-0000-0000-00000000b101', 'staff',
+        '00000000-0000-0000-0000-00000000a001', 'Your order is on the way');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-00000000a101';
+
+PREPARE tamper_body AS
+  UPDATE order_messages SET body = 'Pay 0700000999 instead'
+   WHERE id = '00000000-0000-0000-0000-00000000f101';
+SELECT throws_ok('tamper_body', '42501', NULL,
+  'Cust1 cannot rewrite a staff reply body');
+
+PREPARE tamper_sender AS
+  UPDATE order_messages SET sender_kind = 'customer'
+   WHERE id = '00000000-0000-0000-0000-00000000f101';
+SELECT throws_ok('tamper_sender', '42501', NULL,
+  'Cust1 cannot forge message attribution');
+
+PREPARE mark_read AS
+  UPDATE order_messages SET read_at = now()
+   WHERE id = '00000000-0000-0000-0000-00000000f101';
+SELECT lives_ok('mark_read', 'Cust1 can still mark a staff reply read');
+
+RESET ROLE;
+SELECT is(
+  (SELECT body FROM order_messages
+    WHERE id = '00000000-0000-0000-0000-00000000f101'),
+  'Your order is on the way', 'the staff reply body is unchanged');
 
 SELECT * FROM finish();
 ROLLBACK;

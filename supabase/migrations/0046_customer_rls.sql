@@ -36,6 +36,15 @@ CREATE POLICY orders_customer_insert ON orders FOR INSERT WITH CHECK (
 
 -- order_messages: staff (any active) or the owning customer may read; each side
 -- inserts self-attributed messages on a visible order; either may mark read.
+--
+-- DELIBERATE: staff access here is a bare role check, NOT scoped through
+-- EXISTS(orders) the way status_events_read / proof_events_read are. Those
+-- inherit driver scoping for free (orders_read limits a driver to their assigned
+-- or unassigned orders, and the subquery is itself RLS-filtered). Order chat is
+-- instead a shared support inbox: any active staff member can read and reply on
+-- any order, including one assigned to another driver. That is the intended
+-- product behaviour — do not "fix" this to match the other tables without
+-- changing the support model first.
 CREATE POLICY order_messages_read ON order_messages FOR SELECT USING (
   auth_staff_role() IN ('driver','in_shop','manager')
   OR EXISTS (SELECT 1 FROM orders o
@@ -66,6 +75,16 @@ CREATE POLICY order_messages_mark_read ON order_messages FOR UPDATE
     OR EXISTS (SELECT 1 FROM orders o
                WHERE o.id = order_id AND o.customer_id = auth_customer_id())
   );
+
+-- RLS is row-level only: order_messages_mark_read gates WHICH ROWS a caller may
+-- update, never WHICH COLUMNS. On its own it would let anyone who can see a
+-- message rewrite body / sender_kind / sender_id — a customer could edit a staff
+-- reply's text, or forge attribution — because Supabase's default schema grants
+-- hand table-wide UPDATE to authenticated. Take that back and re-grant only the
+-- column the policy is named for, so the two gates together mean "the right
+-- people may mark the right messages read, and nothing else".
+REVOKE UPDATE ON order_messages FROM anon, authenticated;
+GRANT  UPDATE (read_at) ON order_messages TO authenticated;
 
 -- customers: a customer reads their own profile row (name, phone, custom rate).
 CREATE POLICY customers_self_read ON customers FOR SELECT
