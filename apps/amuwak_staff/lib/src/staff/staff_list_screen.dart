@@ -1,0 +1,157 @@
+import 'package:amuwak_core/amuwak_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../dashboard/dashboard_header_content.dart'; // roleLabel
+import '../data/app_database.dart';
+import 'reset_staff_mfa_service.dart';
+
+/// Managers-only list of staff, whose one action is clearing a lost
+/// authenticator. RLS already allows this read: `staff_self_read` (migration
+/// 0007) lets a manager select every staff row.
+///
+/// It deliberately does NOT show whether each person has two-factor on. Factor
+/// status is admin-only data, so displaying it would mean a second privileged
+/// endpoint for something cosmetic. The reset is idempotent instead and reports
+/// what it actually did.
+///
+/// Dependencies arrive as parameters rather than through providers, matching
+/// [InviteStaffScreen], so the widget test never touches Supabase.
+class StaffListScreen extends ConsumerStatefulWidget {
+  const StaffListScreen({
+    super.key,
+    required this.staff,
+    required this.onReset,
+    required this.currentStaffId,
+  });
+
+  /// A factory rather than a stream, so Retry can genuinely re-subscribe. A
+  /// bare Stream cannot be re-listened to once it has errored, which would make
+  /// the retry button a lie.
+  final Stream<List<StaffData>> Function() staff;
+  final ResetStaffMfaFn onReset;
+
+  /// Used to hide the reset action on the manager's own row. The server refuses
+  /// a self-reset anyway; hiding it avoids walking them into a certain error.
+  final String currentStaffId;
+
+  @override
+  ConsumerState<StaffListScreen> createState() => _StaffListScreenState();
+}
+
+class _StaffListScreenState extends ConsumerState<StaffListScreen> {
+  /// Bumped by Retry. Used as the StreamBuilder's key so a new subscription is
+  /// created rather than the failed one being reused.
+  int _attempt = 0;
+
+  Future<void> _confirmAndReset(StaffData member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset two-factor?'),
+        // Deliberately not "signed out everywhere": deleteFactor's cascade is
+        // scoped to sessions elevated by the deleted factor, and when they have
+        // no factor enrolled nothing happens to their sessions at all. The
+        // runbook was softened for the same reason in 719e195.
+        content: Text(
+          '${member.displayName} will sign in with just their password and be '
+          'asked to set up a new authenticator.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Reset two-factor'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final cleared = await widget.onReset(staffId: member.id);
+      messenger.showSnackBar(SnackBar(
+        content: Text(cleared == 0
+            ? '${member.displayName} had no two-factor set up.'
+            : 'Cleared two-factor for ${member.displayName}.'),
+      ));
+    } on ResetMfaFailure catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Could not reset their two-factor. Please try again.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Staff')),
+      body: StreamBuilder<List<StaffData>>(
+        key: ValueKey(_attempt),
+        stream: widget.staff(),
+        builder: (context, snapshot) {
+          // An RLS rejection or a dropped connection leaves data null AND
+          // hasError true. Without this branch the screen spins forever with no
+          // message and no way out — the failure a manager on a poor network
+          // actually hits.
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Could not load staff. Please try again.'),
+                  const SizedBox(height: AppSpacing.md),
+                  TextButton(
+                    onPressed: () => setState(() => _attempt++),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+          final members = snapshot.data;
+          if (members == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            itemCount: members.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (context, i) {
+              final member = members[i];
+              final isSelf = member.id == widget.currentStaffId;
+              return AppCard(
+                onTap: isSelf ? null : () => _confirmAndReset(member),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(member.displayName),
+                          Text(
+                            roleLabel(member.role) ?? member.role,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isSelf) const Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

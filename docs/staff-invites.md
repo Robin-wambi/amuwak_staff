@@ -72,3 +72,57 @@ These cannot be done from app code — an operator must run them:
 3. Sign out → **Forgot password?** → complete the reset → sign in again.
 4. Negative: a non-manager calling the function is rejected (403); a duplicate
    username/email returns a clear error.
+
+## Recovering a staff member who lost their authenticator
+
+Any active manager can do this from the app: **Account → Staff**, tap the
+person, confirm. Clearing the factor ends the sessions that were elevated by
+it; in practice, the target signs in again with their password alone and is
+prompted to enrol a new authenticator (the exact session behaviour is
+confirmed by the function's manual deployment check, not by anything in this
+repo).
+
+Managers can reset each other, which is why the database requires at least two
+active managers (migration 0054). Nobody can reset themselves.
+
+A manager who has enrolled their own TOTP must complete their own two-factor
+check (be at `aal2`) before they can clear someone else's — if you're a
+manager sitting at `aal1` with a factor already enrolled, you'll see "Complete
+your own two-factor check first." This is deliberate: without it, a stolen
+password alone would be enough to disable MFA on any account.
+
+**If you are down to one manager**, no one in the app can unlock them. Recover
+from the Supabase dashboard: Authentication → Users → the user → remove the MFA
+factor. Avoid this situation by keeping a second manager. Note the database will
+refuse to demote, deactivate or delete a manager that would leave fewer than
+two — promote a replacement first.
+
+Note the in-app way to add a manager is to **invite** one with the `manager`
+role — role changes are not editable from the app.
+
+**Deploying, in this order:**
+
+```bash
+supabase db push                              # 0054, 0055
+supabase functions deploy reset-staff-mfa
+# then merge — the staff app auto-deploys on push to main
+```
+
+Order matters. If the function goes out before the migrations, every reset
+still returns success but writes no audit row, because `mfa_reset_audit` does
+not exist yet — and that failure is only logged server-side, where nobody is
+watching.
+
+No extra secrets: it uses the `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+that Supabase injects automatically.
+
+**Reading the audit log.** Every reset is recorded. Managers can query it:
+
+```sql
+select a.created_at, actor.display_name as cleared_by,
+       target.display_name as cleared_for, a.factors_cleared
+  from mfa_reset_audit a
+  join staff actor  on actor.id  = a.actor_staff_id
+  join staff target on target.id = a.target_staff_id
+ order by a.created_at desc;
+```
