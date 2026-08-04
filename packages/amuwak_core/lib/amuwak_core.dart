@@ -41,5 +41,6 @@ export 'src/pricing/cart_estimate.dart';
 
 export 'src/auth/auth_service.dart';
 export 'src/auth/recovery_intent_store.dart';
+export 'src/auth/recovery_link.dart';
 export 'src/auth/session.dart';
 export 'src/bootstrap/app_config.dart';
